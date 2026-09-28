@@ -26,7 +26,7 @@ first.**
 | 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | **disassembly done** ([rom-disassembly/](rom-disassembly/README.md): machine code, POST catalogues, Forth dictionaries, device trees, FCode); CPU suite: ISA tests + Swift MMU registers done, more POST-derived hardware tests to lift (1f) |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done in the tree, not yet built**: needs an A&S and a fit for both revisions on the Quartus machine, then a hardware boot |
-| 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | in progress: `docs/impl-gaps/{cpu,chipset,video-audio-glue}.md`, summarised into `IMPLEMENTATION_GAPS.md` |
+| 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
 | 5 | Execute: fix gaps in priority order (HPS Ethernet first) | not started |
 | 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | not started |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
@@ -420,8 +420,8 @@ Expected order, subject to the gap reports:
    S6 (CUE/BIN/CHD, CD audio) needs a `support/sparc/` in Main. Its §6
    lists nine open questions for the user.
 1. **Boot the real Sun OBP** (user, 2026-09-28), SS5 first, then SS20.
-   Design: `docs/design/sun-obp-boot.md` (to be written from the phase 1
-   ROM analyses and the phase 4 audits). What is already known:
+   Plan: [design/sun-obp-boot.md](design/sun-obp-boot.md), milestones M1-M10
+   (SS5) and S1-S8 (SS20), each with its blocker, the change and a test. What is already known:
    - QEMU boots the SS5 OBP 2.15 to `ok`, so its sun4m model shows what
      the PROM needs.
    - Known blockers on the core:
