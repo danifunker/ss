@@ -639,6 +639,9 @@ now also clears RAM (G2). §6 covers what it means for the mount state.
 
 ## 6. Keyboard, mouse, serial, debug port
 
+> The full audit of this area is in [keyboard-mouse-serial.md](keyboard-mouse-serial.md)
+> (it arrived after this document was written); what follows is the partial first pass.
+
 **Status: incomplete.** A separate keyboard, mouse, ESCC and debug-port
 audit was still running when this file was written, and its results are not
 in here. This section holds only what this audit checked itself, plus the
