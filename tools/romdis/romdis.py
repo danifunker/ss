@@ -74,6 +74,10 @@ class Rom:
             self.regions.append((num(r["start"]), num(r["end"]),
                                  r["type"], r.get("name", "")))
         self.regions.sort()
+        # optional region keys: "format": "w16" prints halfwords (token
+        # threaded Forth, see obpforth.py); "banner": false drops the banner
+        self.region_opt = {(num(r["start"]), num(r["end"])): r
+                           for r in cfg.get("regions", [])}
         self.noreturn = {num(a) for a in cfg.get("noreturn", [])}
         # virtual windows onto the image: (vbase, size, rom address,
         # flow-only). A flow-only alias (e.g. a boot-mode fetch window at
@@ -323,7 +327,7 @@ class Rom:
         if s is not None:
             self.strings[c] = s
             self.xref(c, pc, "str")
-            self.note(pc, f"= 0x{v:08x}{via} \"{s[:60]}\"")
+            self.note(pc, f"= 0x{v:08x}{via} \"{esc(s[:60])}\"")
             return
         if self.inrom(c) and c & 3 == 0 and c != self.base:
             self.note(pc, f"= 0x{v:08x}{via or ' (ROM)'}")
@@ -342,7 +346,7 @@ class Rom:
             via = "" if c == ea else f" = ROM 0x{c:08x}"
             s = self.cstring(c)
             if s is not None:
-                self.note(pc, f"[0x{ea:08x}]{via} \"{s[:40]}\"")
+                self.note(pc, f"[0x{ea:08x}]{via} \"{esc(s[:40])}\"")
             else:
                 self.note(pc, f"[0x{ea:08x}]{via or ' (ROM)'}")
             self.xref(c, pc, "load")
@@ -385,7 +389,8 @@ class Rom:
         while a < self.end:
             r = self.region_at(a)
             if r != cur_region:
-                if r:
+                if r and self.region_opt.get((r[0], r[1]), {}).get(
+                        "banner", True):
                     w(f"\n!{'=' * 70}\n! region {r[2]}: {r[3]} "
                       f"0x{r[0]:08x}-0x{r[1]:08x}\n!{'=' * 70}\n")
                 cur_region = r
@@ -429,6 +434,9 @@ class Rom:
                 w(f"  ! {self.comments[a]}")
             w("\n")
             return a + ln
+        if region is not None and self.region_opt.get(
+                (region[0], region[1]), {}).get("format") == "w16":
+            return self.emit_w16(out, a, region)
         # up to 4 words per line, stopping at the next label/code/region
         # boundary, the next string or the end
         o = a - self.base
@@ -466,6 +474,38 @@ class Rom:
                 for i, (_, v) in enumerate(words)))
         line = f"{line:<64} ! {asc}" + (" ; " + "; ".join(c) if c else "")
         w(line + "\n")
+        return b
+
+    def emit_w16(self, out, a, region):
+        """Up to 8 halfwords per line (a "w16" region: 16-bit Forth
+        tokens); an odd start gets a single .byte."""
+        b = a
+        vals = []
+        if a & 1:
+            vals.append(("b", self.data[a - self.base]))
+            b += 1
+        else:
+            while b + 2 <= self.end and len(vals) < 8:
+                if b != a and (self.name(b) or self.kind.get(b) or
+                               b in self.blocks or b in self.comments or
+                               self.region_at(b) != region):
+                    break
+                vals.append(("h", int.from_bytes(
+                    self.data[b - self.base:b - self.base + 2], "big")))
+                b += 2
+            if not vals:
+                vals.append(("b", self.data[a - self.base]))
+                b = a + 1
+        txt = " ".join(f"0x{v:04x}" if t == "h" else f"0x{v:02x}"
+                       for t, v in vals)
+        raw = self.data[a - self.base:b - self.base]
+        asc = "".join(chr(c) if 32 <= c < 127 else "." for c in raw)
+        d = ".half" if vals[0][0] == "h" else ".byte"
+        line = f"{a:08x}: {d:<9} {txt}"
+        line = f"{line:<64} ! {asc}"
+        if a in self.comments:
+            line += " ; " + self.comments[a]
+        out.write(line + "\n")
         return b
 
     def db(self):
