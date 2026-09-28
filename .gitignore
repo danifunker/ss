@@ -41,3 +41,9 @@ c5_pin_model_dump.txt
 
 scratch/
 __pycache__/
+
+# scripts/local.env holds this machine's MiSTer address and paths; only the
+# sample is committed. Also catches local.env.bak-* and similar copies.
+scripts/local.env*
+!scripts/local.env.sample
+build_*.log
