@@ -2906,7 +2906,7 @@ PPORT Slave test.
   "<<<*** CHECK ETHERNET EXTERNAL LOOPBACK CONNECTOR ***>>>" (external only; the receive path
   also calls `sub_1ba6c`, which sets `%g3 = 1`), "Error in receive buffer: asi %1 addr %2,
   exp %3, obs %4".
-- **Core**: unknown. `ts_lance` has LOOP (`lopo`) and `ts_iommu` exists, but the arbiter
+- **Core**: unknown. `ts_lance` declares LOOP (`lopo`) but never uses it, so there is no loopback (corrected by [impl-gaps/chipset.md](../../impl-gaps/chipset.md) LAN-1), and `ts_iommu` exists, but the arbiter
   register (0x1008) is not implemented.
 
 #### Name strings with no code ("name string only")
