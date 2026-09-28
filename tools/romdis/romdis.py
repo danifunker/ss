@@ -11,6 +11,7 @@ about it; the tool never needs the image to be in the repository:
   "profile": "ss5",                            # sun4m.PROFILES key
   "base":    "0x70000000",                     # link address of offset 0
   "trap_table": true,                          # seed the 256 trap vectors
+  "trap_tables": {"0x70001000": "tt1"},        # more tables, label prefix
   "entries": {"0x70001000": "name", ...},      # extra code entry points
   "labels":  {"0x70001234": "name", ...},      # names for any address
   "comments":{"0x70001234": "text", ...},      # end-of-line comments
@@ -19,8 +20,13 @@ about it; the tool never needs the image to be in the repository:
                forth|fcode|pad|code", "name": "..."} ],
   "noreturn":["0x7000abcd"],                   # calls that never return
   "jumptables": [ {"at": "0x...", "count": N} ], # tables of code addrs
-  "include": ["forth.json"]                    # merged configs (generated
-}                                              #  by other tools)
+  "include": ["forth.json"],                   # merged configs (generated
+                                               #  by other tools)
+  "aliases": [ {"base": "0xffd00000",          # other addresses the image
+                "size": "0x40000"} ]           #  runs at (MMU mappings);
+}                                              #  optional "offset" into ROM,
+                                               #  "flow": true = only for
+                                               #  jump/call targets
 
 Code is found by following control flow from the entries: branches, calls,
 constant jmpl targets (sethi/or pairs are tracked), delay slots, annulled
@@ -69,12 +75,30 @@ class Rom:
                                  r["type"], r.get("name", "")))
         self.regions.sort()
         self.noreturn = {num(a) for a in cfg.get("noreturn", [])}
+        # virtual windows onto the image: (vbase, size, rom address,
+        # flow-only). A flow-only alias (e.g. a boot-mode fetch window at
+        # 0) is applied to jump/call targets but not to data constants.
+        self.aliases = [(num(x["base"]), num(x.get("size", len(self.data))),
+                         self.base + num(x.get("offset", 0)),
+                         bool(x.get("flow", False)))
+                        for x in cfg.get("aliases", [])]
         self.funcs = set()
         self.strings = {}       # addr -> str, strings referenced by code
 
     # ------------------------------------------------------------ helpers
     def inrom(self, a):
         return self.base <= a < self.end
+
+    def canon(self, a, flow=False):
+        """Map an address in one of the configured aliases (for example the
+        ROM's virtual mapping) to the ROM address it shows; others pass.
+        flow=True also applies the flow-only aliases."""
+        if self.inrom(a):
+            return a
+        for vb, sz, rb, fo in self.aliases:
+            if vb <= a < vb + sz and (flow or not fo):
+                return rb + (a - vb)
+        return a
 
     def word(self, a):
         o = a - self.base
@@ -119,18 +143,32 @@ class Rom:
                 a = self.base + tt * 16
                 work.append(a)
                 self.labels.setdefault(a, f"trap_{tt:02x}")
+        # further trap tables (a ROM may hold several copies, e.g. for
+        # different %tbr settings): {"0x1000": "tt1"} labels tt1_XX
+        for k, pfx in self.cfg.get("trap_tables", {}).items():
+            for tt in range(256):
+                a = num(k) + tt * 16
+                work.append(a)
+                self.labels.setdefault(a, f"{pfx}_{tt:02x}")
+        late = []
         for k, v in self.cfg.get("entries", {}).items():
             a = num(k)
-            work.append(a)
             if v:
+                work.append(a)
                 self.labels.setdefault(a, v)
+            else:
+                late.append(a)
         for jt in self.cfg.get("jumptables", []):
             at, n = num(jt["at"]), int(jt["count"])
             for i in range(n):
-                t = self.word(at + 4 * i)
+                t = self.canon(self.word(at + 4 * i), flow=True)
                 if self.inrom(t):
                     work.append(t)
                     self.xref(t, at + 4 * i, "table")
+        # anonymous entries (e.g. every pc of an execution trace) are walked
+        # last, so the flow from the real entry points - which carries the
+        # sethi/or constants - decodes each instruction first
+        work = late[::-1] + work
         seen_entry = set()
         while work:
             a = work.pop()
@@ -195,6 +233,10 @@ class Rom:
                 self.note(ins.pc, "indirect jump, target unknown")
             return
         kind = "call" if ins.is_call else "jmp" if ins.is_jmpl else "br"
+        if not self.inrom(tgt) and self.inrom(self.canon(tgt, flow=True)):
+            self.note(ins.pc, f"{kind} to 0x{tgt:08x} = ROM "
+                      f"0x{self.canon(tgt, flow=True):08x}")
+            tgt = self.canon(tgt, flow=True)
         if self.inrom(tgt):
             self.xref(tgt, ins.pc, kind)
             work.append(tgt)
@@ -275,15 +317,17 @@ class Rom:
             regs.pop(rd, None)
 
     def const_note(self, pc, v):
-        s = self.cstring(v)
+        c = self.canon(v)
+        via = "" if c == v else f" = ROM 0x{c:08x}"
+        s = self.cstring(c)
         if s is not None:
-            self.strings[v] = s
-            self.xref(v, pc, "str")
-            self.note(pc, f"= 0x{v:08x} \"{s[:60]}\"")
+            self.strings[c] = s
+            self.xref(c, pc, "str")
+            self.note(pc, f"= 0x{v:08x}{via} \"{s[:60]}\"")
             return
-        if self.inrom(v) and v & 3 == 0 and v != self.base:
-            self.note(pc, f"= 0x{v:08x} (ROM)")
-            self.xref(v, pc, "addr")
+        if self.inrom(c) and c & 3 == 0 and c != self.base:
+            self.note(pc, f"= 0x{v:08x}{via or ' (ROM)'}")
+            self.xref(c, pc, "addr")
             return
         if v >= 0x10000:
             dev, off = sun4m.device(self.profile, v)
@@ -293,13 +337,15 @@ class Rom:
                 self.note(pc, f"= 0x{v:08x}")
 
     def addr_note(self, pc, ea):
-        if self.inrom(ea):
-            s = self.cstring(ea)
+        c = self.canon(ea)
+        if self.inrom(c):
+            via = "" if c == ea else f" = ROM 0x{c:08x}"
+            s = self.cstring(c)
             if s is not None:
-                self.note(pc, f"[0x{ea:08x}] \"{s[:40]}\"")
+                self.note(pc, f"[0x{ea:08x}]{via} \"{s[:40]}\"")
             else:
-                self.note(pc, f"[0x{ea:08x}] (ROM)")
-            self.xref(ea, pc, "load")
+                self.note(pc, f"[0x{ea:08x}]{via or ' (ROM)'}")
+            self.xref(c, pc, "load")
             return
         dev, off = sun4m.device(self.profile, ea)
         if dev and dev != "RAM":
