@@ -41221,6 +41221,8 @@ L_0002755c:                              ! xref 00027520b 0002752cb
 !======================================================================
 ! region fcode: FCode image: DBRI (audio/ISDN) probe, 0x13c bytes 0x000299a0-0x00029adc
 !======================================================================
+
+fcode_dbri_regs_pa:
 000299a0: .word     0xf103598f 0x0000013c 0x10000100 0x00b60c64  ! ..Y....<.......d
 000299b0: .word     0x6272692d 0x72656773 0x2d706108 0x00ba1000  ! bri-regs-pa.....
 000299c0: .word     0x001000b6 0x0c646272 0x692d7072 0x6f6d2d70  ! .....dbri-prom-p
@@ -41250,6 +41252,8 @@ L_0002755c:                              ! xref 00027520b 0002752cb
 !======================================================================
 ! region fcode: FCode image: on-board SBus slot f (espdma/esp, ledma/le, bpp), 0x4ba0 bytes 0x00029ae0-0x0002e680
 !======================================================================
+
+fcode_espdma:
 00029ae0: .word     0xf103ca72 0x00004ba0 0xb50800b7 0x01030102  ! ...r..K.........
 00029af0: .word     0x011fc301 0x02c30103 0xc2b50801 0xb7010301  ! ................
 00029b00: .word     0x020127c3 0x0102c301 0x03c21000 0x000026b6  ! ..'...........&.
@@ -42464,6 +42468,8 @@ L_0002755c:                              ! xref 00027520b 0002752cb
 !======================================================================
 ! region fcode: FCode image: cgfourteen (SX/VSIMM frame buffer), 0xc3bc bytes 0x0002e680-0x0003aa3c
 !======================================================================
+
+fcode_cgfourteen:
 0002e680: .word     0xf10397f7 0x0000c3bc 0x120a6367 0x666f7572  ! ..........cgfour
 0002e690: .word     0x7465656e 0x02011207 0x64697370 0x6c617901  ! teen....display.
 0002e6a0: .word     0x1a0102b6 0x10667261 0x6d652d62 0x75662d6f  ! .....frame-buf-o
@@ -46823,7 +46829,7 @@ c_print_number:                          ! xref 0003d91cc 0003d950c
 0003d904: 90100019  mov       %i1, %o0
 0003d908: 92100018  mov       %i0, %o1
 0003d90c: 9607bff8  add       %fp, -0x8, %o3
-0003d910: 400093e4  call      sub_000628a0
+0003d910: 400093e4  call      f_ffd628a0
 0003d914: 9407bffc  add       %fp, -0x4, %o2
 0003d918: d007bffc  ld        [%fp - 4], %o0
 0003d91c: 7ffffff7  call      c_print_number
@@ -46831,7 +46837,7 @@ c_print_number:                          ! xref 0003d91cc 0003d950c
 0003d924: d007bff8  ld        [%fp - 8], %o0
 0003d928: 133ff4f6  sethi     %hi(0xffd3d800), %o1
 0003d92c: 921262e8  or        %o1, 0x2e8, %o1                    ! = 0xffd3dae8 = ROM 0x0003dae8 "0123456789abcdefghijklmnopqrstuvwxyz"
-0003d930: 40009f29  call      sub_000655d4
+0003d930: 40009f29  call      f_ffd655d4
 0003d934: d04a0009  ldsb      [%o0 + %o1], %o0
 
 L_0003d938:                              ! xref 0003d900b
@@ -46849,7 +46855,7 @@ c_print_number_base:                     ! xref 0003d9a0c 0003d9b8c 0003d9d0c 00
 0003d95c: 01000000  nop
 
 L_0003d960:                              ! xref 0003d948b
-0003d960: 40009f1d  call      sub_000655d4
+0003d960: 40009f1d  call      f_ffd655d4
 0003d964: 90102030  mov       0x30, %o0                          ! = 0x00000030 (ROM)
 
 L_0003d968:                              ! xref 0003d958b
@@ -46923,7 +46929,7 @@ L_0003da28:                              ! xref 0003da40b
 0003da2c: 80900008  tst       %o0
 0003da30: 22800026  be,a      L_0003dac8
 0003da34: ba10001a  mov       %i2, %i5
-0003da38: 40009ee7  call      sub_000655d4
+0003da38: 40009ee7  call      f_ffd655d4
 0003da3c: 01000000  nop
 0003da40: 10bffffa  ba        L_0003da28
 0003da44: d04f4000  ldsb      [%i5], %o0
@@ -46948,7 +46954,7 @@ L_0003da48:                              ! xref 0003dab4b
 0003da88: 80a22078  cmp       %o0, 0x78
 0003da8c: 22bfffc4  be,a      L_0003d99c
 0003da90: d006c000  ld        [%i3], %o0
-0003da94: 40009ed0  call      sub_000655d4
+0003da94: 40009ed0  call      f_ffd655d4
 0003da98: 9010001d  mov       %i5, %o0
 0003da9c: ba10001a  mov       %i2, %i5
 0003daa0: fa4f4000  ldsb      [%i5], %i5
@@ -46962,7 +46968,7 @@ L_0003dab4:                              ! xref 0003dad4b
 0003dab8: ba10001a  mov       %i2, %i5
 
 L_0003dabc:                              ! xref 0003da14b
-0003dabc: 40009ec6  call      sub_000655d4
+0003dabc: 40009ec6  call      f_ffd655d4
 0003dac0: 9010001d  mov       %i5, %o0
 
 L_0003dac4:                              ! xref 0003d994b 0003d9a8b 0003d9c0b 0003d9d8b 0003d9f0b 0003da08b
@@ -47411,7 +47417,7 @@ L_0003e0b0:                              ! xref 0003e0c8b
 L_0003e0d0:                              ! xref 0003e0a8b
 0003e0d0: 113ffbc8  sethi     %hi(0xffef2000), %o0
 0003e0d4: 90122060  or        %o0, 0x60, %o0                     ! = 0xffef2060
-0003e0d8: 4000a06d  call      sub_0006628c
+0003e0d8: 4000a06d  call      f_ffd6628c
 0003e0dc: c02f0008  clrb      [%i4 + %o0]                        ! [0xffef2061]
 0003e0e0: 7ffffd8a  call      romvec_exit
 0003e0e4: 01000000  nop
@@ -47449,7 +47455,7 @@ romvec_fortheval:                        ! xref 0003d5fct
 0003e14c: 9410001a  mov       %i2, %o2
 0003e150: 9610001b  mov       %i3, %o3
 0003e154: 9810001c  mov       %i4, %o4
-0003e158: 4000a271  call      sub_00066b1c
+0003e158: 4000a271  call      f_ffd66b1c
 0003e15c: 9a10001d  mov       %i5, %o5
 0003e160: 7ffffd6a  call      romvec_exit
 0003e164: b0100008  mov       %o0, %i0
@@ -47460,7 +47466,7 @@ romvec_v2_inst2pkg:                      ! xref 0003d618t
 0003e170: 9de3bfa0  save      %sp, -0x60, %sp
 0003e174: 7ffffd49  call      romvec_enter
 0003e178: 01000000  nop
-0003e17c: 40004780  call      sub_0004ff7c
+0003e17c: 40004780  call      f_ffd4ff7c
 0003e180: 90100018  mov       %i0, %o0
 0003e184: 7ffffd61  call      romvec_exit
 0003e188: b0100008  mov       %o0, %i0
@@ -47472,7 +47478,7 @@ romvec_v2_mem_alloc:                     ! xref 0003d61ct
 0003e198: 7ffffd40  call      romvec_enter
 0003e19c: 01000000  nop
 0003e1a0: 90100018  mov       %i0, %o0
-0003e1a4: 40006824  call      sub_00058234
+0003e1a4: 40006824  call      f_ffd58234
 0003e1a8: 92100019  mov       %i1, %o1
 0003e1ac: 7ffffd57  call      romvec_exit
 0003e1b0: b0100008  mov       %o0, %i0
@@ -47485,7 +47491,7 @@ romvec_filler0_func:                     ! xref 0003d648t
 0003e1c4: 01000000  nop
 0003e1c8: 90100018  mov       %i0, %o0
 0003e1cc: 92100019  mov       %i1, %o1
-0003e1d0: 4000685d  call      sub_00058344
+0003e1d0: 4000685d  call      f_ffd58344
 0003e1d4: 9410001a  mov       %i2, %o2
 0003e1d8: 7ffffd4c  call      romvec_exit
 0003e1dc: b0100008  mov       %o0, %i0
@@ -47497,7 +47503,7 @@ romvec_v2_mem_free:                      ! xref 0003d620t
 0003e1ec: 7ffffd2b  call      romvec_enter
 0003e1f0: 01000000  nop
 0003e1f4: 90100018  mov       %i0, %o0
-0003e1f8: 40006818  call      sub_00058258
+0003e1f8: 40006818  call      f_ffd58258
 0003e1fc: 92100019  mov       %i1, %o1
 0003e200: 7ffffd42  call      romvec_exit
 0003e204: 01000000  nop
@@ -47511,7 +47517,7 @@ romvec_v2_mmap:                          ! xref 0003d624t
 0003e21c: 90100018  mov       %i0, %o0
 0003e220: 92100019  mov       %i1, %o1
 0003e224: 9410001a  mov       %i2, %o2
-0003e228: 400067d3  call      sub_00058174
+0003e228: 400067d3  call      f_ffd58174
 0003e22c: 9610001b  mov       %i3, %o3
 0003e230: 7ffffd36  call      romvec_exit
 0003e234: b0100008  mov       %o0, %i0
@@ -47523,7 +47529,7 @@ romvec_v2_munmap:                        ! xref 0003d628t
 0003e244: 7ffffd15  call      romvec_enter
 0003e248: 01000000  nop
 0003e24c: 90100018  mov       %i0, %o0
-0003e250: 400067d2  call      sub_00058198
+0003e250: 400067d2  call      f_ffd58198
 0003e254: 92100019  mov       %i1, %o1
 0003e258: 7ffffd2c  call      romvec_exit
 0003e25c: 01000000  nop
@@ -47534,7 +47540,7 @@ romvec_v2_dev_open:                      ! xref 0003d62ct
 0003e268: 9de3bfa0  save      %sp, -0x60, %sp
 0003e26c: 7ffffd0b  call      romvec_enter
 0003e270: 01000000  nop
-0003e274: 400049c3  call      sub_00050980
+0003e274: 400049c3  call      f_ffd50980
 0003e278: 90100018  mov       %i0, %o0
 0003e27c: 7ffffd23  call      romvec_exit
 0003e280: b0100008  mov       %o0, %i0
@@ -47545,7 +47551,7 @@ romvec_v2_dev_close:                     ! xref 0003d630t
 0003e28c: 9de3bfa0  save      %sp, -0x60, %sp
 0003e290: 7ffffd02  call      romvec_enter
 0003e294: 01000000  nop
-0003e298: 400049be  call      sub_00050990
+0003e298: 400049be  call      f_ffd50990
 0003e29c: 90100018  mov       %i0, %o0
 0003e2a0: 7ffffd1a  call      romvec_exit
 0003e2a4: b0100008  mov       %o0, %i0
@@ -47558,7 +47564,7 @@ romvec_v2_dev_read:                      ! xref 0003d634t
 0003e2b8: 01000000  nop
 0003e2bc: 90100018  mov       %i0, %o0
 0003e2c0: 92100019  mov       %i1, %o1
-0003e2c4: 400049b7  call      sub_000509a0
+0003e2c4: 400049b7  call      f_ffd509a0
 0003e2c8: 9410001a  mov       %i2, %o2
 0003e2cc: 7ffffd0f  call      romvec_exit
 0003e2d0: b0100008  mov       %o0, %i0
@@ -47571,7 +47577,7 @@ romvec_v2_dev_write:                     ! xref 0003d638t
 0003e2e4: 01000000  nop
 0003e2e8: 90100018  mov       %i0, %o0
 0003e2ec: 92100019  mov       %i1, %o1
-0003e2f0: 400049b0  call      sub_000509b0
+0003e2f0: 400049b0  call      f_ffd509b0
 0003e2f4: 9410001a  mov       %i2, %o2
 0003e2f8: 7ffffd04  call      romvec_exit
 0003e2fc: b0100008  mov       %o0, %i0
@@ -47584,7 +47590,7 @@ romvec_v2_dev_seek:                      ! xref 0003d63ct
 0003e310: 01000000  nop
 0003e314: 90100018  mov       %i0, %o0
 0003e318: 92100019  mov       %i1, %o1
-0003e31c: 400049a9  call      sub_000509c0
+0003e31c: 400049a9  call      f_ffd509c0
 0003e320: 9410001a  mov       %i2, %o2
 0003e324: 7ffffcf9  call      romvec_exit
 0003e328: b0100008  mov       %o0, %i0
@@ -47599,7 +47605,7 @@ romvec_v2_wheee2:                        ! xref 0003d640t
 0003e344: 92100019  mov       %i1, %o1
 0003e348: 9410001a  mov       %i2, %o2
 0003e34c: 9610001b  mov       %i3, %o3
-0003e350: 40009e57  call      sub_00065cac
+0003e350: 40009e57  call      f_ffd65cac
 0003e354: 9810001c  mov       %i4, %o4
 0003e358: 7ffffcec  call      romvec_exit
 0003e35c: 01000000  nop
@@ -47611,7 +47617,7 @@ romvec_v2_wheee3:                        ! xref 0003d644t
 0003e36c: 7ffffccb  call      romvec_enter
 0003e370: 01000000  nop
 0003e374: 90100018  mov       %i0, %o0
-0003e378: 400067c4  call      sub_00058288
+0003e378: 400067c4  call      f_ffd58288
 0003e37c: 92100019  mov       %i1, %o1
 0003e380: 7ffffce2  call      romvec_exit
 0003e384: 01000000  nop
@@ -47622,7 +47628,7 @@ romvec_no_nextnode:                      ! xref 0003d568t
 0003e390: 9de3bfa0  save      %sp, -0x60, %sp
 0003e394: 7ffffcc1  call      romvec_enter
 0003e398: 01000000  nop
-0003e39c: 40004599  call      sub_0004fa00
+0003e39c: 40004599  call      f_ffd4fa00
 0003e3a0: 90100018  mov       %i0, %o0
 0003e3a4: 7ffffcd9  call      romvec_exit
 0003e3a8: b0100008  mov       %o0, %i0
@@ -47633,7 +47639,7 @@ romvec_no_child:                         ! xref 0003d56ct
 0003e3b4: 9de3bfa0  save      %sp, -0x60, %sp
 0003e3b8: 7ffffcb8  call      romvec_enter
 0003e3bc: 01000000  nop
-0003e3c0: 40004570  call      sub_0004f980
+0003e3c0: 40004570  call      f_ffd4f980
 0003e3c4: 90100018  mov       %i0, %o0
 0003e3c8: 7ffffcd0  call      romvec_exit
 0003e3cc: b0100008  mov       %o0, %i0
@@ -47780,7 +47786,7 @@ L_0003e544:                              ! xref 0003e534b
 !======================================================================
 
 fw_origin:
-0003e600: 30801d45  ba,a      fw_cold
+0003e600: 30801d45  ba,a      fw_ffd45b10
 0003e604: .word     0x01000000 0x01000000 0x01000000             ! ............
 
 fw_docode:
@@ -47859,7 +47865,7 @@ fw_do2constant:
 0003e708: 81c0e000  jmp       %g3                                ! indirect jump, target unknown
 0003e70c: 88040004  add       %l0, %g4, %g4
 
-fw_dodoes:                               ! xref 00043720c 00043ad0c 00046250c 00046cb0c 00046d80c 00046db0c 00048520c 000489c0c (+39)
+fw_dodoes:                               ! xref 00043720c 00043ad0c 00046250c 00046cb0c 00046d80c 00046db0c 00048520c 000489c0c (+43)
 0003e710: c8200007  st        %g4, [%g7]
 0003e714: 88046002  add       %l1, 2, %g4
 0003e718: 8c21a004  sub       %g6, 4, %g6
@@ -53951,77 +53957,77 @@ fw_code_ffd44770:
 f_eof:
 00044790: .half     0x000c 0xffff 0xffff 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd447a0)  (token 0x061a, VA ffd447a0)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd447a0)  (token 0x061a, VA ffd447a0)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd447a0:
 000447a0: .half     0x0617 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd447b0)  (token 0x061b, VA ffd447b0)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd447b0)  (token 0x061b, VA ffd447b0)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd447b0:
 000447b0: .half     0x0617 0x0004 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd447c0)  (token 0x061c, VA ffd447c0)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd447c0)  (token 0x061c, VA ffd447c0)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd447c0:
 000447c0: .half     0x0617 0x0008 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd447d0)  (token 0x061d, VA ffd447d0)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd447d0)  (token 0x061d, VA ffd447d0)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd447d0:
 000447d0: .half     0x0617 0x000c 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd447e0)  (token 0x061e, VA ffd447e0)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd447e0)  (token 0x061e, VA ffd447e0)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd447e0:
 000447e0: .half     0x0617 0x0010 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd447f0)  (token 0x061f, VA ffd447f0)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd447f0)  (token 0x061f, VA ffd447f0)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd447f0:
 000447f0: .half     0x0617 0x0014 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd44800)  (token 0x0620, VA ffd44800)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44800)  (token 0x0620, VA ffd44800)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44800:
 00044800: .half     0x0617 0x0018 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd44810)  (token 0x0621, VA ffd44810)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44810)  (token 0x0621, VA ffd44810)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44810:
 00044810: .half     0x0617 0x001c 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd44820)  (token 0x0622, VA ffd44820)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44820)  (token 0x0622, VA ffd44820)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44820:
 00044820: .half     0x0617 0x0020 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ... ............
 
-! ;code (ffd44830)  (token 0x0623, VA ffd44830)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44830)  (token 0x0623, VA ffd44830)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44830:
 00044830: .half     0x0617 0x0024 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...$............
 
-! ;code (ffd44840)  (token 0x0624, VA ffd44840)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44840)  (token 0x0624, VA ffd44840)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44840:
 00044840: .half     0x0617 0x0028 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...(............
 
-! ;code (ffd44850)  (token 0x0625, VA ffd44850)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44850)  (token 0x0625, VA ffd44850)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44850:
 00044850: .half     0x0617 0x002c 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...,............
 
-! ;code (ffd44860)  (token 0x0626, VA ffd44860)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44860)  (token 0x0626, VA ffd44860)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44860:
 00044860: .half     0x0617 0x0030 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...0............
 
-! ;code (ffd44870)  (token 0x0627, VA ffd44870)  ;code of - (code 00044770) 14 bytes
+! ;code (ffd44870)  (token 0x0627, VA ffd44870)  ;code of a code fragment (code 00044770) 14 bytes
 
 f_ffd44870:
 00044870: .half     0x0617 0x0034 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...4............
 
-! ;code (ffd44880)  (token 0x0628, VA ffd44880)  ;code of - (code 00044770) 8 bytes
+! ;code (ffd44880)  (token 0x0628, VA ffd44880)  ;code of a code fragment (code 00044770) 8 bytes
 
 f_ffd44880:
 00044880: .half     0x0617 0x0038 0x0000 0x0000 0x0000           ! ...8......
@@ -54971,21 +54977,64 @@ f_ffd45b00:
 f_ffd45b10:
 00045b10: .half     0x0004 0x0000                                ! ....
 
-fw_cold:                                 ! xref 0003e600b
-00045b14: .half     0x9de3 0xbfc0 0x4000 0x0001 0x0500 0x001d 0x8400 0xa118 ! ....@...........
-00045b24: .half     0x8423 0xc002 0xac00 0x001a 0xe806 0x2008 0xb426 0x8014 ! .#........ ..&..
-00045b34: .half     0x8600 0x001a 0x2700 0x001d 0xa604 0xe0d2 0xaa00 0x8013 ! ....'...........
-00045b44: .half     0xc635 0x6002 0xa730 0xe010 0xe635 0x6000 0xe606 0x2004 ! .5`..0...5`... .
-00045b54: .half     0xa600 0x8013 0xa8a5 0x2004 0xea04 0xc014 0x12bf 0xfffe ! ...... .........
-00045b64: .half     0xea20 0xc014 0xec20 0xe190 0xc620 0xe034 0x8c00 0x001a ! . ... ... .4....
-00045b74: .half     0xcc20 0xe040 0xb426 0xa400 0xf420 0xe078 0xb426 0xa020 ! . .@.&... .x.&. 
-00045b84: .half     0xf420 0xe03c 0x8e06 0xa004 0xb426 0xa400 0x2d00 0x0040 ! . .<.....&..-..@
-00045b94: .half     0xac05 0xa000 0xad2d 0xa004 0xac05 0x8002 0x80a5 0x801a ! .....-..........
-00045ba4: .half     0x1a80 0x0003 0x0100 0x0000 0xb400 0x0016 0xf420 0xe0ac ! ............. ..
-00045bb4: .half     0xf220 0xe184 0xe006 0x2004 0xa000 0x8010 0xe020 0xe0a8 ! . .... ...... ..
-00045bc4: .half     0xf620 0xe194 0xf820 0xe198 0x0b00 0x001a 0x8a01 0x6332 ! . ... ........c2
-00045bd4: .half     0x81c0 0xe000 0x8a01 0x4002 0xe211 0x6000 0xa32c 0x6004 ! ......@...`..,`.
-00045be4: .half     0xa204 0x4002                                ! ..@.
+fw_ffd45b10:                             ! xref 0003e600b
+00045b14: 9de3bfc0  save      %sp, -0x40, %sp
+00045b18: 40000001  call      sub_00045b1c
+
+sub_00045b1c:                            ! xref 00045b18c
+00045b1c: 0500001d  sethi     %hi(0x00007400), %g2
+00045b20: 8400a118  add       %g2, 0x118, %g2
+00045b24: 8423c002  sub       %o7, %g2, %g2
+00045b28: ac00001a  add       %g0, %i2, %l6
+00045b2c: e8062008  ld        [%i0 + 8], %l4
+00045b30: b4268014  sub       %i2, %l4, %i2
+00045b34: 8600001a  add       %g0, %i2, %g3
+00045b38: 2700001d  sethi     %hi(0x00007400), %l3
+00045b3c: a604e0d2  add       %l3, 0xd2, %l3
+00045b40: aa008013  add       %g2, %l3, %l5
+00045b44: c6356002  sth       %g3, [%l5 + 2]
+00045b48: a730e010  srl       %g3, 16, %l3
+00045b4c: e6356000  sth       %l3, [%l5]
+00045b50: e6062004  ld        [%i0 + 4], %l3
+00045b54: a6008013  add       %g2, %l3, %l3
+
+L_00045b58:                              ! xref 00045b60b
+00045b58: a8a52004  subcc     %l4, 4, %l4
+00045b5c: ea04c014  ld        [%l3 + %l4], %l5
+00045b60: 12bffffe  bne       L_00045b58
+00045b64: ea20c014  st        %l5, [%g3 + %l4]
+00045b68: ec20e190  st        %l6, [%g3 + 0x190]
+00045b6c: c620e034  st        %g3, [%g3 + 0x34]
+00045b70: 8c00001a  add       %g0, %i2, %g6
+00045b74: cc20e040  st        %g6, [%g3 + 0x40]
+00045b78: b426a400  sub       %i2, 0x400, %i2
+00045b7c: f420e078  st        %i2, [%g3 + 0x78]
+00045b80: b426a020  sub       %i2, 0x20, %i2
+00045b84: f420e03c  st        %i2, [%g3 + 0x3c]
+00045b88: 8e06a004  add       %i2, 4, %g7
+00045b8c: b426a400  sub       %i2, 0x400, %i2
+00045b90: 2d000040  sethi     %hi(0x00010000), %l6
+00045b94: ac05a000  add       %l6, 0, %l6                        ! = 0x00010000 (ROM)
+00045b98: ad2da004  sll       %l6, 4, %l6                        ! = 0x00100000 (RAM (8 SIMM slots x 64 MB) +0x100000 if pa)
+00045b9c: ac058002  add       %l6, %g2, %l6
+00045ba0: 80a5801a  cmp       %l6, %i2
+00045ba4: 1a800003  bcc       L_00045bb0
+00045ba8: 01000000  nop
+00045bac: b4000016  add       %g0, %l6, %i2
+
+L_00045bb0:                              ! xref 00045ba4b
+00045bb0: f420e0ac  st        %i2, [%g3 + 0xac]
+00045bb4: f220e184  st        %i1, [%g3 + 0x184]
+00045bb8: e0062004  ld        [%i0 + 4], %l0
+00045bbc: a0008010  add       %g2, %l0, %l0
+00045bc0: e020e0a8  st        %l0, [%g3 + 0xa8]
+00045bc4: f620e194  st        %i3, [%g3 + 0x194]
+00045bc8: f820e198  st        %i4, [%g3 + 0x198]
+00045bcc: 0b00001a  sethi     %hi(0x00006800), %g5
+00045bd0: 8a016332  add       %g5, 0x332, %g5
+00045bd4: 81c0e000  jmp       %g3                                ! NEXT (jmp up: the user area starts with NEXT); indirect jump, target unknown
+00045bd8: 8a014002  add       %g5, %g2, %g5
+00045bdc: .half     0xe211 0x6000 0xa32c 0x6004 0xa204 0x4002    ! ..`..,`...@.
 
 ! colon \tags  (token 0x075f, VA ffd45bf0)
 !   p" maketags" find nip 0= ?branch L1 [compile] \
@@ -59351,9 +59400,7 @@ fw_ffd4b0f0:
 0004b0f4: 00000000  unimp     0
 0004b0f8: 00000000  unimp     0
 0004b0fc: 00000000  unimp     0
-
-fw_code_ffd4b100:
-0004b100: 8e21e004  sub       %g7, 4, %g7                        ! code field routine of ffd4b520, ffd4b530, ffd4b5a0, ffd4b5b0, ffd4b5d0, ffd4b5e0 ...
+0004b100: 8e21e004  sub       %g7, 4, %g7
 0004b104: c8200007  st        %g4, [%g7]
 0004b108: c8116000  lduh      [%g5], %g4
 0004b10c: 89292004  sll       %g4, 4, %g4
@@ -59365,11 +59412,6 @@ fw_code_ffd4b100:
 0004b124: 8a046002  add       %l1, 2, %g5
 0004b128: 81c0e000  jmp       %g3                                ! NEXT (jmp up: the user area starts with NEXT); indirect jump, target unknown
 0004b12c: 80000000  add       %g0, %g0, %g0
-
-! colon (ffd4b130)  (token 0x0cb3, VA ffd4b130)
-!   token@ ;
-
-f_ffd4b130:
 0004b130: .half     0x0002 0x01be 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
 ! code (ffd4b140)  (token 0x0cb4, VA ffd4b140)  machine code 0004b144..0004b1a0
@@ -59599,12 +59641,12 @@ f_ffd4b510:
 0004b514: 8e21e004  sub       %g7, 4, %g7
 0004b518: .half     0x00f4 0x0ce7 0x00f4 0x0083                  ! ........
 
-! ;code (ffd4b520)  (token 0x0cf2, VA ffd4b520)  ;code of - (code 0004b100), token body:
+! ;code (ffd4b520)  (token 0x0cf2, VA ffd4b520)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4b520:
 0004b520: .half     0x0cb0 0x00f4 0x0ce7 0x010a 0x0083 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4b530)  (token 0x0cf3, VA ffd4b530)  ;code of - (code 0004b100), token body:
+! ;code (ffd4b530)  (token 0x0cf3, VA ffd4b530)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4b530:
 0004b530: .half     0x0cb0 0x00f4 0x0ce7 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -59640,12 +59682,12 @@ f_ffd4b590:
 0004b594: 8e21e004  sub       %g7, 4, %g7
 0004b598: .half     0x00f4 0x0cf7 0x00f4 0x0083                  ! ........
 
-! ;code (ffd4b5a0)  (token 0x0cfa, VA ffd4b5a0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4b5a0)  (token 0x0cfa, VA ffd4b5a0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4b5a0:
 0004b5a0: .half     0x0cb0 0x00f4 0x0cf7 0x010a 0x0083 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4b5b0)  (token 0x0cfb, VA ffd4b5b0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4b5b0)  (token 0x0cfb, VA ffd4b5b0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4b5b0:
 0004b5b0: .half     0x0cb0 0x00f4 0x0cf7 0x0083                  ! ........
@@ -59658,12 +59700,12 @@ f_ffd4b5c0:
 0004b5c4: 8e21e004  sub       %g7, 4, %g7
 0004b5c8: .half     0x00f4 0x0cf6 0x00f4 0x0083                  ! ........
 
-! ;code (ffd4b5d0)  (token 0x0cfd, VA ffd4b5d0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4b5d0)  (token 0x0cfd, VA ffd4b5d0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4b5d0:
 0004b5d0: .half     0x0cb0 0x00f4 0x0cf6 0x010a 0x0083 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4b5e0)  (token 0x0cfe, VA ffd4b5e0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4b5e0)  (token 0x0cfe, VA ffd4b5e0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4b5e0:
 0004b5e0: .half     0x0cb0 0x00f4 0x0cf6 0x0083 0x0000           ! ..........
@@ -61208,6 +61250,13 @@ f_ffd4d2b0:
 0004d2c0: .half     0x1f4d 0x6167 0x6963 0x206e 0x756d 0x6265 0x7220 0x6973 ! .Magic number is
 0004d2d0: .half     0x206e 0x6f74 0x2028 0x6f63 0x7461 0x6c29 0x2034 0x3037 !  not (octal) 407
 0004d2e0: .half     0x0000 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd4d2f0)  (token 0x0ecf, VA ffd4d2f0)
+!   (ffd4d1e0) 4 (ffda2e30) @ fgets 4 <> abort" Can't read the magic number" (ffd4d2b0)
+!       (ffd4d1e0) 4 + (ffd4d1d0) 4 - (ffda2e30) @ fgets (ffd4d1d0) 4 - <> abort" Can't read
+!       header" ;
+
+f_ffd4d2f0:
 0004d2f0: .half     0x0002 0x0ebe 0x0391 0x6483 0x00f4 0x06da 0x0391 0x00a5 ! ......d.........
 0004d300: .half     0x03cc 0x1b43 0x616e 0x2774 0x2072 0x6561 0x6420 0x7468 ! ...Can't read th
 0004d310: .half     0x6520 0x6d61 0x6769 0x6320 0x6e75 0x6d62 0x6572 0x0000 ! e magic number..
@@ -61321,7 +61370,7 @@ L_0004d478:                              ! xref 0004d420b 0004d434b
 f_ffd4d4a0:
 0004d4a0: .half     0x0878 0x0000                                ! .x..
 
-fw_ffd4d4a0:
+fw_ffd4d4a0:                             ! xref 0004f984c 0004fa04c 0004ff80c 00050984c 00050994c 000509a4c 000509b4c 000509c4c (+18)
 0004d4a4: c223a044  st        %g1, [%sp + 0x44]
 0004d4a8: c423a048  st        %g2, [%sp + 0x48]
 0004d4ac: c623a04c  st        %g3, [%sp + 0x4c]
@@ -62147,7 +62196,7 @@ f_ffd4e260:
 0004e264: 8e21e004  sub       %g7, 4, %g7
 0004e268: .half     0x00ba 0x05a2 0x01be 0x0083                  ! ........
 
-! ;code (ffd4e270)  (token 0x0fc7, VA ffd4e270)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e270)  (token 0x0fc7, VA ffd4e270)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e270:
 0004e270: .half     0x0cb0 0x00ba 0x05a2 0x01c0 0x05c8 0x0083 0x0000 0x0063 ! ...............c
@@ -62155,9 +62204,19 @@ f_ffd4e270:
 
 f_current_device:
 0004e290: .half     0x0fc6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd4e2a0)  (token 0x0fca, VA ffd4e2a0)
+!   create over , + (does>)
+!   [0004e2b0: call dodoes] does-body: @ current-device >body >user + ;
+
+f_ffd4e2a0:
 0004e2a0: .half     0x0002 0x04da 0x00be 0x03e2 0x005f 0x0444 0x0000 0x0000 ! ........._.D....
-0004e2b0: .half     0x7fff 0xc118 0x8e21 0xe004 0x00f4 0x0fc9 0x01d6 0x0447 ! .....!.........G
-0004e2c0: .half     0x005f 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ._..............
+
+fw_ffd4e2a0_does:
+0004e2b0: 7fffc118  call      fw_dodoes
+0004e2b4: 8e21e004  sub       %g7, 4, %g7
+0004e2b8: .half     0x00f4 0x0fc9 0x01d6 0x0447 0x005f 0x0083 0x0000 0x0000 ! .......G._......
+0004e2c8: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
 ! colon (ffd4e2d0)  (token 0x0fcd, VA ffd4e2d0)
 !   #user @ dup user-size > abort" User area used up!" swap #user +! ;
@@ -62167,37 +62226,37 @@ f_ffd4e2d0:
 0004e2e0: .half     0x7365 0x7220 0x6172 0x6561 0x2075 0x7365 0x6420 0x7570 ! ser area used up
 0004e2f0: .half     0x2100 0x00c0 0x021b 0x00f0 0x0083 0x0000 0x0000 0x0000 ! !...............
 
-! does (ffd4e300)  (token 0x0fd0, VA ffd4e300)  does> of current-device 14 bytes
+! does (ffd4e300)  (token 0x0fd0, VA ffd4e300)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e300:
 0004e300: .half     0x0fcb 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd4e310)  (token 0x0fd1, VA ffd4e310)  does> of current-device 14 bytes
+! does (ffd4e310)  (token 0x0fd1, VA ffd4e310)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e310:
 0004e310: .half     0x0fcb 0x0000 0x0002 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd4e320)  (token 0x0fd2, VA ffd4e320)  does> of current-device 14 bytes
+! does (ffd4e320)  (token 0x0fd2, VA ffd4e320)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e320:
 0004e320: .half     0x0fcb 0x0000 0x0004 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd4e330)  (token 0x0fd3, VA ffd4e330)  does> of current-device 14 bytes
+! does (ffd4e330)  (token 0x0fd3, VA ffd4e330)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e330:
 0004e330: .half     0x0fcb 0x0000 0x0006 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd4e340)  (token 0x0fd4, VA ffd4e340)  does> of current-device 14 bytes
+! does (ffd4e340)  (token 0x0fd4, VA ffd4e340)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e340:
 0004e340: .half     0x0fcb 0x0000 0x0008 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd4e350)  (token 0x0fd5, VA ffd4e350)  does> of current-device 14 bytes
+! does (ffd4e350)  (token 0x0fd5, VA ffd4e350)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e350:
 0004e350: .half     0x0fcb 0x0000 0x000c 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd4e360)  (token 0x0fd6, VA ffd4e360)  does> of current-device 14 bytes
+! does (ffd4e360)  (token 0x0fd6, VA ffd4e360)  does> of (ffd4e2a0) 14 bytes
 
 f_ffd4e360:
 0004e360: .half     0x0fcb 0x0000 0x0010 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -62286,12 +62345,12 @@ f_ffd4e4a0:
 0004e4a4: 8e21e004  sub       %g7, 4, %g7
 0004e4a8: .half     0x0fe6 0x00f4 0x0083 0x0000                  ! ........
 
-! ;code (ffd4e4b0)  (token 0x0feb, VA ffd4e4b0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e4b0)  (token 0x0feb, VA ffd4e4b0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e4b0:
 0004e4b0: .half     0x0cb0 0x0fe6 0x010a 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4e4c0)  (token 0x0fec, VA ffd4e4c0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e4c0)  (token 0x0fec, VA ffd4e4c0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e4c0:
 0004e4c0: .half     0x0cb0 0x0fe6 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -62321,12 +62380,12 @@ f_ffd4e510:
 0004e514: 8e21e004  sub       %g7, 4, %g7
 0004e518: .half     0x0fe6 0x0083 0x0000 0x0000                  ! ........
 
-! ;code (ffd4e520)  (token 0x0ff2, VA ffd4e520)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e520)  (token 0x0ff2, VA ffd4e520)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e520:
 0004e520: .half     0x0cb0 0x0fe6 0x010a 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4e530)  (token 0x0ff3, VA ffd4e530)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e530)  (token 0x0ff3, VA ffd4e530)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e530:
 0004e530: .half     0x0cb0 0x0fe6 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -62354,12 +62413,12 @@ f_ffd4e590:
 0004e594: 8e21e004  sub       %g7, 4, %g7
 0004e598: .half     0x0fe6 0x0083 0x0000 0x0000                  ! ........
 
-! ;code (ffd4e5a0)  (token 0x0ffa, VA ffd4e5a0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e5a0)  (token 0x0ffa, VA ffd4e5a0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e5a0:
 0004e5a0: .half     0x0cb0 0x0fe6 0x010a 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4e5b0)  (token 0x0ffb, VA ffd4e5b0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e5b0)  (token 0x0ffb, VA ffd4e5b0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e5b0:
 0004e5b0: .half     0x0cb0 0x0fe6 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -62389,12 +62448,12 @@ f_ffd4e600:
 0004e604: 8e21e004  sub       %g7, 4, %g7
 0004e608: .half     0x0fe6 0x01be 0x0019 0x0083                  ! ........
 
-! ;code (ffd4e610)  (token 0x1001, VA ffd4e610)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e610)  (token 0x1001, VA ffd4e610)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e610:
 0004e610: .half     0x0cb0 0x0fe6 0x01c0 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4e620)  (token 0x1002, VA ffd4e620)  ;code of - (code 0004b100), token body:
+! ;code (ffd4e620)  (token 0x1002, VA ffd4e620)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4e620:
 0004e620: .half     0x0cb0 0x0fe6 0x01be 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -62650,11 +62709,15 @@ f_device_end:
 0004eb10: .half     0x0002 0x1c5e 0x05d3 0x05be 0x05c8 0x0fdb 0x00ee 0x0083 ! ...^............
 0004eb20: .half     0x0000 0x0000                                ! ....
 
-! does root-node  (token 0x1053, VA ffd4eb30)  does> of vocabulary 48 bytes
+! does root-node  (token 0x1053, VA ffd4eb30)  does> of vocabulary 14 bytes
 0004eb24: .half     0x726f 0x6f74 0x2d6e 0x6f64 0x6589 0x1051    ! root-node..Q
 
 f_root_node:
 0004eb30: .half     0x054d 0x0378 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.x............
+
+! does (ffd4eb40)  (token 0x1054, VA ffd4eb40)  does> of vocabulary 32 bytes
+
+f_ffd4eb40:
 0004eb40: .half     0x054d 0x038a 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M..............
 0004eb50: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 0004eb60: .half     0x0000                                       ! ..
@@ -62729,22 +62792,22 @@ f_ffd4ecb0:
 0004ecb8: .half     0x00bc 0x00bc 0x00f4 0x0061 0x00c0 0x0151 0x00fa 0x0083 ! .......a...Q....
 0004ecc8: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! ;code (ffd4ecd0)  (token 0x106d, VA ffd4ecd0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4ecd0)  (token 0x106d, VA ffd4ecd0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4ecd0:
 0004ecd0: .half     0x0cb0 0x00ba 0x00c8 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4ece0)  (token 0x106e, VA ffd4ece0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4ece0)  (token 0x106e, VA ffd4ece0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4ece0:
 0004ece0: .half     0x0cb0 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4ecf0)  (token 0x106f, VA ffd4ecf0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4ecf0)  (token 0x106f, VA ffd4ecf0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4ecf0:
 0004ecf0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4ed00)  (token 0x1070, VA ffd4ed00)  ;code of - (code 0004b100), token body:
+! ;code (ffd4ed00)  (token 0x1070, VA ffd4ed00)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4ed00:
 0004ed00: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -63094,22 +63157,22 @@ f_ffd4f2e0:
 0004f2e4: 8e21e004  sub       %g7, 4, %g7
 0004f2e8: .half     0x0182 0x0083 0x0000 0x0000                  ! ........
 
-! ;code (ffd4f2f0)  (token 0x10cf, VA ffd4f2f0)  ;code of - (code 0004b100), token body:
+! ;code (ffd4f2f0)  (token 0x10cf, VA ffd4f2f0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4f2f0:
 0004f2f0: .half     0x0cb0 0x00d2 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4f300)  (token 0x10d0, VA ffd4f300)  ;code of - (code 0004b100), token body:
+! ;code (ffd4f300)  (token 0x10d0, VA ffd4f300)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4f300:
 0004f300: .half     0x0cb0 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4f310)  (token 0x10d1, VA ffd4f310)  ;code of - (code 0004b100), token body:
+! ;code (ffd4f310)  (token 0x10d1, VA ffd4f310)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4f310:
 0004f310: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd4f320)  (token 0x10d2, VA ffd4f320)  ;code of - (code 0004b100), token body:
+! ;code (ffd4f320)  (token 0x10d2, VA ffd4f320)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd4f320:
 0004f320: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -63424,9 +63487,14 @@ f_child:
 0004f960: .half     0x0002 0x1134 0x038d 0x0fd1 0x01d0 0x001e 0x000e 0x0087 ! ...4............
 0004f970: .half     0x00bc 0x0019 0x0fd2 0x001c 0xfff0 0x05c5 0x0083 0x0000 ! ................
 
-sub_0004f980:                            ! xref 0003e3c0c
-0004f980: .half     0x9de3 0xbf98 0x7fff 0xf6c8 0x0100 0x0000 0x1136 0x0ed6 ! .............6..
-0004f990: .half     0x0000 0x0000 0x0000 0x0000 0x0070 0x6565 0x7284 0x1136 ! .........peer..6
+! c-entry (ffd4f980)  (token 0x1138, VA ffd4f980)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd4f980:                              ! xref 0003e3c0c
+0004f980: 9de3bf98  save      %sp, -0x68, %sp
+0004f984: 7ffff6c8  call      fw_ffd4d4a0
+0004f988: 01000000  nop
+0004f98c: .half     0x1136 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0070 0x6565 ! .6...........pee
+0004f99c: .half     0x7284 0x1136                                ! r..6
 
 f_peer:
 0004f9a0: .half     0x0002 0x00bc 0x008b 0x001e 0x000a 0x00ba 0x0178 0x1053 ! .............x.S
@@ -63436,8 +63504,13 @@ f_peer:
 0004f9e0: .half     0x001c 0x0018 0x0fd2 0x01be 0x00ca 0x00a5 0x001e 0x0008 ! ................
 0004f9f0: .half     0x0fd9 0x001c 0xfff0 0x00c8 0x0fc9 0x05c5 0x0083 0x0000 ! ................
 
-sub_0004fa00:                            ! xref 0003e39cc
-0004fa00: .half     0x9de3 0xbf98 0x7fff 0xf6a8 0x0100 0x0000 0x113a 0x0ed6 ! .............:..
+! c-entry (ffd4fa00)  (token 0x1140, VA ffd4fa00)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd4fa00:                              ! xref 0003e39cc
+0004fa00: 9de3bf98  save      %sp, -0x68, %sp
+0004fa04: 7ffff6a8  call      fw_ffd4d4a0
+0004fa08: 01000000  nop
+0004fa0c: .half     0x113a 0x0ed6                                ! .:..
 
 ! colon (ffd4fa10)  (token 0x1141, VA ffd4fa10)
 !   >r swap r@ cmove r> ;
@@ -63656,9 +63729,13 @@ f_str_call_parent:
 f_ihandle_gt_phandle:
 0004ff70: .half     0x0002 0x118b 0x100e 0x118e 0x0083 0x0000    ! ............
 
-sub_0004ff7c:                            ! xref 0003e17cc
-0004ff7c: .half     0x9de3 0xbf98 0x7fff 0xf549 0x0100 0x0000 0x1197 0x0ed6 ! .......I........
-0004ff8c: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000    ! ............
+! c-entry (ffd4ff7c)  (VA ffd4ff7c)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd4ff7c:                              ! xref 0003e17cc
+0004ff7c: 9de3bf98  save      %sp, -0x68, %sp
+0004ff80: 7ffff549  call      fw_ffd4d4a0
+0004ff84: 01000000  nop
+0004ff88: .half     0x1197 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
 ! colon get-package-attribute  (token 0x119b, VA ffd4ffb0)
 !   also execute get-attribute previous ;
@@ -64059,20 +64136,45 @@ f_op_seek:
 00050960: .half     0x017f 0x0473 0x6565 0x6b00 0x00c2 0x0178 0x1193 0x0385 ! ...seek....x....
 00050970: .half     0x001e 0x000a 0x00c8 0x00d2 0x0016 0x0000 0x1224 0x0083 ! .............$..
 
-sub_00050980:                            ! xref 0003e274c
-00050980: .half     0x9de3 0xbf98 0x7fff 0xf2c8 0x0100 0x0000 0x1227 0x0ed6 ! .............'..
+! c-entry (ffd50980)  (token 0x1238, VA ffd50980)  C-callable stub: save; call 0004d4a4; nop; then tokens:
 
-sub_00050990:                            ! xref 0003e298c
-00050990: .half     0x9de3 0xbf98 0x7fff 0xf2c4 0x0100 0x0000 0x122a 0x0ed6 ! .............*..
+f_ffd50980:                              ! xref 0003e274c
+00050980: 9de3bf98  save      %sp, -0x68, %sp
+00050984: 7ffff2c8  call      fw_ffd4d4a0
+00050988: 01000000  nop
+0005098c: .half     0x1227 0x0ed6                                ! .'..
 
-sub_000509a0:                            ! xref 0003e2c4c
-000509a0: .half     0x9de3 0xbf98 0x7fff 0xf2c0 0x0100 0x0000 0x122d 0x0ed6 ! .............-..
+! c-entry (ffd50990)  (token 0x1239, VA ffd50990)  C-callable stub: save; call 0004d4a4; nop; then tokens:
 
-sub_000509b0:                            ! xref 0003e2f0c
-000509b0: .half     0x9de3 0xbf98 0x7fff 0xf2bc 0x0100 0x0000 0x1231 0x0ed6 ! .............1..
+f_ffd50990:                              ! xref 0003e298c
+00050990: 9de3bf98  save      %sp, -0x68, %sp
+00050994: 7ffff2c4  call      fw_ffd4d4a0
+00050998: 01000000  nop
+0005099c: .half     0x122a 0x0ed6                                ! .*..
 
-sub_000509c0:                            ! xref 0003e31cc
-000509c0: .half     0x9de3 0xbf98 0x7fff 0xf2b8 0x0100 0x0000 0x1235 0x0ed6 ! .............5..
+! c-entry (ffd509a0)  (token 0x123a, VA ffd509a0)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd509a0:                              ! xref 0003e2c4c
+000509a0: 9de3bf98  save      %sp, -0x68, %sp
+000509a4: 7ffff2c0  call      fw_ffd4d4a0
+000509a8: 01000000  nop
+000509ac: .half     0x122d 0x0ed6                                ! .-..
+
+! c-entry (ffd509b0)  (token 0x123b, VA ffd509b0)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd509b0:                              ! xref 0003e2f0c
+000509b0: 9de3bf98  save      %sp, -0x68, %sp
+000509b4: 7ffff2bc  call      fw_ffd4d4a0
+000509b8: 01000000  nop
+000509bc: .half     0x1231 0x0ed6                                ! .1..
+
+! c-entry (ffd509c0)  (token 0x123c, VA ffd509c0)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd509c0:                              ! xref 0003e31cc
+000509c0: 9de3bf98  save      %sp, -0x68, %sp
+000509c4: 7ffff2b8  call      fw_ffd4d4a0
+000509c8: 01000000  nop
+000509cc: .half     0x1235 0x0ed6                                ! .5..
 
 ! value (ffd509d0)  (token 0x123d, VA ffd509d0)  up+0x3bc  initial 0
 
@@ -64184,16 +64286,24 @@ f_display:
 00050bf0: .half     0x0002 0x123d 0x008b 0x001e 0x0008 0x0fc9 0x05ea 0x123d ! ...=...........=
 00050c00: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd50c10)  (token 0x1261, VA ffd50c10)  does> of vocabulary 39 bytes
+! does (ffd50c10)  (token 0x1261, VA ffd50c10)  does> of vocabulary 14 bytes
 
 f_ffd50c10:
 00050c10: .half     0x054d 0x03c4 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd50c20)  (token 0x1262, VA ffd50c20)  does> of vocabulary 23 bytes
+
+f_ffd50c20:
 00050c20: .half     0x054d 0x03d6 0x7061 0x636b 0x6167 0x6573 0x0000 0x0000 ! .M..packages....
 00050c30: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
 f_name_2:
 00050c40: .half     0x106b 0x0000 0x001e 0x0009 0x0000 0x0000 0x0000 0x0000 ! .k..............
 00050c50: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd50c60)  (token 0x1266, VA ffd50c60)  does> of vocabulary 39 bytes
+
+f_ffd50c60:
 00050c60: .half     0x054d 0x03d8 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
 00050c70: .half     0x054d 0x03ea 0x6f70 0x7469 0x6f6e 0x7300 0x0000 0x0000 ! .M..options.....
 00050c80: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
@@ -64201,6 +64311,10 @@ f_name_2:
 f_name_3:
 00050c90: .half     0x106b 0x0000 0x001e 0x0008 0x0000 0x0000 0x0000 0x0000 ! .k..............
 00050ca0: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd50cb0)  (token 0x126b, VA ffd50cb0)  does> of vocabulary 39 bytes
+
+f_ffd50cb0:
 00050cb0: .half     0x054d 0x03ec 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
 00050cc0: .half     0x054d 0x03fe 0x616c 0x6961 0x7365 0x7300 0x0000 0x0000 ! .M..aliases.....
 00050cd0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
@@ -64450,22 +64564,22 @@ f_ffd511f0:
 000511f8: .half     0x00ba 0x127d 0x00f4 0x00bc 0x09dd 0x00d9 0x0083 0x0000 ! ...}............
 00051208: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! ;code (ffd51210)  (token 0x12c1, VA ffd51210)  ;code of - (code 0004b100), token body:
+! ;code (ffd51210)  (token 0x12c1, VA ffd51210)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd51210:
 00051210: .half     0x0cb0 0x00ba 0x00c8 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd51220)  (token 0x12c2, VA ffd51220)  ;code of - (code 0004b100), token body:
+! ;code (ffd51220)  (token 0x12c2, VA ffd51220)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd51220:
 00051220: .half     0x0cb0 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd51230)  (token 0x12c3, VA ffd51230)  ;code of - (code 0004b100), token body:
+! ;code (ffd51230)  (token 0x12c3, VA ffd51230)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd51230:
 00051230: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd51240)  (token 0x12c4, VA ffd51240)  ;code of - (code 0004b100), token body:
+! ;code (ffd51240)  (token 0x12c4, VA ffd51240)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd51240:
 00051240: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -67000,15 +67114,21 @@ f_afsr_store:
 f_afar_fetch:
 00054090: .half     0x1593 0x0000 0x0600 0x0000                  ! ........
 
-! ;code afar!  (token 0x15aa, VA ffd540a0)  ;code of (ffd53f60) (code 00053f70) 30 bytes
+! ;code afar!  (token 0x15aa, VA ffd540a0)  ;code of (ffd53f60) (code 00053f70) 14 bytes
 00054098: .half     0x6166 0x6172 0x2185 0x15a9                  ! afar!...
 
 f_afar_store:
 000540a0: .half     0x1597 0x0000 0x0600 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd540b0)  (token 0x15ab, VA ffd540b0)
+!   create , (;code)
+!   [machine code 000540c0..000540e8]
+
+f_ffd540b0:
 000540b0: .half     0x0002 0x04da 0x03e2 0x04e1 0x0000 0x0000 0x0000 0x0000 ! ................
 
-fw_code_ffd540c0:
-000540c0: 8e21e004  sub       %g7, 4, %g7                        ! code field routine of aer_fetch, config14_fetch, iommu_ctl_fetch, itmr_fetch, itr_fetch, mdelay_fetch ...
+fw_ffd540b0_code:
+000540c0: 8e21e004  sub       %g7, 4, %g7
 000540c4: c8200007  st        %g4, [%g7]
 000540c8: a0046002  add       %l1, 2, %l0
 000540cc: e2142002  lduh      [%l0 + 2], %l1
@@ -67048,7 +67168,7 @@ f_iommu_ctl_fetch:
 f_iommu_ctl_store:
 00054160: .half     0x15b0 0xe000 0x0000 0x0000                  ! ........
 
-! ;code scsr@  (token 0x15b7, VA ffd54170)  ;code of - (code 000540c0) 6 bytes
+! ;code scsr@  (token 0x15b7, VA ffd54170)  ;code of (ffd540b0) (code 000540c0) 6 bytes
 00054168: .half     0x7363 0x7372 0x4085 0x15b6                  ! scsr@...
 
 f_scsr_fetch:
@@ -67066,7 +67186,7 @@ f_aer_fetch:
 f_aer_store:
 000541a0: .half     0x15b0 0xe000 0x1008                         ! ......
 
-! ;code msafsr@  (token 0x15bb, VA ffd541b0)  ;code of - (code 000540c0) 4 bytes
+! ;code msafsr@  (token 0x15bb, VA ffd541b0)  ;code of (ffd540b0) (code 000540c0) 4 bytes
 000541a6: .half     0x6d73 0x6166 0x7372 0x4087 0x15ba           ! msafsr@...
 
 f_msafsr_fetch:
@@ -67078,7 +67198,7 @@ f_msafsr_fetch:
 f_msafsr_store:
 000541c0: .half     0x15b0 0xe000 0x1000                         ! ......
 
-! ;code msafar@  (token 0x15bd, VA ffd541d0)  ;code of - (code 000540c0) 16 bytes
+! ;code msafar@  (token 0x15bd, VA ffd541d0)  ;code of (ffd540b0) (code 000540c0) 16 bytes
 000541c6: .half     0x6d73 0x6166 0x6172 0x4087 0x15bc           ! msafar@...
 
 f_msafar_fetch:
@@ -67103,7 +67223,7 @@ f_m_to_safsr_store:
 f_m_to_safar_fetch:
 00054210: .half     0x15bd 0x0000                                ! ....
 
-! ;code config14@  (token 0x15c2, VA ffd54220)  ;code of - (code 000540c0) 18 bytes
+! ;code config14@  (token 0x15c2, VA ffd54220)  ;code of (ffd540b0) (code 000540c0) 18 bytes
 00054214: .half     0x636f 0x6e66 0x6967 0x3134 0x4089 0x15c1    ! config14@...
 
 f_config14_fetch:
@@ -67171,13 +67291,13 @@ L_000542e0:                              ! xref 0005427cb 000542c4b
 000542ec: 80000000  add       %g0, %g0, %g0
 000542f0: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! ;code sipr@  (token 0x15d0, VA ffd54300)  ;code of - (code 000540c0) 6 bytes
+! ;code sipr@  (token 0x15d0, VA ffd54300)  ;code of (ffd540b0) (code 000540c0) 6 bytes
 000542f8: .half     0x7369 0x7072 0x4085 0x15c5                  ! sipr@...
 
 f_sipr_fetch:
 00054300: .half     0x15ac 0xf141 0x0000 0x0000                  ! ...A....
 
-! ;code itmr@  (token 0x15d1, VA ffd54310)  ;code of - (code 000540c0) 18 bytes
+! ;code itmr@  (token 0x15d1, VA ffd54310)  ;code of (ffd540b0) (code 000540c0) 18 bytes
 00054308: .half     0x6974 0x6d72 0x4085 0x15d0                  ! itmr@...
 
 f_itmr_fetch:
@@ -67332,7 +67452,7 @@ f_ffd54550:
 00054560: .half     0x1449 0x1463 0x15f2 0x002f 0x1460 0x005f 0x0114 0x0021 ! .I.c.../.`._...!
 00054570: .half     0xffea 0x0083 0x0000 0x0000                  ! ........
 
-! ;code mfsr@  (token 0x15f8, VA ffd54580)  ;code of - (code 000540c0) 6 bytes
+! ;code mfsr@  (token 0x15f8, VA ffd54580)  ;code of (ffd540b0) (code 000540c0) 6 bytes
 00054578: .half     0x6d66 0x7372 0x4085 0x15ef                  ! mfsr@...
 
 f_mfsr_fetch:
@@ -67358,7 +67478,7 @@ f_menable_fetch:
 f_menable_store:
 000545f0: .half     0x15b0 0x0000 0x0000                         ! ......
 
-! ;code mdelay@  (token 0x1600, VA ffd54600)  ;code of - (code 000540c0) 4 bytes
+! ;code mdelay@  (token 0x1600, VA ffd54600)  ;code of (ffd540b0) (code 000540c0) 4 bytes
 000545f6: .half     0x6d64 0x656c 0x6179 0x4087 0x15ff           ! mdelay@...
 
 f_mdelay_fetch:
@@ -67378,7 +67498,7 @@ f_vconfig_fetch:
 f_vconfig_store:
 00054650: .half     0x15b0 0x0000 0x000c                         ! ......
 
-! ;code sx-csr@  (token 0x1606, VA ffd54660)  ;code of - (code 000540c0) 4 bytes
+! ;code sx-csr@  (token 0x1606, VA ffd54660)  ;code of (ffd540b0) (code 000540c0) 4 bytes
 00054656: .half     0x7378 0x2d63 0x7372 0x4087 0x1605           ! sx-csr@...
 
 f_sx_csr_fetch:
@@ -70621,17 +70741,25 @@ f_op_map:
 00058160: .half     0x0002 0x0178 0x19ae 0x0385 0x001e 0x0008 0x00c8 0x00c8 ! ...x............
 00058170: .half     0x038d 0x0083                                ! ....
 
-sub_00058174:                            ! xref 0003e228c
-00058174: .half     0x9de3 0xbf98 0x7fff 0xd4cb 0x0100 0x0000 0x19b6 0x0ed6 ! ................
-00058184: .half     0x006f 0x702d 0x756e 0x6d61 0x7088 0x19b6    ! .op-unmap...
+! c-entry (ffd58174)  (VA ffd58174)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd58174:                              ! xref 0003e228c
+00058174: 9de3bf98  save      %sp, -0x68, %sp
+00058178: 7fffd4cb  call      fw_ffd4d4a0
+0005817c: 01000000  nop
+00058180: .half     0x19b6 0x0ed6 0x006f 0x702d 0x756e 0x6d61 0x7088 0x19b6 ! .....op-unmap...
 
 f_op_unmap:
 00058190: .half     0x0002 0x00c0 0x199a 0x0083                  ! ........
 
-sub_00058198:                            ! xref 0003e250c
-00058198: .half     0x9de3 0xbf98 0x7fff 0xd4c2 0x0100 0x0000 0x19b9 0x0ed6 ! ................
-000581a8: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0028 0x6f70 0x2d61 ! ...........(op-a
-000581b8: .half     0x6c6c 0x6f63 0x298a 0x19b9                  ! lloc)...
+! c-entry (ffd58198)  (VA ffd58198)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd58198:                              ! xref 0003e250c
+00058198: 9de3bf98  save      %sp, -0x68, %sp
+0005819c: 7fffd4c2  call      fw_ffd4d4a0
+000581a0: 01000000  nop
+000581a4: .half     0x19b9 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0028 ! ...............(
+000581b4: .half     0x6f70 0x2d61 0x6c6c 0x6f63 0x298a 0x19b9    ! op-alloc)...
 
 f_p_op_alloc:
 000581c0: .half     0x0002 0x00be 0x008b 0x001e 0x0008 0x00c8 0x038d 0x0081 ! ................
@@ -70645,9 +70773,13 @@ f_op_alloc:
 00058220: .half     0x0002 0x0178 0x19bc 0x0385 0x001e 0x0006 0x00c8 0x038d ! ...x............
 00058230: .half     0x0083 0x0000                                ! ....
 
-sub_00058234:                            ! xref 0003e1a4c
-00058234: .half     0x9de3 0xbf98 0x7fff 0xd49b 0x0100 0x0000 0x19c2 0x0ed6 ! ................
-00058244: .half     0x0000                                       ! ..
+! c-entry (ffd58234)  (VA ffd58234)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd58234:                              ! xref 0003e1a4c
+00058234: 9de3bf98  save      %sp, -0x68, %sp
+00058238: 7fffd49b  call      fw_ffd4d4a0
+0005823c: 01000000  nop
+00058240: .half     0x19c2 0x0ed6 0x0000                         ! ......
 
 ! colon op-free  (token 0x19c5, VA ffd58250)
 !   swap free-virtual ;
@@ -70656,18 +70788,26 @@ sub_00058234:                            ! xref 0003e1a4c
 f_op_free:
 00058250: .half     0x0002 0x00c0 0x1998 0x0083                  ! ........
 
-sub_00058258:                            ! xref 0003e1f8c
-00058258: .half     0x9de3 0xbf98 0x7fff 0xd492 0x0100 0x0000 0x19c5 0x0ed6 ! ................
-00058268: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x006f 0x702d 0x7265 ! ...........op-re
-00058278: .half     0x6c65 0x6173 0x658a 0x19c5                  ! lease...
+! c-entry (ffd58258)  (VA ffd58258)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd58258:                              ! xref 0003e1f8c
+00058258: 9de3bf98  save      %sp, -0x68, %sp
+0005825c: 7fffd492  call      fw_ffd4d4a0
+00058260: 01000000  nop
+00058264: .half     0x19c5 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x006f ! ...............o
+00058274: .half     0x702d 0x7265 0x6c65 0x6173 0x658a 0x19c5    ! p-release...
 
 f_op_release:
 00058280: .half     0x0002 0x19c5 0x0083 0x0000                  ! ........
 
-sub_00058288:                            ! xref 0003e378c
-00058288: .half     0x9de3 0xbf98 0x7fff 0xd486 0x0100 0x0000 0x19c8 0x0ee0 ! ................
-00058298: .half     0x0000 0x0028 0x6f70 0x2d61 0x6c6c 0x6f63 0x2d61 0x6c69 ! ...(op-alloc-ali
-000582a8: .half     0x676e 0x6564 0x2992 0x19c8                  ! gned)...
+! c-entry (ffd58288)  (VA ffd58288)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd58288:                              ! xref 0003e378c
+00058288: 9de3bf98  save      %sp, -0x68, %sp
+0005828c: 7fffd486  call      fw_ffd4d4a0
+00058290: 01000000  nop
+00058294: .half     0x19c8 0x0ee0 0x0000 0x0028 0x6f70 0x2d61 0x6c6c 0x6f63 ! .......(op-alloc
+000582a4: .half     0x2d61 0x6c69 0x676e 0x6564 0x2992 0x19c8    ! -aligned)...
 
 f_p_op_alloc_aligned:
 000582b0: .half     0x0002 0x00be 0x008b 0x001e 0x0008 0x00d2 0x038d 0x0081 ! ................
@@ -70683,9 +70823,13 @@ f_op_alloc_aligned:
 00058330: .half     0x0002 0x0178 0x19cb 0x0385 0x001e 0x0006 0x00d2 0x038d ! ...x............
 00058340: .half     0x0083 0x0000                                ! ....
 
-sub_00058344:                            ! xref 0003e1d0c
-00058344: .half     0x9de3 0xbf98 0x7fff 0xd457 0x0100 0x0000 0x19d3 0x0ed6 ! .......W........
-00058354: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000    ! ............
+! c-entry (ffd58344)  (VA ffd58344)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd58344:                              ! xref 0003e1d0c
+00058344: 9de3bf98  save      %sp, -0x68, %sp
+00058348: 7fffd457  call      fw_ffd4d4a0
+0005834c: 01000000  nop
+00058350: .half     0x19d3 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
 ! colon (ffd58360)  (token 0x19d6, VA ffd58360)
 !   pagesize round-up dup 0 op-alloc tuck ?branch L3 2dup bounds (?do) L2
@@ -73518,10 +73662,14 @@ f_decode_unit:
 0005bea0: .half     0x0002 0x0016 0x002d 0x0e8e 0x00cf 0x1177 0x00c5 0x1d80 ! .....-.....w....
 0005beb0: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd5bec0)  (token 0x1d8c, VA ffd5bec0)  does> of vocabulary 39 bytes
+! does (ffd5bec0)  (token 0x1d8c, VA ffd5bec0)  does> of vocabulary 14 bytes
 
 f_ffd5bec0:
 0005bec0: .half     0x054d 0x05b4 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd5bed0)  (token 0x1d8d, VA ffd5bed0)  does> of vocabulary 23 bytes
+
+f_ffd5bed0:
 0005bed0: .half     0x054d 0x05c6 0x6f70 0x656e 0x7072 0x6f6d 0x0000 0x0000 ! .M..openprom....
 0005bee0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -73535,14 +73683,22 @@ f_name_5:
 f_relative_addressing:
 0005bf10: .half     0x106b 0x0002 0x7002 0x0000 0x0000 0x0000    ! .k..p.......
 
-! does aligned-allocator  (token 0x1d93, VA ffd5bf30)  does> of (ffd4ecb0) 71 bytes
+! does aligned-allocator  (token 0x1d93, VA ffd5bf30)  does> of (ffd4ecb0) 30 bytes
 0005bf1c: .half     0x616c 0x6967 0x6e65 0x642d 0x616c 0x6c6f 0x6361 0x746f ! aligned-allocato
 0005bf2c: .half     0x7291 0x1d91                                ! r...
 
 f_aligned_allocator:
 0005bf30: .half     0x106b 0x0002 0x7022 0x0000 0x0000 0x0000 0x0000 0x0000 ! .k..p"..........
 0005bf40: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd5bf50)  (token 0x1d95, VA ffd5bf50)  does> of vocabulary 14 bytes
+
+f_ffd5bf50:
 0005bf50: .half     0x054d 0x05c8 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd5bf60)  (token 0x1d96, VA ffd5bf60)  does> of vocabulary 23 bytes
+
+f_ffd5bf60:
 0005bf60: .half     0x054d 0x05da 0x696f 0x6d6d 0x7500 0x0000 0x0000 0x0000 ! .M..iommu.......
 0005bf70: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -73600,10 +73756,14 @@ f_decode_unit_2:
 0005c0c0: .half     0x0002 0x0016 0x002d 0x0e8e 0x00cf 0x1177 0x00c5 0x1da3 ! .....-.....w....
 0005c0d0: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd5c0e0)  (token 0x1dae, VA ffd5c0e0)  does> of vocabulary 23 bytes
+! does (ffd5c0e0)  (token 0x1dae, VA ffd5c0e0)  does> of vocabulary 14 bytes
 
 f_ffd5c0e0:
 0005c0e0: .half     0x054d 0x05dc 0x1d95 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M..............
+
+! does (ffd5c0f0)  (token 0x1daf, VA ffd5c0f0)  does> of vocabulary 7 bytes
+
+f_ffd5c0f0:
 0005c0f0: .half     0x054d 0x05ee 0x7362 0x7573 0x006e 0x616d 0x6584 0x0000 ! .M..sbus.name...
 
 f_name_7:
@@ -73707,10 +73867,14 @@ f_close_3:
 0005c340: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 0005c350: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd5c360)  (token 0x1dd6, VA ffd5c360)  does> of vocabulary 23 bytes
+! does (ffd5c360)  (token 0x1dd6, VA ffd5c360)  does> of vocabulary 14 bytes
 
 f_ffd5c360:
 0005c360: .half     0x054d 0x05f0 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd5c370)  (token 0x1dd7, VA ffd5c370)  does> of vocabulary 7 bytes
+
+f_ffd5c370:
 0005c370: .half     0x054d 0x0602 0x6f62 0x696f 0x006e 0x616d 0x6584 0x0000 ! .M..obio.name...
 
 f_name_8:
@@ -73718,12 +73882,20 @@ f_name_8:
 0005c390: .half     0x6963 0x616c 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ical............
 0005c3a0: .half     0x0000                                       ! ..
 
-! does device_type  (token 0x1ddb, VA ffd5c3b0)  does> of (ffd4ecb0) 39 bytes
+! does device_type  (token 0x1ddb, VA ffd5c3b0)  does> of (ffd4ecb0) 14 bytes
 0005c3a2: .half     0x6465 0x7669 0x6365 0x5f74 0x7970 0x658b 0x1dd8 ! device_type...
 
 f_device_type_4:
 0005c3b0: .half     0x106b 0x0000 0x002a 0x000d 0x0000 0x0000 0x0000 0x0000 ! .k...*..........
+
+! does (ffd5c3c0)  (token 0x1ddc, VA ffd5c3c0)  does> of vocabulary 14 bytes
+
+f_ffd5c3c0:
 0005c3c0: .half     0x054d 0x0604 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M..............
+
+! does (ffd5c3d0)  (token 0x1ddd, VA ffd5c3d0)  does> of vocabulary 7 bytes
+
+f_ffd5c3d0:
 0005c3d0: .half     0x054d 0x0616 0x7a73 0x0000 0x006e 0x616d 0x6584 0x0000 ! .M..zs...name...
 
 f_name_9:
@@ -73752,13 +73924,21 @@ f_slave:
 0005c460: .half     0x106b 0x0000 0x001a 0x0004 0x7365 0x7269 0x616c 0x0000 ! .k......serial..
 0005c470: .half     0x0000                                       ! ..
 
-! does device_type  (token 0x1de8, VA ffd5c480)  does> of (ffd4ecb0) 55 bytes
+! does device_type  (token 0x1de8, VA ffd5c480)  does> of (ffd4ecb0) 30 bytes
 0005c472: .half     0x6465 0x7669 0x6365 0x5f74 0x7970 0x658b 0x1de6 ! device_type...
 
 f_device_type_5:
 0005c480: .half     0x106b 0x0000 0x001a 0x0007 0x0000 0x0000 0x0000 0x0000 ! .k..............
 0005c490: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd5c4a0)  (token 0x1dea, VA ffd5c4a0)  does> of vocabulary 14 bytes
+
+f_ffd5c4a0:
 0005c4a0: .half     0x054d 0x0618 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M..............
+
+! does (ffd5c4b0)  (token 0x1deb, VA ffd5c4b0)  does> of vocabulary 7 bytes
+
+f_ffd5c4b0:
 0005c4b0: .half     0x054d 0x062a 0x7a73 0x0000 0x006e 0x616d 0x6584 0x0000 ! .M.*zs...name...
 
 f_name_10:
@@ -73805,7 +73985,15 @@ f_port_a_ignore_cd:
 f_port_b_ignore_cd:
 0005c5c0: .half     0x106b 0x0002 0x76b2 0x0000 0x0000 0x0000 0x0000 0x0000 ! .k..v...........
 0005c5d0: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd5c5e0)  (token 0x1dfe, VA ffd5c5e0)  does> of vocabulary 14 bytes
+
+f_ffd5c5e0:
 0005c5e0: .half     0x054d 0x062c 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.,............
+
+! does (ffd5c5f0)  (token 0x1dff, VA ffd5c5f0)  does> of vocabulary 23 bytes
+
+f_ffd5c5f0:
 0005c5f0: .half     0x054d 0x063e 0x6565 0x7072 0x6f6d 0x0000 0x0000 0x0000 ! .M.>eeprom......
 0005c600: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -73837,10 +74025,14 @@ f_close_4:
 0005c670: .half     0x0002 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 0005c680: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd5c690)  (token 0x1e09, VA ffd5c690)  does> of vocabulary 39 bytes
+! does (ffd5c690)  (token 0x1e09, VA ffd5c690)  does> of vocabulary 14 bytes
 
 f_ffd5c690:
 0005c690: .half     0x054d 0x0640 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.@............
+
+! does (ffd5c6a0)  (token 0x1e0a, VA ffd5c6a0)  does> of vocabulary 23 bytes
+
+f_ffd5c6a0:
 0005c6a0: .half     0x054d 0x0652 0x636f 0x756e 0x7465 0x7200 0x0000 0x0000 ! .M.Rcounter.....
 0005c6b0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -73868,10 +74060,14 @@ f_close_5:
 0005c730: .half     0x0002 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 0005c740: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd5c750)  (token 0x1e15, VA ffd5c750)  does> of vocabulary 39 bytes
+! does (ffd5c750)  (token 0x1e15, VA ffd5c750)  does> of vocabulary 14 bytes
 
 f_ffd5c750:
 0005c750: .half     0x054d 0x0654 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.T............
+
+! does (ffd5c760)  (token 0x1e16, VA ffd5c760)  does> of vocabulary 23 bytes
+
+f_ffd5c760:
 0005c760: .half     0x054d 0x0666 0x696e 0x7465 0x7272 0x7570 0x7400 0x0000 ! .M.finterrupt...
 0005c770: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -73903,22 +74099,32 @@ f_close_6:
 
 f_cpus:
 0005c830: .half     0x09f2 0x0000 0xffef 0x2008 0x0000 0x0000 0x0000 0x0000 ! ...... .........
-0005c840: .half     0x0002 0x05f2 0x0444 0x0000 0x0000 0x0000 0x0000 0x0000 ! .....D..........
-0005c850: .half     0x7fff 0x87b0 0x8e21 0xe004 0x00f4 0x00c0 0x15da 0x0391 ! .....!..........
-0005c860: .half     0x0059 0x1e23 0x005f 0x005f 0x0083 0x0000 0x0000 0x0000 ! .Y.#._._........
 
-! does (ffd5c870)  (token 0x1e27, VA ffd5c870)  does> of cpus 14 bytes
+! colon (ffd5c840)  (token 0x1e24, VA ffd5c840)
+!   field (does>)
+!   [0005c850: call dodoes] does-body: @ swap (ffd543a0) 4 << cpus + + ;
+
+f_ffd5c840:
+0005c840: .half     0x0002 0x05f2 0x0444 0x0000 0x0000 0x0000 0x0000 0x0000 ! .....D..........
+
+fw_ffd5c840_does:
+0005c850: 7fff87b0  call      fw_dodoes
+0005c854: 8e21e004  sub       %g7, 4, %g7
+0005c858: .half     0x00f4 0x00c0 0x15da 0x0391 0x0059 0x1e23 0x005f 0x005f ! .........Y.#._._
+0005c868: .half     0x0083 0x0000 0x0000 0x0000                  ! ........
+
+! does (ffd5c870)  (token 0x1e27, VA ffd5c870)  does> of (ffd5c840) 14 bytes
 
 f_ffd5c870:
 0005c870: .half     0x1e25 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! .%..............
 
-! does (ffd5c880)  (token 0x1e28, VA ffd5c880)  does> of cpus 30 bytes
+! does (ffd5c880)  (token 0x1e28, VA ffd5c880)  does> of (ffd5c840) 30 bytes
 
 f_ffd5c880:
 0005c880: .half     0x1e25 0x0000 0x0004 0x0000 0x0000 0x0000 0x0000 0x0000 ! .%..............
 0005c890: .half     0x1e25 0x0000 0x0008 0x0000 0x0000 0x0000 0x0000 0x0000 ! .%..............
 
-! does (ffd5c8a0)  (token 0x1e2a, VA ffd5c8a0)  does> of cpus 14 bytes
+! does (ffd5c8a0)  (token 0x1e2a, VA ffd5c8a0)  does> of (ffd5c840) 14 bytes
 
 f_ffd5c8a0:
 0005c8a0: .half     0x1e25 0x0000 0x000c 0x0000 0x0000 0x0000 0x0000 0x0000 ! .%..............
@@ -74643,7 +74849,7 @@ f_ffd5d6e0:
 0005d6e8: .half     0x00f4 0x1edf 0x00f4 0x001e 0x0008 0x1ee0 0x001c 0x0006 ! ................
 0005d6f8: .half     0x00ba 0x038d 0x0083 0x0000                  ! ........
 
-! ;code (ffd5d700)  (token 0x1f10, VA ffd5d700)  ;code of - (code 0004b100), token body:
+! ;code (ffd5d700)  (token 0x1f10, VA ffd5d700)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5d700:
 0005d700: .half     0x0cb0 0x00f4 0x1edf 0x00f4 0x001e 0x0008 0x1eee 0x001c ! ................
@@ -74662,7 +74868,7 @@ f_ffd5d740:
 0005d748: .half     0x00ba 0x1edf 0x00f4 0x001e 0x0008 0x1efc 0x001c 0x0004 ! ................
 0005d758: .half     0x038d 0x0083 0x0000 0x0000                  ! ........
 
-! ;code (ffd5d760)  (token 0x1f16, VA ffd5d760)  ;code of - (code 0004b100), token body:
+! ;code (ffd5d760)  (token 0x1f16, VA ffd5d760)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5d760:
 0005d760: .half     0x0cb0 0x00ba 0x1edf 0x00f4 0x001e 0x0008 0x1f01 0x001c ! ................
@@ -75190,30 +75396,34 @@ f_ffd5e070:
 0005e088: .half     0x00be 0x03d4 0x0061 0x03d8 0x0083 0x0000 0x0000 0x0000 ! .....a..........
 0005e098: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! ;code (ffd5e0a0)  (token 0x1faa, VA ffd5e0a0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5e0a0)  (token 0x1faa, VA ffd5e0a0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5e0a0:
 0005e0a0: .half     0x0cb0 0x00ba 0x00c8 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd5e0b0)  (token 0x1fab, VA ffd5e0b0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5e0b0)  (token 0x1fab, VA ffd5e0b0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5e0b0:
 0005e0b0: .half     0x0cb0 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd5e0c0)  (token 0x1fac, VA ffd5e0c0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5e0c0)  (token 0x1fac, VA ffd5e0c0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5e0c0:
 0005e0c0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd5e0d0)  (token 0x1fad, VA ffd5e0d0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5e0d0)  (token 0x1fad, VA ffd5e0d0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5e0d0:
 0005e0d0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd5e0e0)  (token 0x1fae, VA ffd5e0e0)  does> of vocabulary 39 bytes
+! does (ffd5e0e0)  (token 0x1fae, VA ffd5e0e0)  does> of vocabulary 14 bytes
 
 f_ffd5e0e0:
 0005e0e0: .half     0x054d 0x0684 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd5e0f0)  (token 0x1faf, VA ffd5e0f0)  does> of vocabulary 23 bytes
+
+f_ffd5e0f0:
 0005e0f0: .half     0x054d 0x0696 0x6d65 0x6d6f 0x7279 0x0000 0x0000 0x0000 ! .M..memory......
 0005e100: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -75221,7 +75431,7 @@ f_name_14:
 0005e110: .half     0x106b 0x0000 0x001e 0x0007 0x0000 0x0000 0x0000 0x0000 ! .k..............
 0005e120: .half     0x0000 0x0000                                ! ....
 
-! does available  (token 0x1fb3, VA ffd5e130)  does> of (ffd5e070) 231 bytes
+! does available  (token 0x1fb3, VA ffd5e130)  does> of (ffd5e070) 190 bytes
 0005e124: .half     0x6176 0x6169 0x6c61 0x626c 0x6589 0x1fb1    ! available...
 
 f_available:
@@ -75237,7 +75447,15 @@ f_available:
 0005e1c0: .half     0x0cb0 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 0005e1d0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 0005e1e0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd5e1f0)  (token 0x1fbf, VA ffd5e1f0)  does> of vocabulary 14 bytes
+
+f_ffd5e1f0:
 0005e1f0: .half     0x054d 0x0698 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd5e200)  (token 0x1fc0, VA ffd5e200)  does> of vocabulary 23 bytes
+
+f_ffd5e200:
 0005e200: .half     0x054d 0x06aa 0x7669 0x7274 0x7561 0x6c2d 0x6d65 0x6d6f ! .M..virtual-memo
 0005e210: .half     0x7279 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! ry.......name...
 
@@ -76522,22 +76740,22 @@ f_ffd5f940:
 0005f944: 8e21e004  sub       %g7, 4, %g7
 0005f948: .half     0x2126 0x0083 0x0000 0x0000                  ! !&......
 
-! ;code (ffd5f950)  (token 0x2135, VA ffd5f950)  ;code of - (code 0004b100), token body:
+! ;code (ffd5f950)  (token 0x2135, VA ffd5f950)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5f950:
 0005f950: .half     0x0cb0 0x2127 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!'............
 
-! ;code (ffd5f960)  (token 0x2136, VA ffd5f960)  ;code of - (code 0004b100), token body:
+! ;code (ffd5f960)  (token 0x2136, VA ffd5f960)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5f960:
 0005f960: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd5f970)  (token 0x2137, VA ffd5f970)  ;code of - (code 0004b100), token body:
+! ;code (ffd5f970)  (token 0x2137, VA ffd5f970)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5f970:
 0005f970: .half     0x0cb0 0x00ba 0x212b 0x0083 0x0000 0x0000 0x0000 0x0000 ! ....!+..........
 
-! ;code (ffd5f980)  (token 0x2138, VA ffd5f980)  ;code of - (code 0004b100), token body:
+! ;code (ffd5f980)  (token 0x2138, VA ffd5f980)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5f980:
 0005f980: .half     0x0cb0 0x2131 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!1............
@@ -76560,23 +76778,23 @@ f_ffd5f9c0:
 0005f9c8: .half     0x2126 0x0016 0x0019 0x0059 0x0016 0x0019 0x005d 0x0083 ! !&.....Y.....]..
 0005f9d8: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! ;code (ffd5f9e0)  (token 0x213e, VA ffd5f9e0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5f9e0)  (token 0x213e, VA ffd5f9e0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5f9e0:
 0005f9e0: .half     0x0cb0 0x2127 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!'............
 
-! ;code (ffd5f9f0)  (token 0x213f, VA ffd5f9f0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5f9f0)  (token 0x213f, VA ffd5f9f0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5f9f0:
 0005f9f0: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd5fa00)  (token 0x2140, VA ffd5fa00)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fa00)  (token 0x2140, VA ffd5fa00)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fa00:
 0005fa00: .half     0x0cb0 0x00ba 0x001e 0x000e 0x017f 0x0474 0x7275 0x6500 ! ...........true.
 0005fa10: .half     0x001c 0x000c 0x017f 0x0566 0x616c 0x7365 0x0000 0x0083 ! .......false....
 
-! ;code (ffd5fa20)  (token 0x2142, VA ffd5fa20)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fa20)  (token 0x2142, VA ffd5fa20)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fa20:
 0005fa20: .half     0x0cb0 0x00ba 0x017f 0x0474 0x7275 0x6500 0x09ec 0x0083 ! .......true.....
@@ -76598,24 +76816,24 @@ f_ffd5fa60:
 0005fa64: 8e21e004  sub       %g7, 4, %g7
 0005fa68: .half     0x2115 0x0104 0x0083 0x0000                  ! !.......
 
-! ;code (ffd5fa70)  (token 0x2147, VA ffd5fa70)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fa70)  (token 0x2147, VA ffd5fa70)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fa70:
 0005fa70: .half     0x0cb0 0x20ff 0x001e 0x000e 0x2115 0x2080 0x011b 0x20c6 ! .. .....!. ... .
 0005fa80: .half     0x001c 0x0004 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd5fa90)  (token 0x2149, VA ffd5fa90)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fa90)  (token 0x2149, VA ffd5fa90)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fa90:
 0005fa90: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd5faa0)  (token 0x214a, VA ffd5faa0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5faa0)  (token 0x214a, VA ffd5faa0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5faa0:
 0005faa0: .half     0x0cb0 0x210e 0x2124 0x0051 0x001e 0x000c 0x00ba 0x210f ! ..!.!$.Q......!.
 0005fab0: .half     0x0182 0x001c 0x0004 0x212b 0x0083 0x0000 0x0000 0x0000 ! ......!+........
 
-! ;code (ffd5fac0)  (token 0x214c, VA ffd5fac0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fac0)  (token 0x214c, VA ffd5fac0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fac0:
 0005fac0: .half     0x0cb0 0x2131 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!1............
@@ -76648,22 +76866,22 @@ f_ffd5fb40:
 0005fb44: 8e21e004  sub       %g7, 4, %g7
 0005fb48: .half     0x2115 0x0182 0x0083 0x0000                  ! !.......
 
-! ;code (ffd5fb50)  (token 0x2155, VA ffd5fb50)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fb50)  (token 0x2155, VA ffd5fb50)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fb50:
 0005fb50: .half     0x0cb0 0x2128 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!(............
 
-! ;code (ffd5fb60)  (token 0x2156, VA ffd5fb60)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fb60)  (token 0x2156, VA ffd5fb60)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fb60:
 0005fb60: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd5fb70)  (token 0x2157, VA ffd5fb70)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fb70)  (token 0x2157, VA ffd5fb70)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fb70:
 0005fb70: .half     0x0cb0 0x2151 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!Q............
 
-! ;code (ffd5fb80)  (token 0x2158, VA ffd5fb80)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fb80)  (token 0x2158, VA ffd5fb80)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fb80:
 0005fb80: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -76716,22 +76934,22 @@ f_ffd5fc70:
 0005fc74: 8e21e004  sub       %g7, 4, %g7
 0005fc78: .half     0x215e 0x0083 0x0000 0x0000                  ! !^......
 
-! ;code (ffd5fc80)  (token 0x2168, VA ffd5fc80)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fc80)  (token 0x2168, VA ffd5fc80)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fc80:
 0005fc80: .half     0x0cb0 0x2160 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!`............
 
-! ;code (ffd5fc90)  (token 0x2169, VA ffd5fc90)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fc90)  (token 0x2169, VA ffd5fc90)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fc90:
 0005fc90: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd5fca0)  (token 0x216a, VA ffd5fca0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fca0)  (token 0x216a, VA ffd5fca0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fca0:
 0005fca0: .half     0x0cb0 0x2164 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!d............
 
-! ;code (ffd5fcb0)  (token 0x216b, VA ffd5fcb0)  ;code of - (code 0004b100), token body:
+! ;code (ffd5fcb0)  (token 0x216b, VA ffd5fcb0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd5fcb0:
 0005fcb0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -76994,17 +77212,17 @@ f_ffd60290:
 00060294: 8e21e004  sub       %g7, 4, %g7
 00060298: .half     0x2126 0x0083 0x0000 0x0000                  ! !&......
 
-! ;code (ffd602a0)  (token 0x21ca, VA ffd602a0)  ;code of - (code 0004b100), token body:
+! ;code (ffd602a0)  (token 0x21ca, VA ffd602a0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd602a0:
 000602a0: .half     0x0cb0 0x2127 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!'............
 
-! ;code (ffd602b0)  (token 0x21cb, VA ffd602b0)  ;code of - (code 0004b100), token body:
+! ;code (ffd602b0)  (token 0x21cb, VA ffd602b0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd602b0:
 000602b0: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd602c0)  (token 0x21cc, VA ffd602c0)  ;code of - (code 0004b100), token body:
+! ;code (ffd602c0)  (token 0x21cc, VA ffd602c0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd602c0:
 000602c0: .half     0x0cb0 0x00ba 0x038e 0x003a 0x0012 0x017f 0x0763 0x6f6d ! .......:.....com
@@ -77012,7 +77230,7 @@ f_ffd602c0:
 000602e0: .half     0x017f 0x0466 0x756c 0x6c00 0x003f 0x000e 0x017f 0x046e ! ...full..?.....n
 000602f0: .half     0x6f6e 0x6500 0x00c2 0x0041 0x0083 0x0000 0x0000 0x0000 ! one....A........
 
-! ;code (ffd60300)  (token 0x21d0, VA ffd60300)  ;code of - (code 0004b100), token body:
+! ;code (ffd60300)  (token 0x21d0, VA ffd60300)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd60300:
 00060300: .half     0x0cb0 0x00ba 0x00ca 0x017f 0x0466 0x756c 0x6c00 0x09ec ! .........full...
@@ -77036,7 +77254,7 @@ f_ffd60370:
 00060374: 8e21e004  sub       %g7, 4, %g7
 00060378: .half     0x215e 0x0083 0x0000 0x0000                  ! !^......
 
-! ;code (ffd60380)  (token 0x21d8, VA ffd60380)  ;code of - (code 0004b100), token body:
+! ;code (ffd60380)  (token 0x21d8, VA ffd60380)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd60380:
 00060380: .half     0x0cb0 0x00bc 0x014d 0x00fa 0x013e 0x0061 0x00bc 0x007b ! .....M...>.a...{
@@ -77044,17 +77262,17 @@ f_ffd60380:
 000603a0: .half     0x011f 0x014d 0x00bc 0x007d 0x038d 0x012a 0x00c0 0x0048 ! ...M...}...*...H
 000603b0: .half     0x20c6 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 !  ...............
 
-! ;code (ffd603c0)  (token 0x21dc, VA ffd603c0)  ;code of - (code 0004b100), token body:
+! ;code (ffd603c0)  (token 0x21dc, VA ffd603c0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd603c0:
 000603c0: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd603d0)  (token 0x21dd, VA ffd603d0)  ;code of - (code 0004b100), token body:
+! ;code (ffd603d0)  (token 0x21dd, VA ffd603d0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd603d0:
 000603d0: .half     0x0cb0 0x00ba 0x00c8 0x038d 0x038d 0x0083 0x0000 0x0000 ! ................
 
-! ;code (ffd603e0)  (token 0x21de, VA ffd603e0)  ;code of - (code 0004b100), token body:
+! ;code (ffd603e0)  (token 0x21de, VA ffd603e0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd603e0:
 000603e0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
@@ -77217,22 +77435,22 @@ f_ffd60790:
 00060794: 8e21e004  sub       %g7, 4, %g7
 00060798: .half     0x2211 0x0083 0x0000 0x0000                  ! ".......
 
-! ;code (ffd607a0)  (token 0x221a, VA ffd607a0)  ;code of - (code 0004b100), token body:
+! ;code (ffd607a0)  (token 0x221a, VA ffd607a0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd607a0:
 000607a0: .half     0x0cb0 0x2212 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..".............
 
-! ;code (ffd607b0)  (token 0x221b, VA ffd607b0)  ;code of - (code 0004b100), token body:
+! ;code (ffd607b0)  (token 0x221b, VA ffd607b0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd607b0:
 000607b0: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd607c0)  (token 0x221c, VA ffd607c0)  ;code of - (code 0004b100), token body:
+! ;code (ffd607c0)  (token 0x221c, VA ffd607c0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd607c0:
 000607c0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! ;code (ffd607d0)  (token 0x221d, VA ffd607d0)  ;code of - (code 0004b100), token body:
+! ;code (ffd607d0)  (token 0x221d, VA ffd607d0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd607d0:
 000607d0: .half     0x0cb0 0x00ba 0x0083                         ! ......
@@ -77517,12 +77735,20 @@ f_name_16:
 00060dd0: .half     0x2c35 0x3031 0x2d32 0x3332 0x3400 0x0000 0x0000 0x0000 ! ,501-2324.......
 00060de0: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! does model  (token 0x227f, VA ffd60df0)  does> of (ffd4ecb0) 55 bytes
+! does model  (token 0x227f, VA ffd60df0)  does> of (ffd4ecb0) 14 bytes
 00060de8: .half     0x6d6f 0x6465 0x6c85 0x227c                  ! model."|
 
 f_model_2:
 00060df0: .half     0x106b 0x0000 0x002a 0x0012 0x0000 0x0000 0x0000 0x0000 ! .k...*..........
+
+! does (ffd60e00)  (token 0x2280, VA ffd60e00)  does> of vocabulary 14 bytes
+
+f_ffd60e00:
 00060e00: .half     0x054d 0x06f8 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd60e10)  (token 0x2281, VA ffd60e10)  does> of vocabulary 23 bytes
+
+f_ffd60e10:
 00060e10: .half     0x054d 0x070a 0x6563 0x636d 0x656d 0x6374 0x6c00 0x0000 ! .M..eccmemctl...
 00060e20: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -77544,13 +77770,21 @@ f_width:
 00060e70: .half     0x106b 0x0000 0x001a 0x0004 0x534d 0x4300 0x0000 0x0000 ! .k......SMC.....
 00060e80: .half     0x0000 0x0000 0x0000                         ! ......
 
-! does mc-type  (token 0x2289, VA ffd60e90)  does> of (ffd4ecb0) 71 bytes
+! does mc-type  (token 0x2289, VA ffd60e90)  does> of (ffd4ecb0) 30 bytes
 00060e86: .half     0x6d63 0x2d74 0x7970 0x6587 0x2287           ! mc-type.".
 
 f_mc_type:
 00060e90: .half     0x106b 0x0000 0x001a 0x0004 0x0000 0x0000 0x0000 0x0000 ! .k..............
 00060ea0: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd60eb0)  (token 0x228b, VA ffd60eb0)  does> of vocabulary 14 bytes
+
+f_ffd60eb0:
 00060eb0: .half     0x054d 0x070c 0x1053 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...S..........
+
+! does (ffd60ec0)  (token 0x228c, VA ffd60ec0)  does> of vocabulary 23 bytes
+
+f_ffd60ec0:
 00060ec0: .half     0x054d 0x071e 0x5355 0x4e57 0x2c73 0x7800 0x0000 0x0000 ! .M..SUNW,sx.....
 00060ed0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -77612,10 +77846,14 @@ f_close_7:
 f_decode_unit_4:
 00061080: .half     0x0002 0x117a 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...z............
 
-! does (ffd61090)  (token 0x22a9, VA ffd61090)  does> of vocabulary 39 bytes
+! does (ffd61090)  (token 0x22a9, VA ffd61090)  does> of vocabulary 14 bytes
 
 f_ffd61090:
 00061090: .half     0x054d 0x0720 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M. ............
+
+! does (ffd610a0)  (token 0x22aa, VA ffd610a0)  does> of vocabulary 23 bytes
+
+f_ffd610a0:
 000610a0: .half     0x054d 0x0732 0x5355 0x4e57 0x2c66 0x6474 0x776f 0x0000 ! .M.2SUNW,fdtwo..
 000610b0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -77658,10 +77896,14 @@ f_map_out_4:
 00061190: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 000611a0: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd611b0)  (token 0x22bb, VA ffd611b0)  does> of vocabulary 39 bytes
+! does (ffd611b0)  (token 0x22bb, VA ffd611b0)  does> of vocabulary 14 bytes
 
 f_ffd611b0:
 000611b0: .half     0x054d 0x0734 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.4............
+
+! does (ffd611c0)  (token 0x22bc, VA ffd611c0)  does> of vocabulary 23 bytes
+
+f_ffd611c0:
 000611c0: .half     0x054d 0x0746 0x6175 0x7869 0x6f00 0x0000 0x0000 0x0000 ! .M.Fauxio.......
 000611d0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -77669,13 +77911,21 @@ f_name_20:
 000611e0: .half     0x106b 0x0000 0x001e 0x0006 0x0000 0x0000 0x0080 0x0000 ! .k..............
 000611f0: .half     0x0000 0x0001 0x0000 0x0000 0x0000           ! ..........
 
-! does reg  (token 0x22c0, VA ffd61200)  does> of (ffd4ecb0) 71 bytes
+! does reg  (token 0x22c0, VA ffd61200)  does> of (ffd4ecb0) 30 bytes
 000611fa: .half     0x7265 0x6783 0x22be                         ! reg.".
 
 f_reg_12:
 00061200: .half     0x106b 0x0000 0x001a 0x000c 0x0000 0x0000 0x0000 0x0000 ! .k..............
 00061210: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! does (ffd61220)  (token 0x22c2, VA ffd61220)  does> of vocabulary 14 bytes
+
+f_ffd61220:
 00061220: .half     0x054d 0x0748 0x1dd6 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.H............
+
+! does (ffd61230)  (token 0x22c3, VA ffd61230)  does> of vocabulary 23 bytes
+
+f_ffd61230:
 00061230: .half     0x054d 0x075a 0x706f 0x7765 0x7200 0x0000 0x0000 0x0000 ! .M.Zpower.......
 00061240: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -78255,22 +78505,22 @@ f_ffd61c80:
 00061c88: .half     0x2124 0x001e 0x000a 0x00ba 0x2365 0x001c 0x0006 0x2115 ! !$......#e....!.
 00061c98: .half     0x0182 0x0083 0x0000 0x0000                  ! ........
 
-! ;code (ffd61ca0)  (token 0x236a, VA ffd61ca0)  ;code of - (code 0004b100), token body:
+! ;code (ffd61ca0)  (token 0x236a, VA ffd61ca0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd61ca0:
 00061ca0: .half     0x0cb0 0x2128 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!(............
 
-! ;code (ffd61cb0)  (token 0x236b, VA ffd61cb0)  ;code of - (code 0004b100), token body:
+! ;code (ffd61cb0)  (token 0x236b, VA ffd61cb0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd61cb0:
 00061cb0: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd61cc0)  (token 0x236c, VA ffd61cc0)  ;code of - (code 0004b100), token body:
+! ;code (ffd61cc0)  (token 0x236c, VA ffd61cc0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd61cc0:
 00061cc0: .half     0x0cb0 0x2151 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!Q............
 
-! ;code (ffd61cd0)  (token 0x236d, VA ffd61cd0)  ;code of - (code 0004b100), token body:
+! ;code (ffd61cd0)  (token 0x236d, VA ffd61cd0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd61cd0:
 00061cd0: .half     0x0cb0 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 ! ..............
@@ -78861,8 +79111,13 @@ f_dot_version:
 f_divrem:
 00062890: .half     0x0002 0x01eb 0x00c2 0x010a 0x00c0 0x010a 0x0083 0x0000 ! ................
 
-sub_000628a0:                            ! xref 0003d910c
-000628a0: .half     0x9de3 0xbf98 0x7fff 0xab00 0x0100 0x0000 0x2429 0x0ed6 ! ............$)..
+! c-entry (ffd628a0)  (token 0x242a, VA ffd628a0)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd628a0:                              ! xref 0003d910c
+000628a0: 9de3bf98  save      %sp, -0x68, %sp
+000628a4: 7fffab00  call      fw_ffd4d4a0
+000628a8: 01000000  nop
+000628ac: .half     0x2429 0x0ed6                                ! $)..
 
 ! constant (ffd628b0)  (token 0x242b, VA ffd628b0)  = 0x12c
 
@@ -78997,12 +79252,12 @@ f_ffd62b20:
 00062b24: 8e21e004  sub       %g7, 4, %g7
 00062b28: .half     0x244e 0x01be 0x0019 0x0083                  ! $N......
 
-! ;code (ffd62b30)  (token 0x2453, VA ffd62b30)  ;code of - (code 0004b100), token body:
+! ;code (ffd62b30)  (token 0x2453, VA ffd62b30)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd62b30:
 00062b30: .half     0x0cb0 0x244e 0x01c0 0x0083 0x0000 0x0000 0x0000 0x0000 ! ..$N............
 
-! ;code (ffd62b40)  (token 0x2454, VA ffd62b40)  ;code of - (code 0004b100), token body:
+! ;code (ffd62b40)  (token 0x2454, VA ffd62b40)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd62b40:
 00062b40: .half     0x0cb0 0x244e 0x01be 0x0083 0x0000 0x0000 0x0000 ! ..$N..........
@@ -79032,12 +79287,12 @@ f_ffd62bb0:
 00062bb4: 8e21e004  sub       %g7, 4, %g7
 00062bb8: .half     0x244e 0x00f4 0x0083 0x0000                  ! $N......
 
-! ;code (ffd62bc0)  (token 0x245c, VA ffd62bc0)  ;code of - (code 0004b100), token body:
+! ;code (ffd62bc0)  (token 0x245c, VA ffd62bc0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd62bc0:
 00062bc0: .half     0x0cb0 0x244e 0x010a 0x0083 0x0000 0x0000 0x0000 0x0000 ! ..$N............
 
-! ;code (ffd62bd0)  (token 0x245d, VA ffd62bd0)  ;code of - (code 0004b100), token body:
+! ;code (ffd62bd0)  (token 0x245d, VA ffd62bd0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd62bd0:
 00062bd0: .half     0x0cb0 0x244e 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..$N............
@@ -80619,10 +80874,14 @@ f_fb8_install:
 00064960: .half     0x0178 0x25f9 0x2453 0x2474 0x0178 0x2600 0x2453 0x2488 ! .x%.$S$t.x&.$S$.
 00064970: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd64980)  (token 0x2638, VA ffd64980)  does> of vocabulary 39 bytes
+! does (ffd64980)  (token 0x2638, VA ffd64980)  does> of vocabulary 14 bytes
 
 f_ffd64980:
 00064980: .half     0x054d 0x07fc 0x1261 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...a..........
+
+! does (ffd64990)  (token 0x2639, VA ffd64990)  does> of vocabulary 23 bytes
+
+f_ffd64990:
 00064990: .half     0x054d 0x080e 0x6469 0x736b 0x2d6c 0x6162 0x656c 0x0000 ! .M..disk-label..
 000649a0: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -80756,10 +81015,14 @@ f_load:
 00064dc0: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 00064dd0: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
 
-! does (ffd64de0)  (token 0x267e, VA ffd64de0)  does> of vocabulary 30 bytes
+! does (ffd64de0)  (token 0x267e, VA ffd64de0)  does> of vocabulary 14 bytes
 
 f_ffd64de0:
 00064de0: .half     0x054d 0x0810 0x1261 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M...a..........
+
+! does (ffd64df0)  (token 0x267f, VA ffd64df0)  does> of vocabulary 14 bytes
+
+f_ffd64df0:
 00064df0: .half     0x054d 0x0822 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M."............
 
 ! constant (ffd64e00)  (token 0x2680, VA ffd64e00)  = 0x7fffffff
@@ -80936,8 +81199,15 @@ f_mac_address:
 f_mac_address_2:
 000651a0: .half     0x0002 0x017f 0x0b6d 0x6163 0x2d61 0x6464 0x7265 0x7373 ! .....mac-address
 000651b0: .half     0x0000 0x00c2 0x1197 0x119b 0x001e 0x0004 0x20e2 0x00c2 ! ............ ...
-000651c0: .half     0x00c0 0x0258 0x0397 0x0083 0x9de3 0xbf98 0x7fff 0xa0b6 ! ...X............
-000651d0: .half     0x0100 0x0000 0x26ba 0x0ed6 0x0000           ! ....&.....
+000651c0: .half     0x00c0 0x0258 0x0397 0x0083                  ! ...X....
+
+! c-entry (ffd651c8)  (VA ffd651c8)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd651c8:
+000651c8: 9de3bf98  save      %sp, -0x68, %sp
+000651cc: 7fffa0b6  call      fw_ffd4d4a0
+000651d0: 01000000  nop
+000651d4: .half     0x26ba 0x0ed6 0x0000                         ! &.....
 
 ! colon u..  (token 0x26be, VA ffd651e0)
 !   <# #s #> type ;
@@ -81103,9 +81373,16 @@ f_ffd65500:
 f_ffd65510:
 00065510: .half     0x0002 0x03ca 0x1a55 0x6e69 0x6d70 0x6c65 0x6d65 0x6e74 ! .....Unimplement
 00065520: .half     0x6564 0x2052 0x4f4d 0x7665 0x6320 0x6361 0x6c6c 0x2e00 ! ed ROMvec call..
-00065530: .half     0x02c3 0x038d 0x0083 0x0000 0x9de3 0xbf98 0x7fff 0x9fda ! ................
-00065540: .half     0x0100 0x0000 0x26f1 0x0ed6 0x0000 0x0000 0x0000 0x0000 ! ....&...........
-00065550: .half     0x0000 0x0000 0x0000 0x006d 0x6179 0x6765 0x7486 0x26ed ! .......mayget.&.
+00065530: .half     0x02c3 0x038d 0x0083 0x0000                  ! ........
+
+! c-entry (ffd65538)  (VA ffd65538)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd65538:
+00065538: 9de3bf98  save      %sp, -0x68, %sp
+0006553c: 7fff9fda  call      fw_ffd4d4a0
+00065540: 01000000  nop
+00065544: .half     0x26f1 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! &...............
+00065554: .half     0x0000 0x006d 0x6179 0x6765 0x7486 0x26ed    ! ...mayget.&.
 
 f_mayget:
 00065560: .half     0x0002 0x02b7 0x001e 0x0008 0x02b6 0x001c 0x0006 0x0016 ! ................
@@ -81122,14 +81399,39 @@ f_mayput:
 
 f_putchar:
 000655a0: .half     0x0002 0x00bc 0x072d 0x00a2 0x001e 0x0006 0x02d3 0x02b4 ! .....-..........
-000655b0: .half     0x02b4 0x0083 0x9de3 0xbf98 0x7fff 0x9fbb 0x0100 0x0000 ! ................
-000655c0: .half     0x02b6 0x0ed6 0x9de3 0xbf98 0x7fff 0x9fb7 0x0100 0x0000 ! ................
+000655b0: .half     0x02b4 0x0083                                ! ....
+
+! c-entry (ffd655b4)  (VA ffd655b4)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd655b4:
+000655b4: 9de3bf98  save      %sp, -0x68, %sp
+000655b8: 7fff9fbb  call      fw_ffd4d4a0
+000655bc: 01000000  nop
+000655c0: .half     0x02b6 0x0ed6                                ! ....
+
+! c-entry (ffd655c4)  (VA ffd655c4)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd655c4:
+000655c4: 9de3bf98  save      %sp, -0x68, %sp
+000655c8: 7fff9fb7  call      fw_ffd4d4a0
+000655cc: 01000000  nop
 000655d0: .half     0x26f6 0x0ed6                                ! &...
 
-sub_000655d4:                            ! xref 0003d930c 0003d960c 0003da38c 0003da94c 0003dabcc
-000655d4: .half     0x9de3 0xbf98 0x7fff 0x9fb3 0x0100 0x0000 0x26fa 0x0ed6 ! ............&...
-000655e4: .half     0x9de3 0xbf98 0x7fff 0x9faf 0x0100 0x0000 0x26f8 0x0ed6 ! ............&...
-000655f4: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0000    ! ............
+! c-entry (ffd655d4)  (VA ffd655d4)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd655d4:                              ! xref 0003d930c 0003d960c 0003da38c 0003da94c 0003dabcc
+000655d4: 9de3bf98  save      %sp, -0x68, %sp
+000655d8: 7fff9fb3  call      fw_ffd4d4a0
+000655dc: 01000000  nop
+000655e0: .half     0x26fa 0x0ed6                                ! &...
+
+! c-entry (ffd655e4)  (VA ffd655e4)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd655e4:
+000655e4: 9de3bf98  save      %sp, -0x68, %sp
+000655e8: 7fff9faf  call      fw_ffd4d4a0
+000655ec: 01000000  nop
+000655f0: .half     0x26f8 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! &...............
 
 ! constant (ffd65600)  (token 0x2700, VA ffd65600)  = 0x400
 
@@ -81434,10 +81736,14 @@ f_op_chain:
 00065c90: .half     0x00ba 0x038d 0x007d 0x00cf 0x007d 0x19c5 0x2757 0x0df4 ! .....}...}..'W..
 00065ca0: .half     0x0cfd 0x0d24 0x0cfd 0x0d23 0x2201 0x0083    ! ...$...#"...
 
-sub_00065cac:                            ! xref 0003e350c
-00065cac: .half     0x9de3 0xbf98 0x7fff 0x9dfd 0x0100 0x0000 0x2767 0x0ed6 ! ............'g..
-00065cbc: .half     0x0000 0x0000 0x0000 0x0000 0x0075 0x6162 0x7265 0x616b ! .........uabreak
-00065ccc: .half     0x3f88 0x2767                                ! ?.'g
+! c-entry (ffd65cac)  (VA ffd65cac)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd65cac:                              ! xref 0003e350c
+00065cac: 9de3bf98  save      %sp, -0x68, %sp
+00065cb0: 7fff9dfd  call      fw_ffd4d4a0
+00065cb4: 01000000  nop
+00065cb8: .half     0x2767 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0075 0x6162 ! 'g...........uab
+00065cc8: .half     0x7265 0x616b 0x3f88 0x2767                  ! reak?.'g
 
 f_uabreak_q:
 00065cd0: .half     0x0002 0x0016 0x0011 0x13f8 0x1547 0x13f8 0x1548 0x0016 ! .........G...H..
@@ -81698,12 +82004,23 @@ f_ffd66260:
 !   dup cstrlen (ffd66250) ;
 
 f_ffd66270:
-00066270: .half     0x0002 0x00bc 0x09dd 0x27c5 0x0083 0x0000 0x9de3 0xbf98 ! ......'.........
-00066280: .half     0x7fff 0x9c89 0x0100 0x0000 0x27c7 0x0ed6    ! ........'...
+00066270: .half     0x0002 0x00bc 0x09dd 0x27c5 0x0083 0x0000    ! ......'.....
 
-sub_0006628c:                            ! xref 0003e0d8c
-0006628c: .half     0x9de3 0xbf98 0x7fff 0x9c85 0x0100 0x0000 0x27c7 0x0ed6 ! ............'...
-0006629c: .half     0x0000 0x0000                                ! ....
+! c-entry (ffd6627c)  (VA ffd6627c)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd6627c:
+0006627c: 9de3bf98  save      %sp, -0x68, %sp
+00066280: 7fff9c89  call      fw_ffd4d4a0
+00066284: 01000000  nop
+00066288: .half     0x27c7 0x0ed6                                ! '...
+
+! c-entry (ffd6628c)  (VA ffd6628c)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd6628c:                              ! xref 0003e0d8c
+0006628c: 9de3bf98  save      %sp, -0x68, %sp
+00066290: 7fff9c85  call      fw_ffd4d4a0
+00066294: 01000000  nop
+00066298: .half     0x27c7 0x0ed6 0x0000 0x0000                  ! '.......
 
 ! colon (ffd662a0)  (token 0x27ca, VA ffd662a0)
 !   (ffd66230) ?branch L1 exit
@@ -82022,13 +82339,24 @@ f_eval_2:
 00066af0: .half     0x006f 0x702d 0x696e 0x7465 0x7270 0x7265 0x748c 0x284e ! .op-interpret.(N
 
 f_op_interpret:
-00066b00: .half     0x0002 0x00bc 0x09dd 0x0a18 0x0083 0x0000 0x9de3 0xbf98 ! ................
-00066b10: .half     0x7fff 0x9a65 0x0100 0x0000 0x2850 0x0ed6    ! ...e....(P..
+00066b00: .half     0x0002 0x00bc 0x09dd 0x0a18 0x0083 0x0000    ! ............
 
-sub_00066b1c:                            ! xref 0003e158c
-00066b1c: .half     0x9de3 0xbf98 0x7fff 0x9a61 0x0100 0x0000 0x2850 0x0ed6 ! .......a....(P..
-00066b2c: .half     0x0000 0x0000 0x0000 0x0000 0x0000 0x0076 0x6563 0x746f ! ...........vecto
-00066b3c: .half     0x7286 0x2850                                ! r.(P
+! c-entry (ffd66b0c)  (VA ffd66b0c)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd66b0c:
+00066b0c: 9de3bf98  save      %sp, -0x68, %sp
+00066b10: 7fff9a65  call      fw_ffd4d4a0
+00066b14: 01000000  nop
+00066b18: .half     0x2850 0x0ed6                                ! (P..
+
+! c-entry (ffd66b1c)  (VA ffd66b1c)  C-callable stub: save; call 0004d4a4; nop; then tokens:
+
+f_ffd66b1c:                              ! xref 0003e158c
+00066b1c: 9de3bf98  save      %sp, -0x68, %sp
+00066b20: 7fff9a61  call      fw_ffd4d4a0
+00066b24: 01000000  nop
+00066b28: .half     0x2850 0x0ed6 0x0000 0x0000 0x0000 0x0000 0x0000 0x0076 ! (P.............v
+00066b38: .half     0x6563 0x746f 0x7286 0x2850                  ! ector.(P
 
 f_vector:
 00066b40: .half     0x0006 0x0864                                ! ...d
@@ -82920,66 +83248,296 @@ f_execute_buffer_5:
 
 f_fcode_debug_q:
 00067ce0: .half     0x213c 0x05bb 0x0001 0x0000 0x0000 0x0000 0x0000 0x0000 ! !<..............
+
+! colon (ffd67cf0)  (token 0x296f, VA ffd67cf0)
+!   (ffd678c0) state @ ?branch L1 compile (lit) ,
+!   L1: ;
+
+f_ffd67cf0:
 00067cf0: .half     0x0002 0x292c 0x03d2 0x00f4 0x001e 0x0008 0x03eb 0x0013 ! ..),............
 00067d00: .half     0x03e2 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67d10)  (token 0x2971, VA ffd67d10)
+!   (ffd67950) drop state @ ?branch L1 compile (') token,
+!   L1: ;
+
+f_ffd67d10:
 00067d10: .half     0x0002 0x2935 0x00ba 0x03d2 0x00f4 0x001e 0x0008 0x03eb ! ..)5............
 00067d20: .half     0x0178 0x01c3 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! .x..............
+
+! colon (ffd67d30)  (token 0x2973, VA ffd67d30)
+!   (ffd67900) state @ ?branch L1 compile (") ",
+!   L1: ;
+
+f_ffd67d30:
 00067d30: .half     0x0002 0x2930 0x03d2 0x00f4 0x001e 0x0008 0x03eb 0x017f ! ..)0............
 00067d40: .half     0x034a 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! .J..............
+
+! colon (ffd67d50)  (token 0x2975, VA ffd67d50)
+!   (ffd67950) drop do-is ;
+
+f_ffd67d50:
 00067d50: .half     0x0002 0x2935 0x00ba 0x05ec 0x0083 0x0000 0x0000 0x0000 ! ..)5............
+
+! colon (ffd67d60)  (token 0x2976, VA ffd67d60)
+!   (ffd67870) drop ;
+
+f_ffd67d60:
 00067d60: .half     0x0002 0x2927 0x00ba 0x0083 0x0000 0x0000 0x0000 0x0000 ! ..)'............
+
+! constant (ffd67d70)  (token 0x2977, VA ffd67d70)  = 0x55aa3312
+
+f_ffd67d70:
 00067d70: .half     0x000c 0x55aa 0x3312 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..U.3...........
+
+! constant (ffd67d80)  (token 0x2978, VA ffd67d80)  = 0x55aa3321
+
+f_ffd67d80:
 00067d80: .half     0x000c 0x55aa 0x3321 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..U.3!..........
+
+! user (ffd67d90)  (token 0x2979, VA ffd67d90)  up+0x8b8  initial 0
+
+f_ffd67d90:
 00067d90: .half     0x0006 0x08b8 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67da0)  (token 0x297a, VA ffd67da0)
+!   0 >r
+!   L1: (ffd67d70) = ?branch L2 >r branch L1
+!   L2: (ffd67d90) !
+!   L3: r> ?dup ?branch L4 (ffd67d70) branch L3
+!   L4: (ffd67d90) @ ;
+
+f_ffd67da0:
 00067da0: .half     0x0002 0x038d 0x007b 0x2977 0x00a2 0x001e 0x0008 0x007b ! .....{)w.......{
 00067db0: .half     0x001c 0xfff4 0x2979 0x010a 0x007d 0x03a0 0x001e 0x0008 ! ....)y...}......
 00067dc0: .half     0x2977 0x001c 0xfff4 0x2979 0x00f4 0x0083 0x0000 0x0000 ! )w....)y........
+
+! colon (ffd67dd0)  (token 0x297d, VA ffd67dd0)
+!   0 >r
+!   L1: (ffd67d80) = ?branch L2 >r branch L1
+!   L2: (ffd67d90) !
+!   L3: r> ?dup ?branch L4 (ffd67d80) branch L3
+!   L4: (ffd67d90) @ ;
+
+f_ffd67dd0:
 00067dd0: .half     0x0002 0x038d 0x007b 0x2978 0x00a2 0x001e 0x0008 0x007b ! .....{)x.......{
 00067de0: .half     0x001c 0xfff4 0x2979 0x010a 0x007d 0x03a0 0x001e 0x0008 ! ....)y...}......
 00067df0: .half     0x2978 0x001c 0xfff4 0x2979 0x00f4 0x0083 0x0000 0x0000 ! )x....)y........
+
+! colon (ffd67e00)  (token 0x2980, VA ffd67e00)
+!   here (ffd67d70) ;
+
+f_ffd67e00:
 00067e00: .half     0x0002 0x03d4 0x2977 0x0083 0x0000 0x0000 0x0000 0x0000 ! ....)w..........
+
+! colon (ffd67e10)  (token 0x2981, VA ffd67e10)
+!   2swap ;
+
+f_ffd67e10:
 00067e10: .half     0x0002 0x00cf 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67e20)  (token 0x2982, VA ffd67e20)
+!   +level here (ffd67d80) ;
+
+f_ffd67e20:
 00067e20: .half     0x0002 0x041e 0x03d4 0x2978 0x0083 0x0000 0x0000 0x0000 ! ......)x........
+
+! colon (ffd67e30)  (token 0x2983, VA ffd67e30)
+!   (ffd67dd0) here over - swap branch! -level ;
+
+f_ffd67e30:
 00067e30: .half     0x0002 0x297d 0x03d4 0x00be 0x0061 0x00c0 0x01b3 0x0423 ! ..)}.....a.....#
 00067e40: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67e50)  (token 0x2985, VA ffd67e50)
+!   (ffd67d60) [compile] loop -level ;
+
+f_ffd67e50:
 00067e50: .half     0x0002 0x2976 0x0436 0x0423 0x0083 0x0000 0x0000 0x0000 ! ..)v.6.#........
+
+! colon (ffd67e60)  (token 0x2986, VA ffd67e60)
+!   (ffd67d60) [compile] +loop -level ;
+
+f_ffd67e60:
 00067e60: .half     0x0002 0x2976 0x0438 0x0423 0x0083 0x0000 0x0000 0x0000 ! ..)v.8.#........
+
+! colon (ffd67e70)  (token 0x2987, VA ffd67e70)
+!   +level (ffd67d60) [compile] do ;
+
+f_ffd67e70:
 00067e70: .half     0x0002 0x041e 0x2976 0x0432 0x0083 0x0000 0x0000 0x0000 ! ....)v.2........
+
+! colon (ffd67e80)  (token 0x2988, VA ffd67e80)
+!   +level (ffd67d60) [compile] ?do ;
+
+f_ffd67e80:
 00067e80: .half     0x0002 0x041e 0x2976 0x0434 0x0083 0x0000 0x0000 0x0000 ! ....)v.4........
+
+! colon (ffd67e90)  (token 0x2989, VA ffd67e90)
+!   [compile] leave ;
+
+f_ffd67e90:
 00067e90: .half     0x0002 0x042d 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...-............
+
+! colon (ffd67ea0)  (token 0x298a, VA ffd67ea0)
+!   +level 0 (ffd67d70) ;
+
+f_ffd67ea0:
 00067ea0: .half     0x0002 0x041e 0x038d 0x2977 0x0083 0x0000 0x0000 0x0000 ! ......)w........
+
+! colon (ffd67eb0)  (token 0x298b, VA ffd67eb0)
+!   +level (ffd67d60) compile (of) (ffd67e00) 0 branch, ;
+
+f_ffd67eb0:
 00067eb0: .half     0x0002 0x041e 0x2976 0x03eb 0x003a 0x2980 0x038d 0x01b2 ! ....)v...:).....
 00067ec0: .half     0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67ed0)  (token 0x298d, VA ffd67ed0)
+!   compile (endof) (ffd67d60) (ffd67e00) (ffd67e10) 0 branch, (ffd67e30) ;
+
+f_ffd67ed0:
 00067ed0: .half     0x0002 0x03eb 0x003f 0x2976 0x2980 0x2981 0x038d 0x01b2 ! .....?)v).).....
 00067ee0: .half     0x2983 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! )...............
+
+! colon (ffd67ef0)  (token 0x298f, VA ffd67ef0)
+!   compile (endcase)
+!   L1: (ffd67dd0) ?dup ?branch L2 here over - swap branch! branch L1
+!   L2: -level ;
+
+f_ffd67ef0:
 00067ef0: .half     0x0002 0x03eb 0x0041 0x297d 0x03a0 0x001e 0x0010 0x03d4 ! .....A)}........
 00067f00: .half     0x00be 0x0061 0x00c0 0x01b3 0x001c 0xffec 0x0423 0x0083 ! ...a.........#..
+
+! colon (ffd67f10)  (token 0x2991, VA ffd67f10)
+!   (ffd67870) 0< ?branch L1 compile branch (ffd67da0) here - branch, -level branch L2
+!   L1: +level compile branch (ffd67e00) (ffd67e10) 0 branch,
+!   L2: ;
+
+f_ffd67f10:
 00067f10: .half     0x0002 0x2927 0x0091 0x001e 0x0014 0x03eb 0x001c 0x297a ! ..)'..........)z
 00067f20: .half     0x03d4 0x0061 0x01b2 0x0423 0x001c 0x0010 0x041e 0x03eb ! ...a...#........
 00067f30: .half     0x001c 0x2980 0x2981 0x038d 0x01b2 0x0083 0x0000 0x0000 ! ..).)...........
+
+! colon (ffd67f40)  (token 0x2994, VA ffd67f40)
+!   (ffd67870) 0< ?branch L1 compile ?branch (ffd67da0) here - branch, -level branch L2
+!   L1: +level compile ?branch (ffd67e00) 0 branch,
+!   L2: ;
+
+f_ffd67f40:
 00067f40: .half     0x0002 0x2927 0x0091 0x001e 0x0014 0x03eb 0x001e 0x297a ! ..)'..........)z
 00067f50: .half     0x03d4 0x0061 0x01b2 0x0423 0x001c 0x000e 0x041e 0x03eb ! ...a...#........
 00067f60: .half     0x001e 0x2980 0x038d 0x01b2 0x0083 0x0000 0x0000 0x0000 ! ..).............
+
+! colon (ffd67f70)  (token 0x2997, VA ffd67f70)
+!   state on ;
+
+f_ffd67f70:
 00067f70: .half     0x0002 0x03d2 0x00eb 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67f80)  (token 0x2998, VA ffd67f80)
+!   state off ;
+
+f_ffd67f80:
 00067f80: .half     0x0002 0x03d2 0x00ee 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd67f90)  (token 0x2999, VA ffd67f90)
+!   (ffd67670) (ffd67670) swap (ffd677d0) swap (ffd67690) ;
+
+f_ffd67f90:
 00067f90: .half     0x0002 0x2907 0x2907 0x00c0 0x291d 0x00c0 0x2909 0x0083 ! ..).)...)...)...
+
+! colon (ffd67fa0)  (token 0x299a, VA ffd67fa0)
+!   acf-align lastacf swap token! ;
+
+f_ffd67fa0:
 00067fa0: .half     0x0002 0x0190 0x03d1 0x00c0 0x01c0 0x0083 0x0000 0x0000 ! ................
+
+! colon (ffd67fb0)  (token 0x299b, VA ffd67fb0)
+!   (ffd67f90) (ffd67fa0) ;
+
+f_ffd67fb0:
 00067fb0: .half     0x0002 0x2999 0x299a 0x0083 0x0000 0x0000 0x0000 0x0000 ! ..).)...........
+
+! colon (ffd67fc0)  (token 0x299c, VA ffd67fc0)
+!   (ffd678d0) (ffd67f90) swap fcode-debug? ?branch L1 "header branch L2
+!   L1: drop
+!   L2: (ffd67fa0) ;
+
+f_ffd67fc0:
 00067fc0: .half     0x0002 0x292d 0x2999 0x00c0 0x296e 0x001e 0x0008 0x04d4 ! ..)-)...)n......
 00067fd0: .half     0x001c 0x0004 0x00ba 0x299a 0x0083 0x0000 0x0000 0x0000 ! ......).........
+
+! colon (ffd67fe0)  (token 0x299e, VA ffd67fe0)
+!   (ffd678d0) (ffd67f90) swap "header (ffd67fa0) ;
+
+f_ffd67fe0:
 00067fe0: .half     0x0002 0x292d 0x2999 0x00c0 0x04d4 0x299a 0x0083 0x0000 ! ..)-).....).....
+
+! colon (ffd67ff0)  (token 0x299f, VA ffd67ff0)
+!   colon-cf (ffd67f70) ;
+
+f_ffd67ff0:
 00067ff0: .half     0x0002 0x01a5 0x2997 0x0083 0x0000 0x0000 0x0000 0x0000 ! ....)...........
+
+! colon (ffd68000)  (token 0x29a0, VA ffd68000)
+!   compile unnest (ffd67f80) ;
+
+f_ffd68000:
 00068000: .half     0x0002 0x03eb 0x0083 0x2998 0x0083 0x0000 0x0000 0x0000 ! ......).........
+
+! colon (ffd68010)  (token 0x29a1, VA ffd68010)
+!   (ffd4e4d0) ;
+
+f_ffd68010:
 00068010: .half     0x0002 0x0fed 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd68020)  (token 0x29a2, VA ffd68020)
+!   (ffd4e5c0) ;
+
+f_ffd68020:
 00068020: .half     0x0002 0x0ffc 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd68030)  (token 0x29a3, VA ffd68030)
+!   (ffd4e630) ;
+
+f_ffd68030:
 00068030: .half     0x0002 0x1003 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd68040)  (token 0x29a4, VA ffd68040)
+!   (ffd4e540) ;
+
+f_ffd68040:
 00068040: .half     0x0002 0x0ff4 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd68050)  (token 0x29a5, VA ffd68050)
+!   constant-cf , ;
+
+f_ffd68050:
 00068050: .half     0x0002 0x01ab 0x03e2 0x0083 0x0000 0x0000 0x0000 0x0000 ! ................
+
+! colon (ffd68060)  (token 0x29a6, VA ffd68060)
+!   variable-cf align (does>)
+!   [00068070: call dodoes] does-body: aligned ;
+
+f_ffd68060:
 00068060: .half     0x0002 0x019e 0x0298 0x0444 0x0000 0x0000 0x0000 0x0000 ! .......D........
-00068070: .half     0x7fff 0x59a8 0x8e21 0xe004 0x01d9 0x0083 0x0000 0x0000 ! ..Y..!..........
+
+fw_ffd68060_does:
+00068070: 7fff59a8  call      fw_dodoes
+00068074: 8e21e004  sub       %g7, 4, %g7
+00068078: .half     0x01d9 0x0083 0x0000 0x0000                  ! ........
+
+! colon (ffd68080)  (token 0x29a8, VA ffd68080)
+!   variable-cf over , + (does>)
+!   [00068090: call dodoes] does-body: @ + ;
+
+f_ffd68080:
 00068080: .half     0x0002 0x019e 0x00be 0x03e2 0x005f 0x0444 0x0000 0x0000 ! ........._.D....
-00068090: .half     0x7fff 0x59a0 0x8e21 0xe004 0x00f4 0x005f 0x0083 0x0000 ! ..Y..!....._....
-000680a0: .half     0x0000                                       ! ..
+
+fw_ffd68080_does:
+00068090: 7fff59a0  call      fw_dodoes
+00068094: 8e21e004  sub       %g7, 4, %g7
+00068098: .half     0x00f4 0x005f 0x0083 0x0000 0x0000           ! ..._......
 
 ! constant /fcode-prom  (token 0x29ab, VA ffd680b0)  = 0x10000
 000680a2: .half     0x2f66 0x636f 0x6465 0x2d70 0x726f 0x6d8b 0x296a ! /fcode-prom.)j
@@ -83052,6 +83610,10 @@ f_byte_code_colon:
 00068290: .half     0x0010 0x0182 0x02b2 0x03ca 0x0220 0x3f00 0x02c3 0x03c8 ! ......... ?.....
 000682a0: .half     0x0097 0x001e 0x000a 0x00c5 0x00ca 0x2924 0x00c2 0x00c5 ! ..........)$....
 000682b0: .half     0x00c0 0x2909 0x01c0 0x0083 0x0000 0x0000 0x0000 0x0000 ! ..).............
+
+! fcode-table (ffd682c0)  (VA ffd682c0)  FCode token tables: 3 pages (FCode 0x000-0x2ff), 256 tokens + 32-byte immediate bitmap each
+
+f_ffd682c0:
 000682c0: .half     0x2913 0x2915 0x2915 0x2915 0x2915 0x2915 0x2915 0x2915 ! ).).).).).).).).
 000682d0: .half     0x2915 0x2915 0x2915 0x2915 0x2915 0x2915 0x2915 0x2915 ! ).).).).).).).).
 000682e0: .half     0x296f 0x2971 0x2973 0x2991 0x2994 0x2985 0x2986 0x2987 ! )o)q)s).).).).).
@@ -85436,10 +85998,14 @@ f_udp_checksum_q:
 f_tftp_retries:
 0006c0f0: .half     0x0008 0x0950 0x0000 0x0000 0x0000 0x0000 0x0000 0x0000 ! ...P............
 
-! does (ffd6c100)  (token 0x2db0, VA ffd6c100)  does> of vocabulary 39 bytes
+! does (ffd6c100)  (token 0x2db0, VA ffd6c100)  does> of vocabulary 14 bytes
 
 f_ffd6c100:
 0006c100: .half     0x054d 0x0954 0x1261 0x0000 0x0000 0x0000 0x0000 0x0000 ! .M.T.a..........
+
+! does (ffd6c110)  (token 0x2db1, VA ffd6c110)  does> of vocabulary 23 bytes
+
+f_ffd6c110:
 0006c110: .half     0x054d 0x0966 0x6f62 0x702d 0x7466 0x7470 0x0000 0x0000 ! .M.fobp-tftp....
 0006c120: .half     0x0000 0x0000 0x0000 0x0000 0x006e 0x616d 0x6584 0x0000 ! .........name...
 
@@ -87846,24 +88412,24 @@ f_ffd6ef40:
 0006ef48: .half     0x2126 0x0016 0x0019 0x0059 0x0016 0x0019 0x005d 0x0083 ! !&.....Y.....]..
 0006ef58: .half     0x0000 0x0000 0x0000 0x0000                  ! ........
 
-! ;code (ffd6ef60)  (token 0x3096, VA ffd6ef60)  ;code of - (code 0004b100), token body:
+! ;code (ffd6ef60)  (token 0x3096, VA ffd6ef60)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd6ef60:
 0006ef60: .half     0x0cb0 0x00be 0x001e 0x000a 0x0395 0x1ecc 0x001c 0x0006 ! ................
 0006ef70: .half     0x0395 0x1ecd 0x2127 0x0083 0x0000 0x0000 0x0000 0x0000 ! ....!'..........
 
-! ;code (ffd6ef80)  (token 0x3098, VA ffd6ef80)  ;code of - (code 0004b100), token body:
+! ;code (ffd6ef80)  (token 0x3098, VA ffd6ef80)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd6ef80:
 0006ef80: .half     0x0cb0 0x2115 0x0083 0x0000 0x0000 0x0000 0x0000 0x0000 ! ..!.............
 
-! ;code (ffd6ef90)  (token 0x3099, VA ffd6ef90)  ;code of - (code 0004b100), token body:
+! ;code (ffd6ef90)  (token 0x3099, VA ffd6ef90)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd6ef90:
 0006ef90: .half     0x0cb0 0x00ba 0x001e 0x000e 0x017f 0x0474 0x7275 0x6500 ! ...........true.
 0006efa0: .half     0x001c 0x000c 0x017f 0x0566 0x616c 0x7365 0x0000 0x0083 ! .......false....
 
-! ;code (ffd6efb0)  (token 0x309b, VA ffd6efb0)  ;code of - (code 0004b100), token body:
+! ;code (ffd6efb0)  (token 0x309b, VA ffd6efb0)  ;code of (ffd4b0f0) (code 0004b100), token body:
 
 f_ffd6efb0:
 0006efb0: .half     0x0cb0 0x00ba 0x017f 0x0474 0x7275 0x6500 0x09ec 0x0083 ! .......true.....
