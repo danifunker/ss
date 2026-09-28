@@ -77,7 +77,7 @@ match what the core implements:
 
 | Choice | File | Size | MD5 | Machine / CPU | Firmware |
 |---|---|---|---|---|---|
-| **SS5** | `ss5.bin` | 256 KiB | `6364e9a6f5368e2ecc4e9c1d915a93ae` | SPARCstation 5, microSPARC-II ("Swift", MB86904), the CPU the core's SS5 build implements | OBP 2.x, built `95/03/29 14:21:55` |
+| **SS5** | `ss5.bin` | 256 KiB | `6364e9a6f5368e2ecc4e9c1d915a93ae` | SPARCstation 5, microSPARC-II ("Swift", MB86904), the CPU the core's SS5 build implements | **OBP 2.15** (banner "ROM Rev. 2.15"), built `95/03/29 14:21:55` |
 | **SS20** | `SparcSTATION 20 SunOBP2-25_525-1377-08.ROM` | 512 KiB | `910bd7306fcec38361fc4c3a2be50fa0` | SPARCstation 10/20, UP/MP, SuperSPARC ("Viking") with or without MXCC, and Ross HyperSPARC | OBP 2.25 (525-1377-08), built `95/09/15 17:18:06`; POST `VRV3.45 (09/11/95)` |
 | not chosen | `ss5-170.bin` | 512 KiB | `93b047c88caf6660f6ea3e6aa6a439b1` | SPARCstation 5 model 170, TurboSPARC (MB86907, "SR-71") | OBP 2.x built `97/01/13`; `MB86907 POST 2.2.3 03SEP96` |
 
@@ -85,6 +85,30 @@ match what the core implements:
 Its Forth side is newer and worth a later diff against `ss5.bin` (it adds
 `enable-swift-compatability`, TPE link test and the CS4231 / L1A7192
 self-tests), but it is not a primary target.
+
+### Reference emulator and toolchain (found in session 1)
+
+- **QEMU as an oracle.** `qemu-system-sparc` 8.2.2 is installed and runs both
+  real PROMs. The SS5 (`-M SS-5`) boots to `ok`, printing "ROM Rev. 2.15",
+  with POST in diag mode; only the TLB RAM diagnostic fails, because QEMU
+  does not model it. The SS20 (`-M SS-20`) runs POST VRV3.45 ("TI,
+  STP1021PGA(1.x) 1Mb External cache"), fails one I-TLB diagnostic, maps
+  the ROM at `0xffd00000`, and stops early in Forth with "Cpu #0 Data Access
+  Error". `tools/romdis/qemu_trace.py` runs a PROM with `-d in_asm` and turns
+  every executed ROM address into romdis seeds (`qemu-trace.json`); the
+  cleaned console output is `qemu-console.txt` in each ROM folder. QEMU is a
+  model, not silicon: its POST results are evidence, not ground truth.
+- **Forth inner interpreter.** NEXT is copied to RAM at `0xffef0000`:
+  `lduh [%g5]` (IP, 16-bit tokens), `×4 + %g2` (origin) gives the CFA, whose
+  16-bit code field is scaled the same way and jumped to; `%g6` is the return
+  stack.
+- **SPARC toolchain without downloads.** LLVM 18 is installed
+  (`/usr/lib/llvm-18/bin`: `clang --target=sparc`, `llvm-mc -triple=sparc`,
+  `llvm-objcopy`) and assembles V8, privileged and ASI forms included. It
+  has no SPARC linker (no `ld.lld` SPARC32, no `sparc-elf` binutils), so
+  the CPU suite links with a small Python ELF relocator.
+- **VHDL simulation:** neither GHDL nor nvc is installed (phase 6 needs one:
+  `apt install ghdl` or `nvc`, needs the user).
 
 ### Output layout
 
