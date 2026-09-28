@@ -1,0 +1,17 @@
+{
+  "title": "SPARCstation 5 boot PROM (OBP 2.x, 95/03/29) - ss5.bin",
+  "rom": "scratch/SparcStation/ss5.bin",
+  "profile": "ss5",
+  "base": "0x70000000",
+  "trap_table": true,
+  "entries": {},
+  "labels": {},
+  "comments": {},
+  "blocks": {},
+  "regions": [],
+  "include": [
+    "forth.json"
+  ],
+  "noreturn": [],
+  "jumptables": []
+}

@@ -1,0 +1,17 @@
+{
+  "title": "SPARCstation 10/20 boot PROM OBP 2.25 (525-1377-08, 95/09/15), POST VRV3.45",
+  "rom": "scratch/SparcStation/SparcSTATION 20 SunOBP2-25_525-1377-08.ROM",
+  "profile": "ss20",
+  "base": "0x00000000",
+  "trap_table": true,
+  "entries": {},
+  "labels": {},
+  "comments": {},
+  "blocks": {},
+  "regions": [],
+  "include": [
+    "forth.json"
+  ],
+  "noreturn": [],
+  "jumptables": []
+}
