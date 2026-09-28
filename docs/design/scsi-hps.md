@@ -1,12 +1,17 @@
 # SCSI storage through the HPS: design and porting plan
 
+> Line references to `ss.sv` point at the MiSTer top as it was before phase 3
+> (commit `0fb5903`, `src/board/mister/SS_MiSTer/ss.sv`); phase 3 replaced it
+> with `SunSparcStation.sv`. The VHDL moved unchanged, so its line numbers
+> still hold.
+
 Status: design, 2026-09-28. Not implemented. Input to REWORK.md phase 5,
 item 0 ("SCSI storage modelled on the Mac cores").
 
 **Paths.** SunSparcStation files are cited at their **post-phase-3 paths**
-(`src/ts/X` → `rtl/sun4m/X`, `src/cpu/X` → `rtl/cpu/X`,
-`src/board/mister/ss_core.vhd` → `rtl/mister/ss_core.vhd`,
-`src/board/mister/SS_MiSTer/ss.sv` → `SunSparcStation.sv`). Line numbers are
+(`rtl/sun4m/X` → `rtl/sun4m/X`, `rtl/cpu/X` → `rtl/cpu/X`,
+`rtl/mister/ss_core.vhd` → `rtl/mister/ss_core.vhd`,
+`SunSparcStation.sv` → `SunSparcStation.sv`). Line numbers are
 today's; phase 3 moves files without content edits, so they stay valid until
 the first RTL change. Other repositories are cited at their real paths:
 `MacQuadra800_MiSTer/…` means `/home/dani/repos/MacQuadra800_MiSTer/…`.

@@ -276,7 +276,7 @@ clear-pending register (pa `0xf_f140_n004`), keep the context register, then
 0x1ff1 with 1 (no MXCC) or 2 (MXCC); `post_main` refuses a mix (value 3:
 "TMS390Z55 and TMS390Z50 Modules can NOT be mixed").
 
-The core's SS20 configuration (`src/cpu/cpu_conf_pack.vhd`, `CONF_SuperSparc`)
+The core's SS20 configuration (`rtl/cpu/cpu_conf_pack.vhd`, `CONF_SuperSparc`)
 reports PSR impl/ver 0x40 and MMU impl/ver 0x01, and MCNTL.MB reads 1: the ROM
 will call it type 0x40 without MXCC ("TMS390Z50(3.x) 0Mb External cache") and
 skip the MXCC and SuperSPARC-II suites. Its IOMMU reports IMPL 0

@@ -18,152 +18,7 @@
 
 module emu
 (
-	//Master input clock
-	input         CLK_50M,
-
-	//Async reset from top-level module.
-	//Can be used as initial reset.
-	input         RESET,
-
-	//Must be passed to hps_io module
-	inout  [48:0] HPS_BUS,
-
-	//Base video clock. Usually equals to CLK_SYS.
-	output        CLK_VIDEO,
-
-	//Multiple resolutions are supported using different CE_PIXEL rates.
-	//Must be based on CLK_VIDEO
-	output        CE_PIXEL,
-
-	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
-	output [12:0] VIDEO_ARX,
-	output [12:0] VIDEO_ARY,
-
-	output  [7:0] VGA_R,
-	output  [7:0] VGA_G,
-	output  [7:0] VGA_B,
-	output        VGA_HS,
-	output        VGA_VS,
-	output        VGA_DE,    // = ~(VBlank | HBlank)
-	output        VGA_F1,
-	output [1:0]  VGA_SL,
-	output        VGA_SCALER, // Force VGA scaler
-
-	input  [11:0] HDMI_WIDTH,
-	input  [11:0] HDMI_HEIGHT,
-	output        HDMI_FREEZE,
-
-	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
-	// FB_FORMAT:
-	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
-	//    [3]   : 0=16bits 565 1=16bits 1555
-	//    [4]   : 0=RGB  1=BGR (for 16/24/32 modes)
-	//
-	// FB_STRIDE either 0 (rounded to 256 bytes) or multiple of pixel size (in bytes)
-	output        FB_EN,
-	output  [4:0] FB_FORMAT,
-	output [11:0] FB_WIDTH,
-	output [11:0] FB_HEIGHT,
-	output [31:0] FB_BASE,
-	output [13:0] FB_STRIDE,
-	input         FB_VBL,
-	input         FB_LL,
-	output        FB_FORCE_BLANK,
-
-	// Palette control for 8bit modes.
-	// Ignored for other video modes.
-	output        FB_PAL_CLK,
-	output  [7:0] FB_PAL_ADDR,
-	output [23:0] FB_PAL_DOUT,
-	input  [23:0] FB_PAL_DIN,
-	output        FB_PAL_WR,
-
-	output        LED_USER,  // 1 - ON, 0 - OFF.
-
-	// b[1]: 0 - LED status is system status OR'd with b[0]
-	//       1 - LED status is controled solely by b[0]
-	// hint: supply 2'b00 to let the system control the LED.
-	output  [1:0] LED_POWER,
-	output  [1:0] LED_DISK,
-
-	// I/O board button press simulation (active high)
-	// b[1]: user button
-	// b[0]: osd button
-	output  [1:0] BUTTONS,
-
-	input         CLK_AUDIO, // 24.576 MHz
-	output [15:0] AUDIO_L,
-	output [15:0] AUDIO_R,
-	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
-	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
-
-	//ADC
-	inout   [3:0] ADC_BUS,
-
-	//SDIO
-	inout  [3:0]  SDIO_DAT,
-	inout         SDIO_CMD,
-	output        SDIO_CLK,
-/*
-	output        SD_SCK,
-	output        SD_MOSI,
-	input         SD_MISO,
-	output        SD_CS,
-	input         SD_CD,
-*/
-	//High latency DDR3 RAM interface
-	//Use for non-critical time purposes
-	output        DDRAM_CLK,
-	input         DDRAM_BUSY,
-	output  [7:0] DDRAM_BURSTCNT,
-	output [28:0] DDRAM_ADDR,
-	input  [63:0] DDRAM_DOUT,
-	input         DDRAM_DOUT_READY,
-	output        DDRAM_RD,
-	output [63:0] DDRAM_DIN,
-	output  [7:0] DDRAM_BE,
-	output        DDRAM_WE,
-
-	//High latency DDR3 RAM interface
-	//Use for non-critical time purposes
-	output        DDRAM2_CLK,
-	input         DDRAM2_BUSY,
-	output  [7:0] DDRAM2_BURSTCNT,
-	output [28:0] DDRAM2_ADDR,
-	input  [63:0] DDRAM2_DOUT,
-	input         DDRAM2_DOUT_READY,
-	output        DDRAM2_RD,
-	output [63:0] DDRAM2_DIN,
-	output  [7:0] DDRAM2_BE,
-	output        DDRAM2_WE,
-
-	//SDRAM interface with lower latency
-	output        SDRAM_CLK,
-	output        SDRAM_CKE,
-	output [12:0] SDRAM_A,
-	output  [1:0] SDRAM_BA,
-	inout  [15:0] SDRAM_DQ,
-	output        SDRAM_DQML,
-	output        SDRAM_DQMH,
-	output        SDRAM_nCS,
-	output        SDRAM_nCAS,
-	output        SDRAM_nRAS,
-	output        SDRAM_nWE,
-
-	input         UART_CTS,
-	output        UART_RTS,
-	input         UART_RXD,
-	output        UART_TXD,
-	output        UART_DTR,
-	input         UART_DSR,
-
-	// User port.
-	output  [6:0] USER_EN,
- 	output  [6:0] USER_OUT,
-	input   [6:0] USER_IN,
-
-	input         OSD_STATUS
+	`include "sys/emu_ports.vh"
 );
 
 ///////// Default values for ports not used in this core /////////
@@ -174,22 +29,32 @@ assign {UART_RTS, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 
+// USER_IO is open-drain in the stock framework (0 = low, 1 = released):
+// the RMII Ethernet PHY option, which needed push-pull 50 MHz outputs,
+// cannot work and is gone. See docs/REWORK.md, phase 3.
+assign USER_OUT = '1;
+
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 1;
+assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
+assign HDMI_BLACKOUT = 0;
+assign HDMI_BOB_DEINT = 0;
 
 assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
 assign BUTTONS = 0;
 
-assign FB_FORMAT = 6'b000011; // 8bpp
+`ifdef MISTER_FB
+assign FB_FORMAT = 5'b00011; // 8bpp
 assign FB_WIDTH = 1024;
 assign FB_HEIGHT = 768;
 assign FB_BASE = 32'h3E400000;
 assign FB_STRIDE = 1024;
 assign FB_FORCE_BLANK = 0;
+`endif
 
 assign LED_POWER[1]=0;
 assign LED_DISK[1]=0;
@@ -208,9 +73,9 @@ wire clk_sys;
 `include "build_id.v" 
 
 localparam CONF_STR = {
-    "SparcStation;;" ,
+    "SunSparcStation;;" ,
     "-;" ,
-    "O13,SCSI,Image,Direct SD,Image+Image,SD+Image,Image+SD;" ,
+    "O1,SCSI disks,HD0,HD0+HD1;" ,
     "S0,RAW,HD;" ,
     "S1,RAW,HD2;" ,
     "O45,CDROM,OFF,2048,512;" ,
@@ -231,7 +96,6 @@ localparam CONF_STR = {
     "OJ,AOW,OFF,ON;" ,
 `endif
     "OKL,IOMMU rev,26 (Default),11 (Next),23,30;" ,
-    "ON,Ethernet PHY present,NO,YES;",
     "F,ROM,BIOS;" ,
     "-;" ,
     "V,v",`BUILD_DATE 
@@ -239,7 +103,7 @@ localparam CONF_STR = {
 
 wire forced_scandoubler;
 
-wire  [63:0] status;
+wire [127:0] status;
 wire  [2:0]  img_mounted;
 wire  img_readonly;
 wire  [63:0] img_size;
@@ -252,9 +116,9 @@ wire  [15:0] sd_buff_dout;
 wire  [15:0] sd_buff_din0,sd_buff_din1,sd_buff_din2;
 wire  sd_buff_wr;
 wire  ioctl_download;
-wire  [7:0] ioctl_index;
+wire [15:0] ioctl_index;
 wire  ioctl_wr;
-wire  [24:0] ioctl_addr;
+wire  [26:0] ioctl_addr;
 wire  [15:0] ioctl_dout;
 wire  ioctl_wait;
 wire  [64:0] RTC;
@@ -311,8 +175,13 @@ hps_io
 
 );
 
-wire scsi_conf   = status[3:1];
-wire scsi_cdconf = status[5:4];
+// ss_core's scsi_conf: 0 image, 1 direct SD, 2 image+image, 3 SD+image,
+// 4 image+SD. The stock framework has no SDIO pins, so only the image
+// modes remain (status[3:2] stay free, so old configs do not map an SD
+// mode onto a new option). The upstream top declared both of these as
+// 1-bit wires, so only the low bit of each OSD field reached the core.
+wire [2:0] scsi_conf   = status[1] ? 3'd2 : 3'd0;
+wire [1:0] scsi_cdconf = status[5:4];
 
 wire [1:0] ar = status[7:6];
 
@@ -322,7 +191,9 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 wire autoboot  = ~status[8];
 wire viboot    = ~status[9];
 wire tcx       = ~status[10];
+`ifdef MISTER_FB
 assign FB_EN = status[11];
+`endif
 wire vga_on  = 1;
 
 /* PS2 to Sun keyboard layout
@@ -353,8 +224,71 @@ wire [3:0] sd_dat;
 wire sd_cmd;
 wire sd_cd;
 
-wire [1:0] rmii_txd,rmii_rxd;
-wire rmii_txen,rmii_clk;
+wire [1:0] rmii_txd;
+wire rmii_txen;
+
+wire fb_pal_clk, fb_pal_wr;
+wire [23:0] fb_pal_d;
+wire [7:0] fb_pal_a;
+`ifdef MISTER_FB_PALETTE
+assign FB_PAL_CLK  = fb_pal_clk;
+assign FB_PAL_DOUT = fb_pal_d;
+assign FB_PAL_ADDR = fb_pal_a;
+assign FB_PAL_WR   = fb_pal_wr;
+`endif
+
+// ss_core has two DDR3 ports (video; CPU + BIOS download); the stock
+// framework has one. ddram_arb merges them, video first.
+wire        vram_clk, dram_clk;
+wire        vram_wait, dram_wait;
+wire  [7:0] vram_bc, dram_bc;
+wire [28:0] vram_addr, dram_addr;
+wire [63:0] vram_rdata, dram_rdata, vram_wdata, dram_wdata;
+wire        vram_rvalid, dram_rvalid;
+wire        vram_rd, dram_rd, vram_wr, dram_wr;
+wire  [7:0] vram_be, dram_be;
+
+assign DDRAM_CLK = clk_sys;
+
+ddram_arb ddram_arb
+(
+	.clk(clk_sys),
+	.reset(RESET),
+
+	.m0_waitrequest(vram_wait),
+	.m0_burstcount(vram_bc),
+	.m0_address(vram_addr),
+	.m0_read(vram_rd),
+	.m0_write(vram_wr),
+	.m0_writedata(vram_wdata),
+	.m0_byteenable(vram_be),
+	.m0_readdata(vram_rdata),
+	.m0_readdatavalid(vram_rvalid),
+
+	.m1_waitrequest(dram_wait),
+	.m1_burstcount(dram_bc),
+	.m1_address(dram_addr),
+	.m1_read(dram_rd),
+	.m1_write(dram_wr),
+	.m1_writedata(dram_wdata),
+	.m1_byteenable(dram_be),
+	.m1_readdata(dram_rdata),
+	.m1_readdatavalid(dram_rvalid),
+
+	.s_waitrequest(DDRAM_BUSY),
+	.s_burstcount(DDRAM_BURSTCNT),
+	.s_address(DDRAM_ADDR),
+	.s_read(DDRAM_RD),
+	.s_write(DDRAM_WE),
+	.s_writedata(DDRAM_DIN),
+	.s_byteenable(DDRAM_BE),
+	.s_readdata(DDRAM_DOUT),
+	.s_readdatavalid(DDRAM_DOUT_READY)
+);
+
+// the "Direct SD" pins: not available in the stock framework
+wire [3:0] sd_dat_nc;
+wire       sd_cmd_nc, sd_sck_nc;
    
 wire reset = RESET | status[0];
 
@@ -392,39 +326,39 @@ ss_core
  .audio_l(AUDIO_L),
  .audio_r(AUDIO_R),
 
- .fb_pal_clk(FB_PAL_CLK),
- .fb_pal_d(FB_PAL_DOUT),
- .fb_pal_a(FB_PAL_ADDR),
- .fb_pal_wr(FB_PAL_WR),
+ .fb_pal_clk(fb_pal_clk),
+ .fb_pal_d(fb_pal_d),
+ .fb_pal_a(fb_pal_a),
+ .fb_pal_wr(fb_pal_wr),
     
  .led_disk(LED_DISK[0]),
  .led_user(LED_USER),
  .led_power(LED_POWER[0]),
     
- .sd_sck(SDIO_CLK),
- .sd_dat(SDIO_DAT),
- .sd_cmd(SDIO_CMD),
- .ddram_clk(DDRAM_CLK),
- .ddram_waitrequest(DDRAM_BUSY),
- .ddram_burstcount(DDRAM_BURSTCNT),
- .ddram_address(DDRAM_ADDR),
- .ddram_readdata(DDRAM_DOUT),
- .ddram_readdatavalid(DDRAM_DOUT_READY),
- .ddram_read(DDRAM_RD),
- .ddram_writedata(DDRAM_DIN),
- .ddram_byteenable(DDRAM_BE),
- .ddram_write(DDRAM_WE),
-    
- .ddram2_clk(DDRAM2_CLK),
- .ddram2_waitrequest(DDRAM2_BUSY),
- .ddram2_burstcount(DDRAM2_BURSTCNT),
- .ddram2_address(DDRAM2_ADDR),
- .ddram2_readdata(DDRAM2_DOUT),
- .ddram2_readdatavalid(DDRAM2_DOUT_READY),
- .ddram2_read(DDRAM2_RD),
- .ddram2_writedata(DDRAM2_DIN),
- .ddram2_byteenable(DDRAM2_BE),
- .ddram2_write(DDRAM2_WE),
+ .sd_sck(sd_sck_nc),
+ .sd_dat(sd_dat_nc),
+ .sd_cmd(sd_cmd_nc),
+ .ddram_clk(vram_clk),
+ .ddram_waitrequest(vram_wait),
+ .ddram_burstcount(vram_bc),
+ .ddram_address(vram_addr),
+ .ddram_readdata(vram_rdata),
+ .ddram_readdatavalid(vram_rvalid),
+ .ddram_read(vram_rd),
+ .ddram_writedata(vram_wdata),
+ .ddram_byteenable(vram_be),
+ .ddram_write(vram_wr),
+
+ .ddram2_clk(dram_clk),
+ .ddram2_waitrequest(dram_wait),
+ .ddram2_burstcount(dram_bc),
+ .ddram2_address(dram_addr),
+ .ddram2_readdata(dram_rdata),
+ .ddram2_readdatavalid(dram_rvalid),
+ .ddram2_read(dram_rd),
+ .ddram2_writedata(dram_wdata),
+ .ddram2_byteenable(dram_be),
+ .ddram2_write(dram_wr),
 
  .reset_mask_rev(reset_mask_rev),
  .kbm_layout(kbm_layout),
@@ -456,9 +390,9 @@ ss_core
  .sd_buff_din2(sd_buff_din2),
  .sd_buff_wr(sd_buff_wr),
  .ioctl_download(ioctl_download),
- .ioctl_index(ioctl_index),
+ .ioctl_index(ioctl_index[7:0]),
  .ioctl_wr(ioctl_wr),
- .ioctl_addr(ioctl_addr),
+ .ioctl_addr(ioctl_addr[24:0]),
  .ioctl_dout(ioctl_dout),
  .ioctl_wait(ioctl_wait),
  .rtc(RTC),
@@ -472,31 +406,13 @@ ss_core
  .ps2_mouse_data_out(ps2_mouse_data_out),
  .ps2_mouse_clk_in(ps2_mouse_clk_in),
  .ps2_mouse_data_in(ps2_mouse_data_in),
- .rmii_rxd(rmii_rxd),
+ .rmii_rxd(2'b00),
  .rmii_txd(rmii_txd),
  .rmii_txen(rmii_txen),
- .rmii_clk(rmii_clk),
+ .rmii_clk(1'b0),
  .uart_txd(UART_TXD),
  .uart_rxd(UART_RXD)
 
 );
 
-assign VGA_F1 =0;
-assign VGA_SL =0;
-
-/* ETHERNET PHY
-   0 : RX1
-   1 : RX0
-   2 : RX_CLK
-   3 : TXEN
-   4 : TX1
-   5 : TX0
-   6 : NC
- */
-
-assign USER_EN = status[23] ? 7'b0111000 : 7'b0000000 ;
-assign USER_OUT = {1'b0,rmii_txd[0],rmii_txd[1],rmii_txen,3'b0};
-assign rmii_rxd = {USER_IN[1],USER_IN[0]};
-assign rmii_clk = USER_IN[2];
-   
 endmodule

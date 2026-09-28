@@ -625,7 +625,7 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   `" entry # 0x%1"`. QEMU prints `Case 0000000f: I_TLB mis-matched exp=55555000
   obs=00000000 ... entry # 0x00000000` (first write, entry 0 SEL0): QEMU has no TLB diag.
 - **Core**: absent - ASI 5/6/7 are accepted as no-ops ("Diagnostic, on s'en fout",
-  src/cpu/mcu_multi.vhd:692-699); the suite is also skipped because the core reports
+  rtl/cpu/mcu_multi.vhd:692-699); the suite is also skipped because the core reports
   MCNTL impl/ver 0x01 (cpu_conf_pack.vhd:131) -> module type 0x40.
 
 ### MMU ICACHE_TLB context flush Test / region / segment / page / entire flush Test
@@ -695,7 +695,7 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   unexpected here: `%g5` is not set).
 - **Fails with**: 0x21560 `"Tlb_hit error addr=%1 exp=%2 obs=%3"`; MMU restored (BM on, ME
   off) before return -1.
-- **Core**: absent - 4 D-TLB entries (src/cpu/mcu_pack.vhd:24) plus an L2 TLB cache (L2TLB,
+- **Core**: absent - 4 D-TLB entries (rtl/cpu/mcu_pack.vhd:24) plus an L2 TLB cache (L2TLB,
   NB_L2TLB 7) of unknown use here; tables also need PTP0 injection.
 
 ### MMU TLB_MISS Test
@@ -745,7 +745,7 @@ would map VA 0x80000.. onto the PROM. So all MMU-on suite tests need PTP0 inject
   0x6268 (last call's `%o7`) and also prints the "BAD DSIMM" line. ROM bug: cases 0x15-0x18
   put the case number in `%o0` (delay slots 0x62cc/0x6310/0x633c/0x6388), so the string
   index is 0x300000 (garbage text). A failure with DE=1 returns with PSR.DE still set.
-- **Core**: absent - `type_psr` has no bit 15 (src/cpu/iu_pack.vhd:53-65).
+- **Core**: absent - `type_psr` has no bit 15 (rtl/cpu/iu_pack.vhd:53-65).
 
 ### ENDIAN-ness Test with FPU_registers
 - Entry: `0x65b0` (`post_endian_ness_test_with_fpu_registers`), called from 0x1fd88.
@@ -1452,7 +1452,7 @@ in the same order, including "MXCC E-Cache Data RAM Test (1 MB E$DATA RAM, MXCC_
 - Stream-op timeout: poll the RDY bit up to 1000 (0x3e8) times. Interrupt wait: a 20-iteration
   busy loop (about 40 instructions) after the triggering `stda`.
 
-**Core:** the whole group is **absent**. The SS-mode MCNTL readback in src/cpu/mcu_multi.vhd
+**Core:** the whole group is **absent**. The SS-mode MCNTL readback in rtl/cpu/mcu_multi.vhd
 (~l.1378) has constant `"10"` at bits 11:10 (MB = 1), and ASI 2 is only a commented-out constant
 in asi_pack.vhd. So post_main skips the group silently: the "MXCC not installed" string is never
 printed, because post_main performs the check itself.

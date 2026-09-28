@@ -23,9 +23,9 @@ first.**
 | Phase | What | State |
 |---|---|---|
 | 0 | Distribution blockers (license, ROM redistribution) | **open, needs the user** |
-| 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | in progress |
+| 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | machine code, POST catalogues and CPU suite first cut done; Forth dictionary in progress |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
-| 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | not started |
+| 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done in the tree, not yet built**: needs an A&S and a fit for both revisions on the Quartus machine, then a hardware boot |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | not started |
 | 5 | Execute: fix gaps in priority order (HPS Ethernet first) | not started |
 | 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | not started |
@@ -248,10 +248,12 @@ rtl/
   pll/ pll.v pll.qip pll_q17.qip pll.13.qip   (template requirement)
   mister/                   ss_core.vhd, plomb_avalon_mister.vhd
   cpu/                      was src/cpu
-  sun4m/                    was src/ts (the chipset); keep file names
+  sun4m/                    was src/ts (the chipset); keep file names. The
+                            *.vhs microcode and the asm_*.rb assemblers stay
+                            beside the .vhd files they generate (the scripts
+                            use relative paths)
   plomb/                    was src/plomb (the internal bus)
   peri/                     was src/peri
-  gen/                      the *.rb microcode assemblers and *.vhs sources
 releases/                   <core>_YYYYMMDD.rbf + boot.rom (OpenBIOS) + README.md
 docs/                       this file, analyses, rom-disassembly/, user docs
 tools/                      romdis/, debugarm/ (was soft/debugarm)
@@ -476,6 +478,25 @@ Expected order, subject to the gap reports:
 | 2026-09-28 | Drop "Direct SD"; disks only through the HPS, SCSI modelled on the Mac cores (Main changes allowed) |
 | 2026-09-28 | Retire the RMII Ethernet PHY option; HPS-bridged Ethernet instead |
 | 2026-09-28 | Commit the full Sun PROM disassembly listings (the ROM images themselves stay out) |
+
+### What phase 3 did (session 1)
+
+- Commit `7ba7b37`: moves only (162 renames, no content change).
+- Next commit: `sys/` replaced by Template_MiSTer `3ea1134` (2026-08-26),
+  verbatim; `SunSparcStation.sv` ported to `emu_ports.vh`; the two DDR3
+  ports merged by `rtl/mister/ddram_arb.sv` (video first; randomised bench
+  `rtl/mister/tb/run.sh`, 6000 bursts, no errors); Direct SD pins and RMII
+  tied off at the `ss_core` boundary (so `ss_core.vhd` is unchanged); OSD
+  "SCSI disks: HD0 / HD0+HD1", the Ethernet PHY entry gone, the 1-bit
+  `scsi_conf`/`scsi_cdconf` wires fixed; CONF_STR name `SunSparcStation`;
+  template qsf + project settings; `SunSparcStation.qpf` with revisions
+  `SunSparcStation5` and `SunSparcStation20`.
+- Linted: `verilator --lint-only` of the top against the stock `hps_io`
+  with an `ss_core` port stub, both revisions. Not synthesised.
+- Left for later: moving the unused `scsi_sd*`, `ts_lance_mac_rmii*`,
+  `mcu_multi_avant_x.vhd` to `attic/` (done with the SCSI and Ethernet
+  work, which change `ss_core`); `MISTER_FB_PALETTE` stays off as upstream
+  had it.
 
 ## Session log
 

@@ -7,8 +7,8 @@ separately) the machine-code words of the Forth kernel that QEMU executed.
 Generated from [`listing.s`](listing.s)'s analysis (every load/store whose
 address the constant tracker resolves), then annotated by hand; addresses
 computed at run time (loops, per-CPU offsets) are described in §2. This is
-the list to diff against the core's address decoder (`src/ts/ts_decode.vhd`)
-and ASI decoder (`src/cpu/asi_pack.vhd`).
+the list to diff against the core's address decoder (`rtl/sun4m/ts_decode.vhd`)
+and ASI decoder (`rtl/cpu/asi_pack.vhd`).
 
 Conventions: physical addresses are 36-bit, `0xS_HHHH_LLLL` with S =
 PA[35:32] (bypass ASI 0x20 → S = 0, 0x2e → 0xe, 0x2f → 0xf). Width in bits;
@@ -421,7 +421,7 @@ chosen by Forth code (see `forth-dictionary.txt`).
 
 ## 4. For the core's decoder
 
-Devices the machine code touches that `src/ts/ts_decode.vhd` /
+Devices the machine code touches that `rtl/sun4m/ts_decode.vhd` /
 `ts_iommu.vhd` do not decode (quick check, not an audit):
 
 - EMC/SMC memory controller, pa `0xf_0000_0000-0x1f` (reads return

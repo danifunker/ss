@@ -442,14 +442,14 @@ aliases that only apply to jump/call targets).
    tests, DMA2 E_CSR (and, by construction, the other slave-error tests) and
    TOD Registers ([`post-tests.md`](post-tests.md) §13).
 8. Found in passing, for phase 2/4 (quick look only): the core decodes ASI 4
-   with VA[11:8] (`src/cpu/mcu_simple.vhd:970`, `mcu_multi.vhd:1045`), so the
+   with VA[11:8] (`rtl/cpu/mcu_simple.vhd:970`, `mcu_multi.vhd:1045`), so the
    microSPARC-II registers at `0x1000` (TLB replacement control), `0x1300` and
    `0x1400` (SFSR/SFAR diagnostic) alias the PCR, SFSR and SFAR. The PROM
    writes `0` to `[0x1000] 4` in `tlb_init_clear` while still in boot mode;
    on the core that clears PCR.BM and would move instruction fetch from the
    PROM to RAM. ASI 5/6/7 (TLB diagnostics) are ignored, so the POST fails at
    test 6 as under QEMU. The core's SS5 decoder puts the PROM at PA
-   `0xFxxxxxxx` (`src/ts/ts_decode.vhd:79-81`) and its boot-mode fetch at
+   `0xFxxxxxxx` (`rtl/sun4m/ts_decode.vhd:79-81`) and its boot-mode fetch at
    `0xFF`+VA[27:0]; this image reads itself at PA `0x7000xxxx` with ASI 0x20
    and OBP maps the PROM from PA `0x70000000`, so running it needs the PROM
    decoded there too ([`hardware-access.md`](hardware-access.md) §5).

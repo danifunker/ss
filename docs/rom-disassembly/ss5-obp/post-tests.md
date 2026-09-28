@@ -149,7 +149,7 @@ implemented bits, `%i2` = bits forced on in every write):
 |---|---|---|---|---|---|---|
 | 1 | MMU Context Table Reg Test | `0x100` | `0x00ffffc0` | 0 | context table pointer | present |
 | 2 | MMU Context Register Test | `0x200` | `0x000000ff` | 0 | context (8 bits) | present |
-| 3 | MMU TLB Replace Ctrl Reg Tst | `0x1000` | `0x0011ffff` | `0x40` | TLB replacement control | **absent** — the core decodes ASI 4 VA[11:8] only (`src/cpu/mcu_simple.vhd:970`, `mcu_multi.vhd:1045`), so `0x1000` is the PCR there: this test would write walking patterns into the PCR |
+| 3 | MMU TLB Replace Ctrl Reg Tst | `0x1000` | `0x0011ffff` | `0x40` | TLB replacement control | **absent** — the core decodes ASI 4 VA[11:8] only (`rtl/cpu/mcu_simple.vhd:970`, `mcu_multi.vhd:1045`), so `0x1000` is the PCR there: this test would write walking patterns into the PCR |
 | 4 | MMU Sync Fault Stat Reg Test | `0x1300` | `0x00016fff` | 0 | SFSR, diagnostic (writable) alias | **absent** (aliases `0x300`; a write clears the SFSR) |
 | 5 | MMU Sync Fault Addr Reg Test | `0x1400` | `0xffffffff` | 0 | SFAR, diagnostic alias | **absent** (aliases `0x400`, not writable) |
 
@@ -174,7 +174,7 @@ Three calls of the march routine `nta_march_test(base, len, stride, asi, mask)`
   `Address= 000000fc, exp= 07ffffdc, obs= 00000000` — the first read of the
   descending element; QEMU has no TLB diagnostic access.
 - **Core:** **absent**: ASI 5/6/7 accesses are acknowledged and ignored
-  (`src/cpu/mcu_simple.vhd:678-684` "Diagnostic, on s'en fout"), so the core
+  (`rtl/cpu/mcu_simple.vhd:678-684` "Diagnostic, on s'en fout"), so the core
   fails here exactly like QEMU.
 
 The ASI 6 layout (PTE at `0x000+4n`, lower tag at `0x100+4n`, upper tag at
@@ -399,7 +399,7 @@ Scratch memory: `%l0`/`%l4` = `base + 0x2000` where base = `%g2 & 0x0f000000`
 - **On failure** (`fpu_regfile_fail` `0x7000366c`): "ERROR  : FPU Registerfile
   Stuck-at Fault", then sixteen lines "%1 :  %2  %3" (register number
   0,2,…,0x1e and its two words), "WARNING: Suspect Swift Module".
-- **Core:** present (FPU register file, `src/cpu/fpu_regs_2r1w.vhd`).
+- **Core:** present (FPU register file, `rtl/cpu/fpu_regs_2r1w.vhd`).
 
 ### 7.2 FPU Misaligned Reg Pair Test — `post_fpu_misaligned_pair` @ 0x700026b8
 
@@ -439,7 +439,7 @@ Scratch memory: `%l0`/`%l4` = `base + 0x2000` where base = `%g2 & 0x0f000000`
   Then each result is stored (`st`) and compared with `fcmps %fN,%f0` / `fbne`.
 - **On failure:** "ERROR  : FPU Single-precision Op, exp= %1, obs= %2"
   (%1 = `0x41c80000`, %2 = result image), "Suspect Swift".
-- **Core:** present (`src/cpu/fpu*.vhd`).
+- **Core:** present (`rtl/cpu/fpu*.vhd`).
 
 ### 7.4 FPU Double-precision Tests — `post_fpu_double` @ 0x700029bc
 
@@ -569,7 +569,7 @@ which leaves every source masked.
   7. Return %g3 (0x70005350). %g3 is nonzero only if an interrupt handler reported an error.
 - **Pass criteria / expected values:** pending = 0 at entry. After the set, pending = 0x7ffe0000 exactly: no hardware bits (15:1) and no soft-15 bit 31. After the clear, pending = 0. Soft level 15 (bit 31) is never set.
 - **On failure prints:** at `L_700055f4` (0x700055f4): "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4". %1 = register address (%l0, always 0x71e00000 here), %2 = exp (%l1), %3 = obs (%l2), %4 = exp^obs (%l7). Then "UNUMBER: " and "U1507" (0x7000a990). Returns 0xff. The error path does **not** restore PSR (PIL stays 15) and does not mask the system interrupts again.
-- **Core:** present (`src/ts/ts_inter.vhd:165-185`: CPU0 pending = `softint0 & '0' & hardint0 & '0'`; clear and set work on bits 31:17).
+- **Core:** present (`rtl/sun4m/ts_inter.vhd:165-185`: CPU0 pending = `softint0 & '0' & hardint0 & '0'`; clear and set work on bits 31:17).
 
 ### 8.3 Soft Interrupts OFF Test — `post_soft_irq_off` @ 0x7000535c
 - **Called:** only by `post_sequencer` at 0x70009acc. Failure goes to `post_fail_cpu_board_leds` (0x70009ad8).
@@ -619,7 +619,7 @@ which leaves every source masked.
   - Not counting at `L_70006a48`: "ERROR  : Processor User Timer Not Incrementing" + "U1507".
   - L bit at `L_70006a84`: Address/exp/obs/xor + "U1507". Step 8 passes exp 0x80000000, obs = MSW, "xor" = MSW & ~0x80000000 (an `andn`, 0x700067c8). Step 9 passes exp 0, obs = MSW, xor = MSW.
   - Every path returns 0xff.
-- **Core:** present (`src/ts/ts_timer.vhd` config 247-252, start/stop 213-219, user-timer MSW/LSW 169-199). Timing dependency: steps 7 and 8 need at least one 500 ns tick between two accesses that are only 5-6 instructions apart. The real machine gets that from slow, uncached boot-PROM fetches (caches are off with the MMU off; microSPARC-II manual, AC bit). A core that fetches PROM instructions faster than about 80 ns each can fail "Not Incrementing" or the L-bit check.
+- **Core:** present (`rtl/sun4m/ts_timer.vhd` config 247-252, start/stop 213-219, user-timer MSW/LSW 169-199). Timing dependency: steps 7 and 8 need at least one 500 ns tick between two accesses that are only 5-6 instructions apart. The real machine gets that from slow, uncached boot-PROM fetches (caches are off with the MMU off; microSPARC-II manual, AC bit). A core that fetches PROM instructions faster than about 80 ns each can fail "Not Incrementing" or the L-bit check.
 
 ### 8.6 PROC0 Counter/Timer Test — `post_proc0_counter_timer` @ 0x70006814
 - **Called:** only by `post_sequencer` at 0x70009b18. Failure goes to `post_fail_cpu_board_leds` (0x70009b24).
@@ -986,7 +986,7 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   3. Return %g3 (cleared at 0x70006c24).
 - **Pass criteria / expected values:** each read equals the byte just written. The byte is **not restored** and is left as 0x00.
 - **On failure prints:** a first-check failure goes to `L_70006e54`: "ERROR  : NVRAM (%1) Battery Failure, exp = %2, obs = %3, xor = %4". %1 = 0x71200003, %2 = ~original & 0xff, %3 = read, %4 = xor. Pattern failures go to `L_70006e9c`: "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4". Both then print "UNUMBER: U1506" (0x7000a998) and return 0xff. The sequencer then lights the NVRAM LED and prints "Power-On Selftest FAILED ... Replace NVRAM".
-- **Core:** present (`src/ts/iram_rtc.vhd`, an 8 KB block RAM behind `ts_rtc.vhd`).
+- **Core:** present (`rtl/sun4m/iram_rtc.vhd`, an 8 KB block RAM behind `ts_rtc.vhd`).
 
 ### 10.2 TOD Registers Test — `post_tod_regs` @ 0x70006cf8
 - **Called:** only by `post_sequencer` at 0x70009c60. Failure goes to `post_fail_nvram` (0x70009c6c).
@@ -1004,7 +1004,7 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
 - **On failure prints:** `L_70006e9c`: "ERROR  : Address= %1, exp= %2, obs= %3, xor= %4" (%1 = register address, %2 = value written, %3 = read, %4 = xor) + "UNUMBER: U1506", returns 0xff. On failure the TOD is **not restored**: control is left at 0x80 (clock halted) with test values in the registers.
 - **Side effects on success:** the saved control byte was read after writing 0x40, so the value restored is 0x40. R stays set after POST and the original calibration and sign bits are lost. The time is restored from the snapshot, so the time spent in the test is lost.
 - **Unreached TOD oscillator code:** 0x70006ee4-0x70006f28 prints "ERROR  : Unable to Kickstart TOD Oscillator " (0x700084b4; the string has no %n, but %o1-%o4 = %l2, %l1, %l3, %l7 are loaded anyway) + "U1506" and returns 0xff. 0x70006f2c-0x70006f70 prints Address/exp/obs/xor with %l4/%l3/%l6/%l7 + "U1506". Neither has any reference. The title "TOD Oscillator Test" (0x700093fe) is unreferenced too. They are remnants of a removed oscillator test.
-- **Core:** present (`src/ts/ts_rtc.vhd`: `mem_s/i/h/j/d/m/y` widths 7/7/6/3/6/5/8 match the 0x70006e4c masks). Possible issue: in `Sync_HTR`, `IF cr='0' THEN mem_* <= cpt_*` and `IF cw='1' THEN cpt_* <= mem_*` are both active when W = 1 and R = 0. That is exactly the 0x80 state this test uses. A written value can then swap between mem and cpt on every clock, and readback depends on clock parity (unverified; worth a simulation). A candidate fix is to gate the mem←cpt copy with `cw='0'`.
+- **Core:** present (`rtl/sun4m/ts_rtc.vhd`: `mem_s/i/h/j/d/m/y` widths 7/7/6/3/6/5/8 match the 0x70006e4c masks). Possible issue: in `Sync_HTR`, `IF cr='0' THEN mem_* <= cpt_*` and `IF cw='1' THEN cpt_* <= mem_*` are both active when W = 1 and R = 0. That is exactly the 0x80 state this test uses. A written value can then swap between mem and cpt on every clock, and readback depends on clock parity (unverified; worth a simulation). A candidate fix is to gate the mem←cpt copy with `cw='0'`.
 
 ## 11. Shared routines
 
@@ -1104,7 +1104,7 @@ The sequencer (`post_sequencer` 0x700098c0) calls the tests itself. Its order is
   5. Else if %l7 = 0 (no keyboard): POST with %g4 &= ~2 (quiet; matches the manual's "keyboard disconnected and diag-switch? false").
   6. Else `post_exit_soft_reset(-1)` (skip).
   - `escc_init_kbd` has just reset the channel, so step 1 only sees bytes that arrive in a window of a few ms. The L1-D case is really handled by step 4, because reset_power_on already set diag-switch?.
-- **Core:** present (`src/ts/ts_sunkb.vhd`: 0x01 → FF 04 7F, 0x0F → FE <layout>, 0x0E <v> is latched). So `kbd_detect` returns 4 (set A LEDs) unless the OSD layout byte is 9. The keyboard LEDs are not forwarded to MiSTer (`docs/HARDWARE_GAPS.md` §6, `ss_core.vhd:819-820`). There is no Stop (0x01) key, so L1 and L1-D cannot be entered; only diag-switch? in NVRAM can force POST.
+- **Core:** present (`rtl/sun4m/ts_sunkb.vhd`: 0x01 → FF 04 7F, 0x0F → FE <layout>, 0x0E <v> is latched). So `kbd_detect` returns 4 (set A LEDs) unless the OSD layout byte is 9. The keyboard LEDs are not forwarded to MiSTer (`docs/HARDWARE_GAPS.md` §6, `ss_core.vhd:819-820`). There is no Stop (0x01) key, so L1 and L1-D cannot be entered; only diag-switch? in NVRAM can force POST.
 
 ## 12. Test names without code
 

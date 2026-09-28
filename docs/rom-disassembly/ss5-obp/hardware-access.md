@@ -228,7 +228,7 @@ code:
 ## 5. Address ranges for the decoder diff
 
 Physical ranges the machine code reaches, with the registers used, and — from
-a quick read of the SS5 branch of `src/ts/ts_decode.vhd` (lines 54-98) —
+a quick read of the SS5 branch of `rtl/sun4m/ts_decode.vhd` (lines 54-98) —
 whether the core has an address select for them ("decoded" says nothing about
 how complete the device is; see [`post-tests.md`](post-tests.md) for that):
 
@@ -238,7 +238,7 @@ how complete the device is; see [`post-tests.md`](post-tests.md) for that):
 | `0x10000000`-`0x10000fff` | IOMMU | +0 control, +4 base, +0x14 flush all, +0x18 address flush | `sel.iommu` (PA[31:28]=1) |
 | `0x10001000`-`0x10001fff` | SBus controller | +0 AFSR, +4 AFAR, +0x10 SSCR0 (SSCR1-4 listed, not reached), +0x50 MFSR, +0x54 MFAR | inside `sel.iommu` |
 | `0x10002000` | MID / SBAE | +0 | inside `sel.iommu` |
-| `0x70000000`-`0x7003ffff` | **boot PROM** | instruction fetch in boot mode; ASI 9 loads (`post_printf`, tables; boot-mode mapped like fetches); **ASI 0x20 loads** at `0x7000xxxx` (`boot_puts`); and, once the MMU is on, every PTE OBP builds for the PROM (`mmu_map_range(0x70000000, …)`, watchdog TLB entries → PA `0x7000c000`, `0x70027000`) | **not decoded**: the core's PROM is at PA `0xFxxxxxxx`/`0xBxxxxxxx` (`sel.rom`), and its boot-mode fetch produces PA `0xFF`+VA[27:0] (`src/cpu/mcu_simple.vhd:1393`) instead of `0x7`+VA[27:0]. Boot-mode fetches would still reach the PROM; the ASI 0x20 reads and the translated PROM mapping would not |
+| `0x70000000`-`0x7003ffff` | **boot PROM** | instruction fetch in boot mode; ASI 9 loads (`post_printf`, tables; boot-mode mapped like fetches); **ASI 0x20 loads** at `0x7000xxxx` (`boot_puts`); and, once the MMU is on, every PTE OBP builds for the PROM (`mmu_map_range(0x70000000, …)`, watchdog TLB entries → PA `0x7000c000`, `0x70027000`) | **not decoded**: the core's PROM is at PA `0xFxxxxxxx`/`0xBxxxxxxx` (`sel.rom`), and its boot-mode fetch produces PA `0xFF`+VA[27:0] (`rtl/cpu/mcu_simple.vhd:1393`) instead of `0x7`+VA[27:0]. Boot-mode fetches would still reach the PROM; the ASI 0x20 reads and the translated PROM mapping would not |
 | `0x71000000` | Z85C30 #0 (keyboard ch A) | +4 control, +6 data | `sel.kbm` |
 | `0x71100000` | Z85C30 #1 (ttya ch A) | +4 control, +6 data | `sel.sport` |
 | `0x71200000`-`0x71201fff` | MK48T08 NVRAM/TOD | +0, +1, +3, +0x4e, +0x1dd8, +0x1ff8-+0x1fff | `sel.rtc` |

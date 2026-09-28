@@ -1,5 +1,10 @@
 # Hardware gap analysis: SPARCstation 5 and SPARCstation 20
 
+> Line references to `ss.sv` point at the MiSTer top as it was before phase 3
+> (commit `0fb5903`, `src/board/mister/SS_MiSTer/ss.sv`); phase 3 replaced it
+> with `SunSparcStation.sv`. The VHDL moved unchanged, so its line numbers
+> still hold.
+
 Phase 2 of [`REWORK.md`](REWORK.md). This compares what a real SPARCstation 5 and
 a real SPARCstation 20 contain with what this core implements today, and ranks
 the gaps. It is an inventory, not an audit: whether an implemented block is
@@ -46,9 +51,9 @@ These were cross-checked against two outside references:
   `eccmemctl`, `mxcc-*`, `SUNW,sx`, DBRI tests).
 
 **What the core does.** The claims come from reading the address decoder
-(`src/ts/ts_decode.vhd`), the I/O block (`src/ts/ts_io.vhd`), the machine top
-(`src/ts/ts_core.vhd`), the board top (`src/board/mister/ss_core.vhd`), the
-MiSTer top (`src/board/mister/SS_MiSTer/ss.sv`), and the device files they
+(`rtl/sun4m/ts_decode.vhd`), the I/O block (`rtl/sun4m/ts_io.vhd`), the machine top
+(`rtl/sun4m/ts_core.vhd`), the board top (`rtl/mister/ss_core.vhd`), the
+MiSTer top (`SunSparcStation.sv`), and the device files they
 instantiate. Only files listed in `SS_MiSTer/files.qip` count as built.
 
 **What the OS sees.** The core boots Grabulosaure's OpenBIOS fork
@@ -170,7 +175,7 @@ boot with a hard-coded MAC address, `08:00:20:12:34:56` (`obio.c:269`,
 `obio.c:305-320`). The hostid is taken from the last three MAC bytes, so every
 MiSTer also reports hostid `0x80123456` (SS5) or `0x72123456` (SS20). The
 IDPROM baked into the NVRAM block RAM holds a QEMU-style `52:54:00:12:34:56`,
-but it is overwritten at boot (`src/ts/iram_rtc.vhd`, image offset `0x1FD8`).
+but it is overwritten at boot (`rtl/sun4m/iram_rtc.vhd`, image offset `0x1FD8`).
 
 ---
 
@@ -267,7 +272,7 @@ instead of the hardware: disks, keyboard, video out, persistence.
 | RTC | seeded from the MiSTer RTC, with the year rebased to 1968 (`ss_core.vhd:831-855`) | none (done in `630d68e`) |
 | Keyboard | PS/2 to Sun Type-5 with 4 layouts, US/FR/DE/ES (`ss.sv:336-338`); Win keys map to the ◊ keys, Menu to Compose (`ts_ps2sun.vhd:355-371`) | **no Stop (L1) key and no Again/Props/Undo/Front/Copy/Open/Paste/Find/Cut/Help.** No table entry produces Sun codes `0x01`, `0x03`, `0x19`, `0x1A`, `0x31`, `0x33`, `0x48`, `0x49`, `0x5F`, `0x61` or `0x76`, and the PS/2 Pause (`E1`) prefix is ignored (`ts_ps2sun.vhd:292,582`). So **Stop-A cannot be typed.** Keyboard LEDs are not passed through (`ss_core.vhd:819-820`) |
 | Mouse | PS/2 to Sun 3-button mouse (`ts_ps2sun.vhd`) | fine |
-| Serial | port A goes to the HPS UART (`/dev/ttyS1`), shared with the ARM debug monitor (`soft/debugarm/lib.h:14`) | CONF_STR has no `UART` declaration (first entry is `"SparcStation;;"`, `ss.sv:211`), so Main offers none of its UART modes (PPP, modem, console). Main enables them only when the core declares `UART…` (Main `user_io.cpp:754`, `1722`). Port B goes nowhere |
+| Serial | port A goes to the HPS UART (`/dev/ttyS1`), shared with the ARM debug monitor (`tools/debugarm/lib.h:14`) | CONF_STR has no `UART` declaration (first entry is `"SparcStation;;"`, `ss.sv:211`), so Main offers none of its UART modes (PPP, modem, console). Main enables them only when the core declares `UART…` (Main `user_io.cpp:754`, `1722`). Port B goes nowhere |
 | Video, native | 1024×768@60 at 65 MHz (`ss_core.vhd:780-781`), always through the scaler (`VGA_SCALER=1`, `ss.sv:179`) | a single mode; see the resolution gap in §7 |
 | Video, "Scaler framebuffer" | `FB_EN` from the OSD, 8 bpp, 1024×768, `FB_BASE = 0x3E40_0000` (`ss.sv:187-192`) | **suspected broken, from reading the code, not tested.** By the address mapping in `ss_core.vhd:698-699`, TCX VRAM at core `0x1D40_0000` lands at DDR3 `0x22B0_0000`, while DDR3 `0x3E40_0000` is core RAM `0x01B0_0000`. On top of that, `MISTER_FB_PALETTE` is commented out (`ss5.qsf:59`, `ss20.qsf:53`), so the `FB_PAL_*` outputs are not connected (`sys/sys_top.v:1603-1608`) and 8 bpp mode would use the wrong palette |
 | Audio out | 16-bit signed stereo from the CS4231, SS5 only | none on SS20 |
@@ -291,7 +296,7 @@ user feature that breaks or goes missing without it.
 | 4 | Stop-A and the Sun-only keys | Type-5 keyboard: Stop, Again … Cut, Help | no PS/2 key maps to Sun codes `0x01` … `0x76`; Pause is ignored (`ts_ps2sun.vhd`, §6) | L1-A to break into the `ok` prompt (sync, `boot -s`, hung OS); OpenWindows/CDE Copy/Paste/Front/Open | P1 | S | Proposal: Pause → Stop, F13-style or Scroll-Lock chords for L2-L10, plus an OSD "Send Stop-A" entry |
 | 5 | NVRAM persistence to SD | battery-backed MK48T08 | block RAM only, lost on core reload (`iram_rtc.vhd`, `ts_rtc.vhd:282`) | `boot-device`, `auto-boot?`, `diag-switch?`, the OpenBIOS reboot-args scratch (fork commit `6f3c0b7`), Solaris `eeprom` | P1 | M | Options: a fourth VD auto-mounted to `games/<core>/nvram.bin`, or the Template `ioctl_upload` path after phase 3. Keep the IDPROM region under firmware control |
 | 6 | CD-ROM media change | removable medium | mount latched forever, `hd_mounted` unused (§6) | Multi-CD installs (Solaris 2.x "Software 1 of 2 / 2 of 2", NetBSD sets), eject | P1 | M | Edit `scsi_mist_cdrom.vhs` (not the generated `.vhd`): NOT READY with no image, UNIT ATTENTION `28h` after a swap, START STOP eject, clear the mount on unmount |
-| 7 | SS20 SMP without the ARM debug monitor | OBP starts the secondary CPUs | NCPUS=3, but README says `soft/debugarm` is needed to activate SMP | Multiprocessor Solaris, NetBSD MP on a stock MiSTer (Main does not run `debugarm`) | P1 | L | Phase 4.2 owns the root cause. Listed here because it is the SS20's headline feature |
+| 7 | SS20 SMP without the ARM debug monitor | OBP starts the secondary CPUs | NCPUS=3, but README says `tools/debugarm` is needed to activate SMP | Multiprocessor Solaris, NetBSD MP on a stock MiSTer (Main does not run `debugarm`) | P1 | L | Phase 4.2 owns the root cause. Listed here because it is the SS20's headline feature |
 | 8 | "Scaler framebuffer" video mode | n/a | `FB_BASE` does not match where TCX VRAM lands (by arithmetic); palette macro off (§6) | Anyone who picks OSD "Video: Scaler framebuffer" | P1 if confirmed | S | Verify on hardware first. Fix `FB_BASE` or the remap, enable `MISTER_FB_PALETTE`, and feed `FB_PAL_*` from the TCX/CG3 DAC (the ports exist, `ss_core.vhd:322-325`) |
 | 9 | Video resolutions | S24 did 1152×900 and 1024×768 (unverified); CG3 is natively 1152×900; Sun's usual default is 1152×900; cgsix up to 1280×1024 (unverified) | 1024×768@60 only (`ts_tcx.vhd:99`); `vid_pack.vhd` already has 1152×864 and 1280×1024 modelines | Desktop real estate, apps and window layouts that assume 1152×900 | P2 | M | Needs pixel clocks beyond the current PLL outputs (65/80/40 MHz, `ss_core.vhd:881-888`), a VRAM stride and OpenBIOS width/height |
 | 10 | SS20 audio | DBRI plus on-board codec (§5) | none: CS4231 synthesised but not decoded on SS20 (`ts_decode.vhd:115-162`); no OpenBIOS node | Any SS20 OS that plays sound | P2 | S-M (CS4231 route) / XL (DBRI) | Cheap route: decode the existing CS4231 plus APC at an SS20 SBus address and add the node to OpenBIOS `sbus_probe_slot_ss10`. Not period-accurate, but Solaris `audiocs` and NetBSD `audiocs` bind by node name (unverified for SS20). A real DBRI model is item 30 |

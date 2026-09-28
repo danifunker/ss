@@ -1,31 +1,41 @@
-# [SparcStation](https://en.wikipedia.org/wiki/SPARCstation) for [MiSTer Platform](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
+# [SPARCstation](https://en.wikipedia.org/wiki/SPARCstation) for [MiSTer Platform](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
+
+SunSparcStation_MiSTer: Sun SPARCstation 5 and SPARCstation 20 (sun4m) for
+MiSTer, by Grabulosaure, reworked for distribution. The rework is in
+progress on branch `danifunker`; the plan and its status are in
+[docs/REWORK.md](docs/REWORK.md).
 
 ## Compilation Modes
 
-### SS5
-SparcStation 5 : Single CPU. MicroSparcII compatible CPU. Up to around 65MHz.
+Two builds come from one Quartus project (`SunSparcStation.qpf`), one per
+revision:
 
-Compatible with all the OSes which supported actual Sun4m SparcStations : Linux, NetBSD, OpenBSD, SunOS, Solaris, NextSTEP. Some OSes requires a special configuration.
-  
-### SS20
-SparcStation 20 : Up to 3 CPUs can fit in MiSTer FPGA. SMP with write-back caches, MESI coherency. SuperSparc compatible CPU. Up to around 50MHz.
+### SunSparcStation5
+SparcStation 5: single CPU. MicroSparcII compatible CPU. Up to around 65MHz.
 
-SS20 seems to work with NetBSD with 3 CPUs. This is quite complex code and difficult to validate. Linux hardy ever supported multicore on these computers. I would like to be able to run multicore Solaris. IIRC, the debug monitor (/soft/debugarm) is currently needed to properly activate SMP mode.
+Compatible with all the OSes which supported actual Sun4m SparcStations: Linux, NetBSD, OpenBSD, SunOS, Solaris, NextSTEP. Some OSes require a special configuration.
+
+### SunSparcStation20
+SparcStation 20: up to 3 CPUs can fit in MiSTer FPGA. SMP with write-back caches, MESI coherency. SuperSparc compatible CPU. Up to around 50MHz.
+
+SS20 seems to work with NetBSD with 3 CPUs. This is quite complex code and difficult to validate. Linux hardly ever supported multicore on these computers. I would like to be able to run multicore Solaris. IIRC, the debug monitor (`tools/debugarm`) is currently needed to properly activate SMP mode.
 
 ## Code
-Core: https://github.com/Grabulosaure/ss
+Core upstream: https://github.com/Grabulosaure/ss
 
-There is also the OpenBIOS sources with the changes for this core (original repo. works with QEMU) : https://github.com/Grabulosaure/ss_openbios
+There is also the OpenBIOS sources with the changes for this core (original repo. works with QEMU): https://github.com/Grabulosaure/ss_openbios
 
 ## Setup
 ### BIOS
-Place [boot.rom](https://github.com/Grabulosaure/ss_openbios/raw/refs/heads/main/boot.rom) in games/SparcStation folder.
+Place [boot.rom](https://github.com/Grabulosaure/ss_openbios/raw/refs/heads/main/boot.rom) in the `games/SunSparcStation` folder.
+
+**Upgrading from the SparcStation core:** the folder was `games/SparcStation`.
+Move `boot.rom` and your disk images to `games/SunSparcStation`.
 
 ### OS
-You can also make your own images using the core, QEMU, or a real SparcStation.
+You can make your own images using the core, QEMU, or a real SparcStation.
 
-[Using QEMU Sparc emulator to build a RAW image](https://learn.adafruit.com/build-your-own-sparc-with-qemu-and-solaris?view=all&gclid=CjwKCAjwsJ6TBhAIEiwAfl4TWB7lb0zPB9E2s0v9HOEfbNoVReuQV-d9LEpU9mJ8X-fljT1ssA6kQRoCJdgQAvD_BwE
-)
+[Using QEMU Sparc emulator to build a RAW image](https://learn.adafruit.com/build-your-own-sparc-with-qemu-and-solaris?view=all)
 
 `qemu-img create -f raw solaris8.raw 2.9G`
 
@@ -39,16 +49,24 @@ It's better to reboot MiSTer when trying different OSes, probably a few missing 
 When trying different IOMMU rev options, do a core RESET after applying a new value as this is copied by the BIOS into
 a configuration structure.
 
-CDROM works with Solaris (8), NextSTEP, Linux (RH). To mount the CD with Solaris, type : " mount -F hsfs -r /dev/dsk/c0t6d0s0 /cdrom", for old Linux, it's "/dev/scd0"
+Disks are images on the MiSTer's SD card (OSD: HD, HD2, CDROM). The
+"Direct SD" modes of the SparcStation core, which drove the secondary SD card
+directly, were removed with the move to the standard MiSTer framework.
+
+CDROM works with Solaris (8), NextSTEP, Linux (RH). To mount the CD with Solaris, type: `mount -F hsfs -r /dev/dsk/c0t6d0s0 /cdrom`; for old Linux, it's `/dev/scd0`.
 
 I've changed L2TLB control so that it can be enabled/disabled at any time. NextSTEP isn't compatible, Solaris and Linux seem safe. There are a few other possible tweaks for better performance, I'm curious of the effects on real-time games.
 
-The Ethernet interface works with the USER_IO port connected to a MII PHY like the [LAN8720](https://www.waveshare.com/lan8720-eth-board.htm).
+Ethernet: the SparcStation core reached the network through an MII PHY board
+(LAN8720) on the USER_IO port. The standard framework drives USER_IO
+open-drain only, which cannot carry that interface, so the option is gone;
+Ethernet through the MiSTer's own network port is planned
+([docs/HARDWARE_GAPS.md](docs/HARDWARE_GAPS.md), gap #1).
 
 ## OS Notes
 Besides my own bugs, running all these different OSes is a bit tricky because the actual CPUs on SparcStations,
 MicroSparcII on SS5 and SuperSparc on SS20 cannot be efficiently implemented exactly the same in a FPGA, and, more
-than that, these microprocessors made by Fujistu and Texas Instruments and designed partly by Sun were full of bugs,
+than that, these microprocessors made by Fujitsu and Texas Instruments and designed partly by Sun were full of bugs,
 particularly in the MMU and cache, so that the Operating Systems had to detect which CPU was present (hence IOMMU rev parameter)
 to enable different cache and MMU management code. Awful.
 (Just have to read old Linux kernel source code for Sparc32 support, it's full of profanities)

@@ -8,7 +8,7 @@ another. The same source runs in three places:
 | target | runs on | PROM link address |
 |---|---|---|
 | `ss5-qemu` | `qemu-system-sparc -M SS-5` | `0x70000000` (a real SPARCstation 5's) |
-| `ss5-core` | this core's SS5 build, loaded through the OSD's **BIOS** entry (`F,ROM`) in place of `boot.rom` | `0xF0000000` (`src/ts/ts_decode.vhd`, `sel.rom`) |
+| `ss5-core` | this core's SS5 build, loaded through the OSD's **BIOS** entry (`F,ROM`) in place of `boot.rom` | `0xF0000000` (`rtl/sun4m/ts_decode.vhd`, `sel.rom`) |
 | `ss20` | `qemu-system-sparc -M SS-20`, and the core's SS20 build | `0` (boot mode); pa `0xF_F0000000` |
 
 The SS20 PROM is not readable at its link address with the MMU off, so
