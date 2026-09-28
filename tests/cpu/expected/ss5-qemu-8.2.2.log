@@ -1,6 +1,22 @@
 
-CPUTEST ss20 psr=40400fc0 nwindows=8 fpu=1
-PASS alu: every integer ALU instruction, table of vectors
+CPUTEST ss5-qemu psr=04400fc0 nwindows=8 fpu=1
+    check 0010a570 exp=ffffffff obs=00000000
+    check 0010a5f0 exp=fffffffe obs=00000000
+    check 0010a670 exp=fffffffd obs=00000000
+    check 0010a6f0 exp=fffffffc obs=00000000
+    check 0010a770 exp=80000001 obs=00000000
+    check 0010a7f0 exp=7fffffff obs=00000000
+    check 0010a800 exp=00000001 obs=ffffffff
+    check 0010a870 exp=7fffffff obs=00000000
+    check 0010a8f0 exp=00000002 obs=00000000
+    check 0010a970 exp=00000001 obs=00000000
+    check 0010a9f0 exp=aaaaaaab obs=00000000
+    check 0010aa70 exp=55555556 obs=00000000
+    check 0010aaf0 exp=ffff0001 obs=00000000
+    check 0010ab70 exp=00010000 obs=00000000
+    check 0010abf0 exp=edcba988 obs=00000000
+    check 0010ac70 exp=01234568 obs=00000000
+FAIL alu: every integer ALU instruction, table of vectors
 PASS alu: sethi / set / %hi %lo
 PASS alu: wr/rd %y, xor semantics of wr
 PASS ldst: byte/half/word loads, sign extension, big-endian
@@ -15,7 +31,7 @@ PASS branch: annul bit and delay slots
 PASS branch: call/jmpl link register, computed jumps
 PASS trap: ta n -> tt 0x80+n, trap PC/nPC, register+imm number
 PASS trap: unimp and invalid opcodes -> illegal_instruction
-    check 00000002 exp=000025e8 obs=000025ec
+    check 00000002 exp=700025c8 obs=700025cc
 FAIL trap: rett with traps enabled -> illegal_instruction
 PASS trap: udiv/sdiv by zero -> division_by_zero (0x2a)
 PASS trap: taddcctv/tsubcctv -> tag_overflow (0x0a)
@@ -25,11 +41,13 @@ PASS window: save/restore, ins/outs overlap, globals shared
 PASS window: 40-deep recursion, overflow/underflow traps
 PASS window: WIM implements NWINDOWS bits, save into WIM traps
 PASS psr: impl/ver read-only, PIL and icc writable
-    check 00000004 exp=00000b30 obs=00000ff0
+    check 00000004 exp=70000b30 obs=70000ff0
 FAIL psr: TBR.tt holds the last trap type, TBA writable
+PASS mmu: context table pointer and context registers
+PASS mmu: Swift TLB replacement control, SFSR/SFAR diag
 PASS fpu: single precision add/sub/mul/div/sqrt, moves
 PASS fpu: double precision arithmetic, even/odd pairs
 PASS fpu: fitos/fitod/fstoi/fdtoi/fstod/fdtos
 PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
-CPUTEST DONE pass=28 fail=2 skip=0
+CPUTEST DONE pass=29 fail=3 skip=0

@@ -44,8 +44,16 @@ BEGIN(t_rett_supervisor, "trap: rett with traps enabled -> illegal_instruction")
         EXPECT_TRAP(TT_ILLEGAL)
         jmp %l0
         rett %l0 + 4
-1:      nop                             /* harmless if skipped */
-        CHECK_TRAPPED(TT_ILLEGAL, 1)
+1:      nop                             /* harmless if skipped (QEMU) */
+        /* If the rett executed instead of trapping, we are now one window
+         * up (CWP+1) with ET=1: a save restores exactly this test's window
+         * (its %sp was the caller's %sp - 96), so the suite can go on. */
+        ld [%g7 + V_TRAP_SEEN], %g1
+        cmp %g1, -1
+        bne 2f
+        nop
+        save %sp, -96, %sp
+2:      CHECK_TRAPPED(TT_ILLEGAL, 1)
         ld [%g7 + V_TRAP_NPC], %l1
         EXPECT_R(%l1, %l0, 2)
 END

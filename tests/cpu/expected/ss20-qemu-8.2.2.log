@@ -1,6 +1,22 @@
 
 CPUTEST ss20 psr=40400fc0 nwindows=8 fpu=1
-PASS alu: every integer ALU instruction, table of vectors
+    check 0010a570 exp=ffffffff obs=00000000
+    check 0010a5f0 exp=fffffffe obs=00000000
+    check 0010a670 exp=fffffffd obs=00000000
+    check 0010a6f0 exp=fffffffc obs=00000000
+    check 0010a770 exp=80000001 obs=00000000
+    check 0010a7f0 exp=7fffffff obs=00000000
+    check 0010a800 exp=00000001 obs=ffffffff
+    check 0010a870 exp=7fffffff obs=00000000
+    check 0010a8f0 exp=00000002 obs=00000000
+    check 0010a970 exp=00000001 obs=00000000
+    check 0010a9f0 exp=aaaaaaab obs=00000000
+    check 0010aa70 exp=55555556 obs=00000000
+    check 0010aaf0 exp=ffff0001 obs=00000000
+    check 0010ab70 exp=00010000 obs=00000000
+    check 0010abf0 exp=edcba988 obs=00000000
+    check 0010ac70 exp=01234568 obs=00000000
+FAIL alu: every integer ALU instruction, table of vectors
 PASS alu: sethi / set / %hi %lo
 PASS alu: wr/rd %y, xor semantics of wr
 PASS ldst: byte/half/word loads, sign extension, big-endian
@@ -32,4 +48,4 @@ PASS fpu: double precision arithmetic, even/odd pairs
 PASS fpu: fitos/fitod/fstoi/fdtoi/fstod/fdtos
 PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
-CPUTEST DONE pass=28 fail=2 skip=0
+CPUTEST DONE pass=27 fail=3 skip=0

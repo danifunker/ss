@@ -15,7 +15,7 @@ esac
 [ "$2" = "--no-build" ] || python3 "$here/build.py" "$target" >/dev/null
 mkdir -p "$here/out/$target"
 log="$here/out/$target/qemu.log"
-timeout 60 qemu-system-sparc -M "$machine" -m "$mem" \
+timeout 60 ${QEMU:-qemu-system-sparc} -M "$machine" -m "$mem" \
     -bios "$here/out/$target/cputest.rom" -nographic -serial mon:stdio \
     -monitor none -display none </dev/null 2>/dev/null \
   | tr -d '\r' | sed -u '/CPUTEST DONE/q' > "$log" || true
