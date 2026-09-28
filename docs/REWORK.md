@@ -55,12 +55,9 @@ phases 1–3.
    the files on their own.
 2. **Sun PROM images and their disassembly.** The Sun OBP ROMs are Sun/Oracle
    copyright. The images stay in `scratch/` (gitignored) and are never
-   committed. The generated listings under `docs/rom-disassembly/` are
-   derivative of those images. **Decide before pushing this branch publicly**
-   whether to commit the full machine listings or only the hand-written
-   analysis plus the generator (`tools/romdis/`), which rebuilds the listings
-   from a user-supplied ROM. The analysis documents (layout, POST test
-   catalogue, register usage) are fine either way.
+   committed. **Decided (user, 2026-09-28): commit everything else,** the full
+   generated listings under `docs/rom-disassembly/` included, because they
+   are the reference for the work ahead.
 3. **The BIOS the core ships with** is OpenBIOS (`boot.rom` from
    `github.com/Grabulosaure/ss_openbios`, GPL-2). It can be redistributed.
    Whether the core should also run the real Sun OBP is a phase 4/5 question
@@ -270,8 +267,8 @@ core relies on:
 | Custom framework feature | Used for | Stock template | Plan |
 |---|---|---|---|
 | **A second DDR3 port, `DDRAM2`**: the old `sys_top.v` comments out ALSA's `ddr_svc` and hands its f2sdram `ram2` port to `emu` | `ss_core.vhd`: DDRAM carries video (the TCX VRAM, `i_plomb_avalon_vram`); DDRAM2 carries CPU main memory and the BIOS download (`i_plomb_avalon_dram`) | one `DDRAM` port; `ram2` belongs to ALSA | merge the two masters inside the core onto the one port: a 2:1 Avalon arbiter, or `plomb_mux` ahead of a single `plomb_avalon64`. Costs concurrency, so measure CPU memory latency and video underruns on hardware |
-| **The SDIO pins passed to `emu`** (`SDIO_DAT/CMD/CLK`) | the OSD's "Direct SD" SCSI modes (`scsi_sd.vhd` drives the secondary SD card itself) | the secondary SD is reached only in SPI mode through `SD_SCK/MOSI/MISO/CS`, whose pins are shared with analog VGA | **decision:** drop Direct SD (HPS image mode is the MiSTer norm), or port `scsi_sd` to SPI mode |
-| **Push-pull USER_IO** (`USER_EN` per pin) | the RMII Ethernet PHY on USER_IO (50 MHz TX0/TX1/TXEN) | USER_IO is **open-drain only** (`!user_out ? 0 : Z`), so 50 MHz RMII cannot work | the RMII path cannot survive the move. HPS-bridged Ethernet (HARDWARE_GAPS #1) becomes the only network path; keep the RMII MAC in `attic/` |
+| **The SDIO pins passed to `emu`** (`SDIO_DAT/CMD/CLK`) | the OSD's "Direct SD" SCSI modes (`scsi_sd.vhd` drives the secondary SD card itself) | the secondary SD is reached only in SPI mode through `SD_SCK/MOSI/MISO/CS`, whose pins are shared with analog VGA | **Decided: drop Direct SD.** Disks go through the HPS. The SCSI storage path is to be modelled on the Mac cores (see phase 5, SCSI) |
+| **Push-pull USER_IO** (`USER_EN` per pin) | the RMII Ethernet PHY on USER_IO (50 MHz TX0/TX1/TXEN) | USER_IO is **open-drain only** (`!user_out ? 0 : Z`), so 50 MHz RMII cannot work | **Decided: retire RMII.** HPS-bridged Ethernet (HARDWARE_GAPS #1) is the only network path; keep the RMII MAC in `attic/` |
 
 Two smaller differences: `HPS_BUS` is `[45:0]`, not `[48:0]`, and
 `hps_io.sv` changed (walk its port list against `ss.sv`'s instance).
@@ -306,7 +303,7 @@ Steps:
    top can be linted with Verilator here; the VHDL needs GHDL or nvc (neither
    is installed yet).
 
-### Naming decision (open)
+### Naming decision (decided 2026-09-28: B)
 
 The first field of `CONF_STR` (`"SparcStation;;"`) names the core on MiSTer
 and so the `games/` folder that holds `boot.rom` and the disk images.
@@ -321,6 +318,10 @@ and so the `games/` folder that holds `boot.rom` and the disk images.
 Either way the two builds share one folder (same `boot.rom`, same disk
 images), the way Atari800_MiSTer ships two rbfs from two revisions of one
 project.
+
+**Decided: B.** The CONF_STR name becomes `SunSparcStation`, so files live in
+`games/SunSparcStation/`, and the first release notes must tell existing users
+to move `games/SparcStation/`.
 
 ---
 
@@ -367,8 +368,14 @@ section, or OS driver code) and a severity.
 
 Expected order, subject to the gap reports:
 
-1. HPS-bridged Ethernet for the LANCE (Main_MiSTer extension plus core side),
-   RMII kept as an option.
+0. **SCSI storage modelled on the Mac cores** (user, 2026-09-28): disk and
+   CD-ROM images only through the HPS, the way `../MacQuadra800_MiSTer` does
+   it (its NCR 53C96 is from the same 53C9x "ESP" family as the SPARCstation's
+   ESP, with HPS-backed targets, a block cache, a CD-ROM target, and the
+   Main_MiSTer changes it needed). The design and porting assessment are in
+   `docs/design/scsi-hps.md`. Main changes are acceptable where needed.
+1. HPS-bridged Ethernet for the LANCE (Main_MiSTer extension plus core side).
+   RMII is retired (it needs push-pull USER_IO).
 2. Reset and robustness fixes, so no MiSTer reboot is needed between OSes.
 3. SMP without the ARM debug monitor.
 4. P0/P1 device gaps (floppy? cgsix? SS20 audio?) as agreed in phase 2.
@@ -418,6 +425,15 @@ Expected order, subject to the gap reports:
 - The upstream project has an ARM-side debug monitor, `soft/debugarm`
   (`arm-linux-gnueabihf-gcc`), which talks to the core's debug port and is
   said to be needed for SS20 SMP.
+
+## Decisions
+
+| Date | Decision |
+|---|---|
+| 2026-09-28 | Core name SunSparcStation_MiSTer; CONF_STR name `SunSparcStation` (`games/SunSparcStation/`) |
+| 2026-09-28 | Drop "Direct SD"; disks only through the HPS, SCSI modelled on the Mac cores (Main changes allowed) |
+| 2026-09-28 | Retire the RMII Ethernet PHY option; HPS-bridged Ethernet instead |
+| 2026-09-28 | Commit the full Sun PROM disassembly listings (the ROM images themselves stay out) |
 
 ## Session log
 
