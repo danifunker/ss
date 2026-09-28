@@ -53,7 +53,7 @@ PASS alu: sethi / set / %hi %lo
 FAIL alu: every integer ALU instruction, table of vectors
     check 0010a570 exp=ffffffff obs=00000000
 ...
-CPUTEST DONE pass=27 fail=3 skip=0
+CPUTEST DONE pass=29 fail=3 skip=0
 ```
 
 Each `check` line names the check code, the expected value and the
@@ -72,6 +72,7 @@ row up in `out/alu_vectors.txt`.
 | `t_window.S` | save/restore overlap, CWP arithmetic, 40-deep recursion through the spill/fill handlers, NWINDOWS |
 | `t_psr.S` | read-only impl/ver, PIL, icc, TBR.tt and TBA |
 | `t_fpu.S` | single and double arithmetic, conversions, fcmp/fcc/FBfcc, FSR cexc/aexc |
+| `t_mmu_swift.S` | SS5 only: the POST's microSPARC-II MMU register walking-pattern tests (CTPR, context, TLB replacement control `0x1000`, SFSR/SFAR diagnostic aliases `0x1300`/`0x1400`), with the POST's masks. It probes first whether `0x1000` aliases the PCR, as it does on the core (ASI 4 decoded from VA[11:8]), and reports that instead of walking. |
 
 ## Known QEMU 8.2.2 deviations
 

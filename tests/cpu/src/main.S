@@ -9,6 +9,7 @@
 #include "t_traps.S"
 #include "t_window.S"
 #include "t_psr.S"
+#include "t_mmu_swift.S"
 #include "t_fpu.S"
 
         .section .testtab, "a", @progbits

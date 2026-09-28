@@ -43,9 +43,11 @@ PASS window: WIM implements NWINDOWS bits, save into WIM traps
 PASS psr: impl/ver read-only, PIL and icc writable
     check 00000004 exp=70000b30 obs=70000ff0
 FAIL psr: TBR.tt holds the last trap type, TBA writable
+PASS mmu: context table pointer and context registers
+PASS mmu: Swift TLB replacement control, SFSR/SFAR diag
 PASS fpu: single precision add/sub/mul/div/sqrt, moves
 PASS fpu: double precision arithmetic, even/odd pairs
 PASS fpu: fitos/fitod/fstoi/fdtoi/fstod/fdtos
 PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
-CPUTEST DONE pass=27 fail=3 skip=0
+CPUTEST DONE pass=29 fail=3 skip=0
