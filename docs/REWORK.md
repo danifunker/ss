@@ -359,6 +359,22 @@ Known leads to start from:
   sector size OSD option (2048/512), the keyboard layouts, video timing and
   scaler, audio levels.
 
+- 4.7 **Found so far** (session 1, to be confirmed and fixed):
+  - `ss.sv` declared `scsi_conf` and `scsi_cdconf` as 1-bit wires, so only
+    the low bit of each OSD field reached `ss_core` (3 and 2 bits wide):
+    "Image+Image" gave a single disk and CD-ROM "512" switched the CD-ROM
+    off. Fixed in the phase 3 top.
+  - The MMU decodes ASI 4 from VA[11:8] only, so microSPARC-II registers
+    at `0x1000`, `0x1300` and `0x1400` alias the PCR, SFSR and SFAR. The
+    real SS5 PROM writes 0 to `[0x1000]`, which on the core would clear
+    boot mode ([ss5-obp/post-tests.md](rom-disassembly/ss5-obp/post-tests.md)).
+  - The TLB diagnostic ASI (6) and the cache RAM/tag ASIs are not
+    implemented, so POST test 6 fails (QEMU fails it too).
+  - The SS5 PROM sits at pa `0xF…` on the core but `0x7000_0000` on a real
+    SS5; the Sun PROM reads itself and maps itself at `0x70000000`.
+  - Unmapped addresses never fault: they return `0xBADACCE5` and ack
+    (HARDWARE_GAPS §2.1). The PROM's SBus/EBus time-out tests cannot pass.
+
 **Done when** every block has an audit entry with its evidence (datasheet
 section, or OS driver code) and a severity.
 
