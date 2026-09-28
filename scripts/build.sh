@@ -30,9 +30,12 @@ if pgrep -f "quartus_(map|fit|asm|sta|sh)" >/dev/null; then
     log "another Quartus flow is running; refusing to start a second one"; exit 1
 fi
 : > "$LOG"
-log "=== $REV: build_id ==="
-"$Q/quartus_sh" -t sys/build_id.tcl compile "$PROJECT" "$REV" >> "$LOG" 2>&1 || {
-    log "sys/build_id.tcl failed (see $LOG)"; exit 1; }
+# build_id.v is the version date the OSD shows. It is written here rather
+# than by running sys/build_id.tcl standalone: that script opens and closes
+# the project, and project_close writes every assignment sys/sys.tcl sources
+# back into the .qsf (300 inlined pin lines). BUILD_DATE=YYMMDD pins it.
+printf '`define BUILD_DATE "%s"' "${BUILD_DATE:-$(date +%y%m%d)}" > build_id.v
+log "=== $REV: build date $(sed 's/.*"\(.*\)"/\1/' build_id.v) ==="
 log "=== $REV: synthesis ==="
 "$Q/quartus_map" "$PROJECT" -c "$REV" >> "$LOG" 2>&1
 RC=$?
@@ -56,3 +59,6 @@ FITSUM="output_files/$REV.fit.summary"; STASUM="output_files/$REV.sta.summary"
 [ -f "$FITSUM" ] && { log "--- fit summary ---"; sed -n '1,16p' "$FITSUM" | sed 's/^/    /'; }
 [ -f "$STASUM" ] && { log "--- worst setup slack per clock ---"; grep -A2 "^Type  : .*Setup" "$STASUM" | sed 's/^/    /' | head -40; }
 [ -f "output_files/$REV.rbf" ] && log "OK: output_files/$REV.rbf" || { log "no rbf produced"; exit 1; }
+if ! git diff --quiet -- "$REV.qsf" 2>/dev/null; then
+    log "warning: Quartus changed $REV.qsf; review with git diff (git checkout -- $REV.qsf to discard)"
+fi
