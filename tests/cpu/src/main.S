@@ -1,0 +1,20 @@
+/* The CPU test suite as one translation unit: sparc_link.py links a
+ * single object. Tests run in the order they are included. */
+#include "runtime.S"
+#include "gen/cond_tab.S"
+#include "gen/alu_vec.S"
+#include "t_alu.S"
+#include "t_ldst.S"
+#include "t_branch.S"
+#include "t_traps.S"
+#include "t_window.S"
+#include "t_psr.S"
+#include "t_fpu.S"
+
+        .section .testtab, "a", @progbits
+        .word 0, 0                      /* end of the test table */
+
+        .section .romend, "a", @progbits
+        .align 4
+        .globl rom_end
+rom_end:

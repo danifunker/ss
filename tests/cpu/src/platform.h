@@ -1,0 +1,99 @@
+/* Per-target constants for the bare-metal CPU test suite.
+ *
+ * The suite is a boot PROM image: it starts at the reset vector with the
+ * MMU off and reports on ttya (ESCC channel A). One source, one image per
+ * target, because the PROM's link address differs:
+ *
+ *   ss5-qemu  qemu-system-sparc -M SS-5    PROM at pa 0x0_70000000 (as on a
+ *                                          real SPARCstation 5)
+ *   ss5-core  this core's SS5 build        PROM at pa 0x0_F0000000
+ *                                          (src/ts/ts_decode.vhd sel.rom)
+ *   ss20      qemu -M SS-20 and the core   PROM at pa 0xF_F0000000, run in
+ *                                          boot mode from VA 0
+ *
+ * With the MMU off, data accesses are physical with pa[35:32] = 0. The SS20
+ * PROM is therefore not readable at its link address: the start-up code
+ * copies the image to RAM at pa 0 (SHADOW_ROM) so that constant tables and
+ * strings can be read at their link addresses, while instructions keep
+ * coming from the PROM in boot mode.
+ */
+#ifndef PLATFORM_H
+#define PLATFORM_H
+
+#if defined(TARGET_SS5_QEMU)
+#  define ROM_BASE      0x70000000
+#  define IO_ASI        0x20            /* MMU bypass, pa[35:32] = 0 */
+#  define ESCC_BASE     0x71100000
+#  define SHADOW_ROM    0
+#elif defined(TARGET_SS5_CORE)
+#  define ROM_BASE      0xf0000000
+#  define IO_ASI        0x20
+#  define ESCC_BASE     0x71100000
+#  define SHADOW_ROM    0
+#elif defined(TARGET_SS20)
+#  define ROM_BASE      0x00000000
+#  define IO_ASI        0x2f            /* MMU bypass, pa[35:32] = 0xf */
+#  define ESCC_BASE     0xf1100000
+#  define SHADOW_ROM    1
+#  define ROM_PA_LOW    0xf0000000      /* pa 0xf_f0000000 via ASI 0x2f */
+#else
+#  error "define TARGET_SS5_QEMU, TARGET_SS5_CORE or TARGET_SS20"
+#endif
+
+/* ESCC (Z85C30) on sun4m: channel B control/data at +0/+2, channel A
+ * (ttya) control/data at +4/+6. */
+#define TTYA_CTRL       (ESCC_BASE + 4)
+#define TTYA_DATA       (ESCC_BASE + 6)
+
+/* RAM layout (physical, MMU off). The SS20 shadow copy of the PROM image
+ * occupies the bottom of RAM, so everything else starts at 1 MiB. */
+#define VARS            0x00100000      /* runtime variables, see VAR_* */
+#define STACK_TOP       0x001ff000
+#define SCRATCH         0x00200000      /* free for tests: 1 MiB */
+#define SCRATCH_SIZE    0x00100000
+
+/* Runtime variables, offsets from VARS (kept in %g7 by convention). */
+#define V_TRAP_EXPECT   0x00    /* tt the current test expects, or -1 */
+#define V_TRAP_SEEN     0x04    /* tt of the last expected trap taken */
+#define V_TRAP_PC       0x08
+#define V_TRAP_NPC      0x0c
+#define V_UNEXP_TT      0x10
+#define V_UNEXP_PC      0x14
+#define V_TEST_FAILS    0x18    /* failed checks in the current test */
+#define V_WIN_OVF       0x1c    /* window overflow traps taken */
+#define V_WIN_UNF       0x20    /* window underflow traps taken */
+#define V_NWINDOWS      0x24
+#define V_FPU           0x28    /* 1 when PSR.EF sticks */
+#define V_PASS          0x2c
+#define V_FAIL          0x30
+#define V_TRAPS         0x34    /* all non-window traps taken */
+#define V_DETAILS       0x38    /* detail lines printed for this test */
+#define V_PSR0          0x3c    /* PSR at reset (impl/ver) */
+#define V_TT_RESUME     0x40    /* 1: expected trap re-executes (jmp %l1) */
+#define V_SKIP          0x44    /* set by a test that could not run */
+#define V_SKIP_COUNT    0x48
+#define V_SIZE          0x80
+
+/* Trap types (SPARC V8 table 7-1) */
+#define TT_RESET        0x00
+#define TT_IACC         0x01
+#define TT_ILLEGAL      0x02
+#define TT_PRIV         0x03
+#define TT_FP_DISABLED  0x04
+#define TT_WIN_OVF      0x05
+#define TT_WIN_UNF      0x06
+#define TT_ALIGN        0x07
+#define TT_FP_EXC       0x08
+#define TT_DACC         0x09
+#define TT_TAG_OVF      0x0a
+#define TT_DIV_ZERO     0x2a
+#define TT_TICC(n)      (0x80 + (n))
+
+#define PSR_EF          0x00001000
+#define PSR_S           0x00000080
+#define PSR_PS          0x00000040
+#define PSR_ET          0x00000020
+#define PSR_PIL_MASK    0x00000f00
+#define PSR_ICC_SHIFT   20
+
+#endif
