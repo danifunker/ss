@@ -23,7 +23,7 @@ first.**
 | Phase | What | State |
 |---|---|---|
 | 0 | Distribution blockers (license, ROM redistribution) | **open, needs the user** |
-| 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | machine code, POST catalogues and CPU suite first cut done; Forth dictionary in progress |
+| 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | **disassembly done** ([rom-disassembly/](rom-disassembly/README.md): machine code, POST catalogues, Forth dictionaries, device trees, FCode); CPU suite: ISA tests + Swift MMU registers done, more POST-derived hardware tests to lift (1f) |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done in the tree, not yet built**: needs an A&S and a fit for both revisions on the Quartus machine, then a hardware boot |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | in progress: `docs/impl-gaps/{cpu,chipset,video-audio-glue}.md`, summarised into `IMPLEMENTATION_GAPS.md` |
