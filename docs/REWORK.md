@@ -388,8 +388,15 @@ Expected order, subject to the gap reports:
    CD-ROM images only through the HPS, the way `../MacQuadra800_MiSTer` does
    it (its NCR 53C96 is from the same 53C9x "ESP" family as the SPARCstation's
    ESP, with HPS-backed targets, a block cache, a CD-ROM target, and the
-   Main_MiSTer changes it needed). The design and porting assessment are in
-   `docs/design/scsi-hps.md`. Main changes are acceptable where needed.
+   Main_MiSTer changes it needed). Main changes are acceptable where needed.
+   **Design: [design/scsi-hps.md](design/scsi-hps.md).** Recommended: keep
+   `ts_esp` and the DMA2/IOMMU path that every sun4m OS drives; replace
+   everything behind the ESP (`scsi_mist*`, `scsi_sd`, the `ss_core`
+   muxes) with one SystemVerilog target engine for disks and CD at
+   OSD-selectable IDs, in front of the Mac's `scsi_cache.sv`. Steps S0–S5
+   need no Main change (stock Main already does multi-block transfers);
+   S6 (CUE/BIN/CHD, CD audio) needs a `support/sparc/` in Main. Its §6
+   lists nine open questions for the user.
 1. HPS-bridged Ethernet for the LANCE (Main_MiSTer extension plus core side).
    RMII is retired (it needs push-pull USER_IO).
 2. Reset and robustness fixes, so no MiSTer reboot is needed between OSes.
