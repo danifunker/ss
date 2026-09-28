@@ -374,6 +374,25 @@ Known leads to start from:
     SS5; the Sun PROM reads itself and maps itself at `0x70000000`.
   - Unmapped addresses never fault: they return `0xBADACCE5` and ack
     (HARDWARE_GAPS §2.1). The PROM's SBus/EBus time-out tests cannot pass.
+  - SS20 MP, against the real OBP 2.25
+    ([ss20-obp-2.25/README.md](rom-disassembly/ss20-obp-2.25/README.md),
+    [post-tests.md](rom-disassembly/ss20-obp-2.25/post-tests.md)):
+    every CPU identifies as MID 8; the MSI MID register and arbiter
+    enable (which the PROM uses to stop and start CPUs) are not decoded;
+    ASI 0x38 is the core's internal table-walk ASI, but the PROM keeps the
+    MID there; the IOMMU reports IMPL 0 with MB=1. Any one of these breaks
+    the PROM's MP start-up, and these are likely what the OS SMP start
+    path (`v3_cpustart` → `cpu_enter_client` at 0x274ac) needs too
+    (phase 4.2).
+  - SS20 POST fails first at "MMU Context Register": the core has 8
+    context bits, the SuperSPARC POST expects 12.
+  - Absent on the SS20 build: EMC/SMC at pa `0xf_0000_0000`, TLB/cache
+    diagnostic ASIs and flash clear, MSI AFSR/AFAR and slot configuration,
+    IOMMU diagnostic windows, the MACIO ID register, the parallel port.
+  - The FPU "trap priority" POST tests (a misaligned store must trap, tt 7,
+    before a pending deferred fp_exception) suggest the order is inverted in
+    `iu_pipe5.vhd` (unverified). QEMU raises FP traps at the FPop itself
+    and fails these tests too.
 
 **Done when** every block has an audit entry with its evidence (datasheet
 section, or OS driver code) and a severity.
