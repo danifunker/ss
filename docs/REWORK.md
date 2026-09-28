@@ -24,7 +24,7 @@ first.**
 |---|---|---|
 | 0 | Distribution blockers (license, ROM redistribution) | **open, needs the user** |
 | 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | in progress |
-| 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | in progress |
+| 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | not started |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | not started |
 | 5 | Execute: fix gaps in priority order (HPS Ethernet first) | not started |
