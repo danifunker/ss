@@ -1,5 +1,14 @@
 # Implementation gaps: video, audio and the MiSTer integration
 
+> **Update (session 1, after this audit):** G1, G2 and G5 are addressed by the
+> pipelined `rtl/mister/ddram_arb.sv`. It grants with no dead cycle and keeps
+> up to 8 reads in flight from either master, so the RAM clear is back to 1
+> cycle per beat. The pipelined and watchdog benches are in `rtl/mister/tb/`.
+> At DDR latency 10-20 it sustains 4 cycles per 4-beat burst (L+6 before).
+> A write burst abandoned mid-way (master reset) is flushed with the byte
+> enables off after 2^16 idle cycles, so the other master cannot be locked
+> out. DDR latency on hardware is still unmeasured.
+
 Phase 4 of [`REWORK.md`](../REWORK.md), one of three parallel audits
 (the others: [`cpu.md`](cpu.md), [`chipset.md`](chipset.md)). The question
 is not which devices are missing (that is phase 2,

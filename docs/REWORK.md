@@ -512,6 +512,10 @@ Expected order, subject to the gap reports:
   `SunSparcStation5` and `SunSparcStation20`.
 - Linted: `verilator --lint-only` of the top against the stock `hps_io`
   with an `ss_core` port stub, both revisions. Not synthesised.
+- After the phase 4 glue audit: `ddram_arb` rewritten to pipeline. It
+  grants with no dead cycle, tracks up to 8 outstanding reads in a FIFO,
+  locks write bursts, and flushes an abandoned write burst. Benches are
+  `rtl/mister/tb/run.sh`: random, pipelined, abandon, and latency.
 - Left for later: moving the unused `scsi_sd*`, `ts_lance_mac_rmii*`,
   `mcu_multi_avant_x.vhd` to `attic/` (done with the SCSI and Ethernet
   work, which change `ss_core`); `MISTER_FB_PALETTE` stays off as upstream

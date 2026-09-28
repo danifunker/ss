@@ -1,7 +1,7 @@
 // Randomised test of ddram_arb: two masters issuing read and write bursts
-// (1-8 beats) to their own address ranges, a slave with random waitrequest,
-// random read latency and gaps between data beats. Every read is checked
-// against a shadow copy.
+// (1-8 beats) to their own address ranges, each waiting for its read data;
+// an in-order pipelined slave with random waitrequest, latency and gaps
+// between data beats. Every read is checked against a shadow copy.
 `timescale 1ns/1ps
 module tb;
 
@@ -45,17 +45,19 @@ reg        wait_r = 1;
 assign s_wait = wait_r;
 integer    wbeat = 0, wlen = 0;
 reg [28:0] waddr;
-integer    rpend = 0, rnext;
-reg [28:0] raddr;
-integer    rdelay;
+reg [63:0] rq[$];                        // read beats, snapshot at acceptance
+integer    rgap = 0;
 integer    i;
 
 initial for (i = 0; i < 4096; i = i + 1) mem[i] = {32'hdead0000 | i, 32'hbeef0000 | i};
 
+// an in-order, pipelined slave: read data is what memory held when the
+// read was accepted, returned after a latency, with random gaps
 always @(posedge clk) begin
 	wait_r   <= ($random & 3) == 0;          // busy 25% of cycles
 	s_rvalid <= 0;
-	// accept commands / write beats
+	if (!s_wait && s_rd)
+		for (i = 0; i < s_bc; i = i + 1) rq.push_back(mem[(s_addr + i) & 4095]);
 	if (!s_wait && s_wr) begin
 		if (wbeat == 0) begin waddr = s_addr; wlen = s_bc; end
 		for (i = 0; i < 8; i = i + 1)
@@ -63,20 +65,12 @@ always @(posedge clk) begin
 		wbeat = wbeat + 1;
 		if (wbeat == wlen) wbeat = 0;
 	end
-	if (!s_wait && s_rd) begin
-		if (rpend != 0) begin $display("FAIL: read command while %0d beats pending", rpend); $finish; end
-		raddr = s_addr; rpend = s_bc; rnext = 0; rdelay = 3 + ($random & 7);
+	if (rq.size() && rgap == 0 && ($random & 1)) begin
+		s_rdata  <= rq[0];
+		s_rvalid <= 1;
+		void'(rq.pop_front());
 	end
-	// return read data after a latency, with random gaps
-	if (rpend != 0) begin
-		if (rdelay > 0) rdelay = rdelay - 1;
-		else if ($random & 1) begin
-			s_rdata  <= mem[(raddr + rnext) & 4095];
-			s_rvalid <= 1;
-			rnext = rnext + 1;
-			rpend = rpend - 1;
-		end
-	end
+	rgap = rq.size() ? (rgap ? rgap - 1 : 0) : 3 + ($random & 7);
 end
 
 // ------------------------------------------------------------ masters ----

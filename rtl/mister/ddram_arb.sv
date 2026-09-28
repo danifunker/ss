@@ -3,11 +3,24 @@
 //  framework. ss_core has two DDR3 ports (video; CPU + BIOS download), which
 //  the core's old, modified sys_top provided; Template_MiSTer provides one.
 //
-//  Each master is a plomb_avalon64 bridge with at most one burst in flight,
-//  so a master is granted for a whole transaction - a read until its last
-//  readdatavalid beat, a write until its last beat is accepted - and read
-//  data needs no routing FIFO. Master 0 wins a tie (video must not
-//  underrun). A grant costs one cycle.
+//  The masters are plomb_avalon64 bridges. They pipeline: a bridge may
+//  present its next command as soon as the previous one is accepted, before
+//  that read's data has returned, and it may pause between the beats of a
+//  write burst. So:
+//
+//  - Commands are granted combinationally, with no dead cycle, to master 0
+//    (video: it must not underrun) unless it is idle, or is waiting to read
+//    while the read FIFO is full and master 1 has a command that can go.
+//  - Every accepted read pushes {master, burstcount} into a FIFO. The
+//    single slave port returns read data in order, so the head of the FIFO
+//    says whose beats are arriving. Up to RDEPTH reads may be outstanding,
+//    from either master, interleaved with writes.
+//  - A write burst locks the port to its master until its last beat, pauses
+//    included. If a locked burst sees no beat for 2^WTO cycles (its master
+//    was reset mid-burst), the arbiter completes it itself with the byte
+//    enables off. Otherwise the slave would wait for those beats forever,
+//    and with one shared port, so would the other master: for example the
+//    RAM clear after an OSD reset that caught video in a write burst.
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -15,7 +28,7 @@
 //  any later version.
 //============================================================================
 
-module ddram_arb #(parameter AW = 29)
+module ddram_arb #(parameter AW = 29, parameter RDEPTH = 8, parameter WTO = 16)
 (
 	input             clk,
 	input             reset,
@@ -54,73 +67,96 @@ module ddram_arb #(parameter AW = 29)
 	input             s_readdatavalid
 );
 
-localparam IDLE = 2'd0, CMD = 2'd1, WDATA = 2'd2, RDATA = 2'd3;
+localparam PW = $clog2(RDEPTH);
 
-reg  [1:0] state = IDLE;
-reg        sel   = 0;        // granted master
-reg  [7:0] cnt;              // beats left
+// ------------------------------------------------------ read tracking ----
+reg          rf_m  [RDEPTH];          // master of each outstanding read
+reg    [7:0] rf_bc [RDEPTH];          // its burst length
+reg [PW-1:0] rf_wp, rf_rp;
+reg   [PW:0] rf_n;                     // entries in use
+reg    [7:0] rbeat;                    // beats received for the head read
+wire         rf_full  = (rf_n == RDEPTH);
+wire         rf_empty = (rf_n == 0);
+
+// ------------------------------------------------------------ grant ------
+reg          wlock;                    // inside a write burst
+reg          wsel;                     // its master
+reg    [7:0] wcnt;                     // beats still to come
+reg  [WTO-1:0] widle;                  // cycles since the burst's last beat
+wire         wflush = wlock & (&widle); // master gone: finish the burst
+
+wire m0_can = m0_write | (m0_read & ~rf_full);
+wire m1_can = m1_write | (m1_read & ~rf_full);
+wire sel    = wlock ? wsel : (m0_can ? 1'b0 : m1_can ? 1'b1 : 1'b0);
 
 wire       g_read  = sel ? m1_read  : m0_read;
 wire       g_write = sel ? m1_write : m0_write;
 wire [7:0] g_bc    = sel ? m1_burstcount : m0_burstcount;
-wire       pass    = (state == CMD) || (state == WDATA);
+wire       g_ok    = ~wflush & (wlock | (sel ? m1_can : m0_can));
 
 assign s_burstcount = g_bc;
 assign s_address    = sel ? m1_address    : m0_address;
 assign s_writedata  = sel ? m1_writedata  : m0_writedata;
-assign s_byteenable = sel ? m1_byteenable : m0_byteenable;
-assign s_read       = (state == CMD) & g_read;
-assign s_write      = pass & g_write;
+assign s_byteenable = wflush ? 8'h00 : sel ? m1_byteenable : m0_byteenable;
+assign s_read       = g_ok & g_read & ~wlock;
+assign s_write      = wflush | (g_ok & g_write);
 
-assign m0_waitrequest = (pass & ~sel) ? s_waitrequest : 1'b1;
-assign m1_waitrequest = (pass &  sel) ? s_waitrequest : 1'b1;
+assign m0_waitrequest = (g_ok & ~sel) ? s_waitrequest : 1'b1;
+assign m1_waitrequest = (g_ok &  sel) ? s_waitrequest : 1'b1;
 
+// ---------------------------------------------------------- read data ----
+wire head_m = rf_m[rf_rp];
 assign m0_readdata      = s_readdata;
 assign m1_readdata      = s_readdata;
-assign m0_readdatavalid = (state == RDATA) & ~sel & s_readdatavalid;
-assign m1_readdatavalid = (state == RDATA) &  sel & s_readdatavalid;
+assign m0_readdatavalid = s_readdatavalid & ~rf_empty & ~head_m;
+assign m1_readdatavalid = s_readdatavalid & ~rf_empty &  head_m;
+
+wire push = s_read & ~s_waitrequest;
+wire last = s_readdatavalid & ~rf_empty & (rbeat + 8'd1 == rf_bc[rf_rp]);
 
 always @(posedge clk) begin
-	case (state)
-		IDLE:
-			if (m0_read | m0_write) begin
-				sel   <= 0;
-				state <= CMD;
+	// write burst lock
+	// (once flushing, stay flushing until the burst's last beat)
+	if (!wlock || (s_write & ~s_waitrequest & ~wflush)) widle <= 0;
+	else if (!wflush) widle <= widle + 1'd1;
+	if (s_write & ~s_waitrequest) begin
+		if (!wlock) begin
+			if (g_bc > 8'd1) begin
+				wlock <= 1;
+				wsel  <= sel;
+				wcnt  <= g_bc - 8'd1;
 			end
-			else if (m1_read | m1_write) begin
-				sel   <= 1;
-				state <= CMD;
-			end
+		end
+		else begin
+			wcnt <= wcnt - 8'd1;
+			if (wcnt == 8'd1) wlock <= 0;
+		end
+	end
 
-		CMD:
-			if (!s_waitrequest) begin
-				if (g_read) begin
-					cnt   <= g_bc;
-					state <= RDATA;
-				end
-				else if (g_write) begin
-					cnt   <= g_bc - 8'd1;
-					state <= (g_bc <= 8'd1) ? IDLE : WDATA;
-				end
-				else state <= IDLE;              // request withdrawn
-			end
-
-		WDATA:
-			if (g_write & ~s_waitrequest) begin
-				cnt <= cnt - 8'd1;
-				if (cnt == 8'd1) state <= IDLE;
-			end
-
-		RDATA:
-			if (s_readdatavalid) begin
-				cnt <= cnt - 8'd1;
-				if (cnt == 8'd1) state <= IDLE;
-			end
-	endcase
+	// read FIFO
+	if (push) begin
+		rf_m[rf_wp]  <= sel;
+		rf_bc[rf_wp] <= g_bc;
+		rf_wp        <= rf_wp + 1'd1;
+	end
+	if (s_readdatavalid & ~rf_empty) begin
+		if (last) begin
+			rbeat <= 0;
+			rf_rp <= rf_rp + 1'd1;
+		end
+		else rbeat <= rbeat + 8'd1;
+	end
+	rf_n <= rf_n + {{PW{1'b0}}, push} - {{PW{1'b0}}, last};
 
 	if (reset) begin
-		state <= IDLE;
-		sel   <= 0;
+		wlock <= 0;
+		wsel  <= 0;
+		wcnt  <= 0;
+		widle <= 0;
+		rf_wp <= 0;
+		rf_rp <= 0;
+		rf_n  <= 0;
+		rbeat <= 0;
 	end
 end
 
