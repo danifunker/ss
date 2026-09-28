@@ -25,10 +25,10 @@ first.**
 | 0 | Distribution blockers (license, ROM redistribution) | **open, needs the user** |
 | 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | **disassembly done** ([rom-disassembly/](rom-disassembly/README.md): machine code, POST catalogues, Forth dictionaries, device trees, FCode); CPU suite: ISA tests + Swift MMU registers done, more POST-derived hardware tests to lift (1f) |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
-| 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done in the tree, not yet built**: needs an A&S and a fit for both revisions on the Quartus machine, then a hardware boot |
+| 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5): see [Bring-up](#bring-up-stage-0-results-session-1). SS20 not built yet |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute: fix gaps in priority order (HPS Ethernet first) | not started |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | not started |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | Stage 0 (bring-up) mostly done; the order was reviewed by the user ("looks very good"), later stages **not started, waiting for the user** |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | CPU suite runs on hardware (28/32); NetBSD 11 and Solaris 8 images built ([disk-images.md](disk-images.md)); simulation not started |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -104,8 +104,19 @@ self-tests), but it is not a primary target.
   `llvm-objcopy`) and assembles V8, privileged and ASI forms included. It
   has no SPARC linker (no `ld.lld` SPARC32, no `sparc-elf` binutils), so
   the CPU suite links with a small Python ELF relocator.
-- **VHDL simulation:** neither GHDL nor nvc is installed (phase 6 needs one:
-  `apt install ghdl` or `nvc`, needs the user).
+- **VHDL simulation:** neither GHDL nor nvc is installed here. The user's
+  Mac cores used OSS-CAD-Suite's GHDL 7.0.0-dev in WSL on the Windows machine
+  (`../lbmactwo_MiSTer/CLAUDE.md`), not on this box. Options: `sudo apt
+  install ghdl-mcode` (4.1; Ubuntu's `ghdl-llvm` has a broken libLLVM
+  soname), or OSS-CAD-Suite in `~/oss-cad-suite` (a download; needs the
+  user's OK).
+- **QEMU 11.1.1** built from source (`~/src/qemu-11.1.1`, installed in
+  `~/.local/qemu-11.1.1`, sparc-softmmu only). It fixes the `sdiv` bug and
+  installs Solaris 8, which 8.2.2 cannot (`tests/cpu/README.md`,
+  [disk-images.md](disk-images.md)). The RETT nPC and WRTBR deviations are
+  still there in 11.1.1.
+- **Quartus 17.0.2 Lite** is on this box, at `~/intelFPGA_lite/17.0/quartus`:
+  builds run here (`scripts/build.sh 5|20`).
 
 ### Output layout
 
@@ -401,9 +412,74 @@ section, or OS driver code) and a severity.
 
 ---
 
-## Phase 5 — execute (outline, refined after phases 2 and 4)
+## Phase 5 — execute
 
-Expected order, subject to the gap reports:
+### Stage order (proposed 2026-09-28, reviewed by the user: "looks very good")
+
+The principle is foundations before features. A fast feedback loop comes
+first, then the changes everything else builds on (reset, bus errors, the
+memory map, NVRAM), and one FPGA↔HPS channel for all the Main-side
+services. The items numbered 0-5 further down are the content of these
+stages.
+
+| Stage | What | Depends on | State |
+|---|---|---|---|
+| **0** | Bring-up under the new name: build both revisions, deploy, CPU suite as the BIOS, OpenBIOS `ok`, an OS from disk; baseline area/timing | phase 3 | SS5 **mostly done** (below). Left: SS20 build; close SS5 timing (-2.7 ns); NetBSD to a login on the core; `scripts/` for screenshots |
+| **1** | Full-machine simulation (GHDL → Verilog → Verilator, as the SGI Indy core does) booting OpenBIOS and the CPU suite; regression scripts | a GHDL on this box | not started |
+| **2** | Platform foundations: reset architecture (SW_RST keeps DRAM, RS status bit, reset everything the audits found surviving), bus errors (unmapped → fault), memory-map decisions (SS5 PROM at `0x7000_0000` and `0xF…`; SS20 top-48 MB fold; FCode ROM windows), NVRAM persistence plus the IDPROM | 1 (for fast testing) | not started |
+| **3** | Real Sun OBP on the SS5 (design/sun-obp-boot.md M1-M5), then use it as the hardware regression tool | 2 | not started |
+| **4** | Main-side services on one channel: design the FPGA↔HPS channel once; SCSI replies in Main (IDs 3/1/6), then HPS Ethernet; test with OpenBIOS and the real OBP | 2, the revised SCSI design | not started (the "replies in Main" revision of design/scsi-hps.md is still to write) |
+| **5** | Device and OS fixes in batches (the IMPLEMENTATION_GAPS quick wins: ESCC, timers, TOD, CG3, CS4231, mouse, Stop-A/BREAK, UART CONF_STR, Scaler framebuffer) | 2 | not started |
+| **6** | SS20 and MP: MID/MSI/arbiter enable, IOMMU IMPL, 16-bit contexts, the real OBP on the SS20, SMP without debugarm | 2, 4 (area freed) | not started |
+| **7** | Diagnostic POST and polish (the S1-diag items) | 3, 6 | not started |
+| **8** | Release (phase 7) | all | not started |
+| — | In parallel: the license question with Grabulosaure (phase 0) | — | open |
+
+### Bring-up (Stage 0) results, session 1
+
+- **Build (SS5, on this box).**
+  - Fit: 20,372 / 41,910 ALMs (49 %), 31,537 registers, 165 / 553 RAM
+    blocks, 45 / 112 DSPs.
+  - The first fit showed -74 ns. The core's PLL (`i_pll`) did not match the
+    template's clock-group pattern, and the router spent 1.5 h on bogus hold
+    fixes. With the clock groups in `SunSparcStation.sdc` routing takes 4
+    minutes; every framework clock meets timing, and `clk_sys` (65 MHz)
+    misses by **-2.72 ns** (TNS -404 ns). All the failing paths are inside
+    the upstream CPU (MCU → IU, IU → IU).
+  - Next for timing: seeds, then deciding whether 65 MHz stays. The build
+    works on hardware as it is.
+- **Hardware (MiSTer `192.168.99.92`).**
+  - **CPU suite as the BIOS: 28/32 pass**
+    ([tests/cpu/expected/ss5-core-hw.log](../tests/cpu/expected/ss5-core-hw.log)).
+  - The four failures are core bugs:
+    - RETT with ET=1 executes instead of trapping;
+    - CBccc gives illegal_instruction, not cp_disabled;
+    - WRTBR overwrites TBR.tt;
+    - the ASI 4 `0x1000` alias of the PCR (IMPLEMENTATION_GAPS MMU-1),
+      confirmed on the board.
+  - **OpenBIOS** boots to "Trying disk…" on the serial console (256 MB,
+    `FMI,MB86904`).
+  - **NetBSD 11.0 from `netbsd11.raw`**: through autoconfiguration (esp,
+    sd0, le, tcx, audiocs), root mounted, the journal replayed. It had not
+    reached a login when the capture stopped; that needs a longer look.
+- **Images.** NetBSD 11.0 (any target) and Solaris 8 2/04 (target 3) were
+  built under QEMU 11.1.1. The recipes are in
+  [disk-images.md](disk-images.md). The raw copies are on the NAS in
+  `Sun-Solaris/SparcStation-Images/`, and the VHD copies in `scratch/images/`.
+  The Solaris image boots on the core only once HD0 is at target 3 (Stage
+  4, or a small early fix).
+- **Tooling.** In `scripts/`, with the settings in the gitignored `local.env`:
+  - `build.sh` builds one revision;
+  - `deploy.sh` pushes the rbf and boot.rom and launches the core;
+  - `console.sh` captures ttya from the MiSTer's `/dev/ttyS1` at 115200;
+  - `setopt.sh` writes the core's `.CFG` OSD options;
+  - `mount.sh` writes the remembered-slot records.
+
+  Screenshots come from mrext: `curl -X POST
+  http://<mister>:8182/api/screenshots`, then fetch the newest file in
+  `/media/fat/screenshots/SunSparcStation/`.
+
+### Work items (the content of the stages)
 
 0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
    replies are to live in Main, see Decisions): disk and CD-ROM images only
@@ -497,6 +573,9 @@ Expected order, subject to the gap reports:
 | 2026-09-28 | **Target the real Sun OBP** (SS5 OBP 2.15, SS20 OBP 2.25) as the firmware, instead of OpenBIOS. Users supply the PROM image, as other MiSTer cores do with their BIOS. OpenBIOS stays bootable until the real PROM works (phase 5.1) |
 | 2026-09-28 | SCSI: the disk and CD **replies move into Main** (the NeXT/Mac-family way; frees ALMs). The FPGA keeps the ESP and a thin transport. Keep today's OSD slot layout. SCSI IDs as on a real Sun: disks at 3 and 1, CD at 6. INQUIRY identity "MiSTer". Two disks. CUE/BIN/CHD and CD audio deferred |
 | 2026-09-28 | GHDL is not on this box; the user may install it (`sudo apt install ghdl-mcode`, GHDL 4.1) |
+| 2026-09-28 | Builds run on this box (Quartus 17.0.2 Lite in `~/intelFPGA_lite`); the test MiSTer is `192.168.99.92` (in `scripts/local.env`, gitignored) |
+| 2026-09-28 | Disk images: the OSD takes VHD, IMG, HDA and RAW (all raw sector data to the core); slots are remembered (`SC0`-`SC2`). Test images are built in QEMU 11.1.1; the raw copies are kept on the NAS (`Sun-Solaris/SparcStation-Images/`) |
+| 2026-09-28 | QEMU: use the locally built 11.1.1 (`~/.local/qemu-11.1.1`), not Ubuntu's 8.2.2 |
 
 ### What phase 3 did (session 1)
 
@@ -535,3 +614,15 @@ Expected order, subject to the gap reports:
   ported top, DDR arbiter); phase 4 audit started in three parts. The Forth
   dictionary decoder (`tools/romdis/obpforth.py`) was still running at the
   end of this entry.
+- **2026-09-28, session 1, continued.** Phase 1 finished (the Forth
+  dictionaries, device trees, FCode). Phase 4 finished
+  (IMPLEMENTATION_GAPS.md plus four audits; design/sun-obp-boot.md). The
+  user decided on the real Sun OBP as the target firmware and on SCSI
+  replies in Main. `ddram_arb` was rewritten to pipeline. Proposed the stage
+  order, which the user reviewed. Stage 0 bring-up: the SS5 builds on this
+  box, the SDC clock groups are fixed, the CPU suite passes 28/32 on
+  hardware, OpenBIOS boots, and NetBSD mounts its root on the core. Built
+  QEMU 11.1.1. Built the NetBSD 11 and Solaris 8 images and copied them to
+  the NAS. The SCSI "replies in Main" design revision was started by an
+  agent that ended without output: still to do. Hand-off:
+  [RESUME-20260928.md](../RESUME-20260928.md).
