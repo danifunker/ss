@@ -26,7 +26,7 @@ first.**
 | 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | machine code, POST catalogues and CPU suite first cut done; Forth dictionary in progress |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done in the tree, not yet built**: needs an A&S and a fit for both revisions on the Quartus machine, then a hardware boot |
-| 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | not started |
+| 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | in progress: `docs/impl-gaps/{cpu,chipset,video-audio-glue}.md`, summarised into `IMPLEMENTATION_GAPS.md` |
 | 5 | Execute: fix gaps in priority order (HPS Ethernet first) | not started |
 | 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | not started |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
@@ -504,3 +504,11 @@ Expected order, subject to the gap reports:
   the framework version and the ROMs; chose `ss5.bin` and the SS20 OBP 2.25
   image; extracted the PDF text to `scratch/SparcStation/text/`; found the
   license blocker; wrote this plan. Started phase 1 (tooling) and phase 2.
+  Then: romdis + QEMU traces; SS5 and SS20 machine-code disassembly and
+  POST catalogues; the CPU test suite (27/30 under QEMU, the 3 failures
+  QEMU bugs; later +2 Swift MMU tests); HARDWARE_GAPS (phase 2 done); the
+  user's decisions (name, Direct SD, RMII, listings); the SCSI design
+  (`design/scsi-hps.md`); phase 3 in two commits (moves; stock framework,
+  ported top, DDR arbiter); phase 4 audit started in three parts. The Forth
+  dictionary decoder (`tools/romdis/obpforth.py`) was still running at the
+  end of this entry.
