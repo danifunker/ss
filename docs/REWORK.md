@@ -405,8 +405,9 @@ section, or OS driver code) and a severity.
 
 Expected order, subject to the gap reports:
 
-0. **SCSI storage modelled on the Mac cores** (user, 2026-09-28): disk and
-   CD-ROM images only through the HPS, the way `../MacQuadra800_MiSTer` does
+0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
+   replies are to live in Main, see Decisions): disk and CD-ROM images only
+   through the HPS, the way `../MacQuadra800_MiSTer` does
    it (its NCR 53C96 is from the same 53C9x "ESP" family as the SPARCstation's
    ESP, with HPS-backed targets, a block cache, a CD-ROM target, and the
    Main_MiSTer changes it needed). Main changes are acceptable where needed.
@@ -418,12 +419,27 @@ Expected order, subject to the gap reports:
    need no Main change (stock Main already does multi-block transfers);
    S6 (CUE/BIN/CHD, CD audio) needs a `support/sparc/` in Main. Its §6
    lists nine open questions for the user.
-1. HPS-bridged Ethernet for the LANCE (Main_MiSTer extension plus core side).
+1. **Boot the real Sun OBP** (user, 2026-09-28), SS5 first, then SS20.
+   Design: `docs/design/sun-obp-boot.md` (to be written from the phase 1
+   ROM analyses and the phase 4 audits). What is already known:
+   - QEMU boots the SS5 OBP 2.15 to `ok`, so its sun4m model shows what
+     the PROM needs.
+   - Known blockers on the core:
+     - the SS5 PROM decode at pa `0x7000_0000`;
+     - the ASI 4 register aliasing;
+     - unmapped addresses must fault, or SBus probing finds phantom cards;
+     - an IDPROM in NVRAM, with a per-unit MAC and hostid;
+     - FCode on the TCX/CG3 "card" (QEMU ships GPL FCode for both);
+     - the memory-controller bank registers the PROM sizes SIMMs with;
+     - SS20 adds MID/MSI, the EMC/SMC and 12-bit contexts.
+   - OpenBIOS stays bootable meanwhile. Decoding the PROM at both addresses
+     keeps both firmwares working.
+2. HPS-bridged Ethernet for the LANCE (Main_MiSTer extension plus core side).
    RMII is retired (it needs push-pull USER_IO).
-2. Reset and robustness fixes, so no MiSTer reboot is needed between OSes.
-3. SMP without the ARM debug monitor.
-4. P0/P1 device gaps (floppy? cgsix? SS20 audio?) as agreed in phase 2.
-5. Real Sun OBP boot, if phase 4.3 says it is reachable.
+3. Reset and robustness fixes, so no MiSTer reboot is needed between OSes.
+4. SMP without the ARM debug monitor (the real SS20 OBP's MP start-up needs
+   the same fixes: MID, MSI, ASI 0x38).
+5. P0/P1 device gaps (floppy? cgsix? SS20 audio?) as agreed in phase 2.
 
 ## Phase 6 — test infrastructure
 
@@ -478,6 +494,9 @@ Expected order, subject to the gap reports:
 | 2026-09-28 | Drop "Direct SD"; disks only through the HPS, SCSI modelled on the Mac cores (Main changes allowed) |
 | 2026-09-28 | Retire the RMII Ethernet PHY option; HPS-bridged Ethernet instead |
 | 2026-09-28 | Commit the full Sun PROM disassembly listings (the ROM images themselves stay out) |
+| 2026-09-28 | **Target the real Sun OBP** (SS5 OBP 2.15, SS20 OBP 2.25) as the firmware, instead of OpenBIOS. Users supply the PROM image, as other MiSTer cores do with their BIOS. OpenBIOS stays bootable until the real PROM works (phase 5.1) |
+| 2026-09-28 | SCSI: the disk and CD **replies move into Main** (the NeXT/Mac-family way; frees ALMs). The FPGA keeps the ESP and a thin transport. Keep today's OSD slot layout. SCSI IDs as on a real Sun: disks at 3 and 1, CD at 6. INQUIRY identity "MiSTer". Two disks. CUE/BIN/CHD and CD audio deferred |
+| 2026-09-28 | GHDL is not on this box; the user may install it (`sudo apt install ghdl-mcode`, GHDL 4.1) |
 
 ### What phase 3 did (session 1)
 
