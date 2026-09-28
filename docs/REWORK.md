@@ -261,6 +261,23 @@ tools/                      romdis/, debugarm/ (was soft/debugarm)
 tests/                      cpu/ (phase 1f), sim regressions (phase 6)
 ```
 
+### The core depends on a modified framework (found in session 1)
+
+The old `SS_MiSTer/sys/` is not a stock copy. Moving to the stock
+`Template_MiSTer/sys` (which may not be modified) breaks three things the
+core relies on:
+
+| Custom framework feature | Used for | Stock template | Plan |
+|---|---|---|---|
+| **A second DDR3 port, `DDRAM2`**: the old `sys_top.v` comments out ALSA's `ddr_svc` and hands its f2sdram `ram2` port to `emu` | `ss_core.vhd`: DDRAM carries video (the TCX VRAM, `i_plomb_avalon_vram`); DDRAM2 carries CPU main memory and the BIOS download (`i_plomb_avalon_dram`) | one `DDRAM` port; `ram2` belongs to ALSA | merge the two masters inside the core onto the one port: a 2:1 Avalon arbiter, or `plomb_mux` ahead of a single `plomb_avalon64`. Costs concurrency, so measure CPU memory latency and video underruns on hardware |
+| **The SDIO pins passed to `emu`** (`SDIO_DAT/CMD/CLK`) | the OSD's "Direct SD" SCSI modes (`scsi_sd.vhd` drives the secondary SD card itself) | the secondary SD is reached only in SPI mode through `SD_SCK/MOSI/MISO/CS`, whose pins are shared with analog VGA | **decision:** drop Direct SD (HPS image mode is the MiSTer norm), or port `scsi_sd` to SPI mode |
+| **Push-pull USER_IO** (`USER_EN` per pin) | the RMII Ethernet PHY on USER_IO (50 MHz TX0/TX1/TXEN) | USER_IO is **open-drain only** (`!user_out ? 0 : Z`), so 50 MHz RMII cannot work | the RMII path cannot survive the move. HPS-bridged Ethernet (HARDWARE_GAPS #1) becomes the only network path; keep the RMII MAC in `attic/` |
+
+Two smaller differences: `HPS_BUS` is `[45:0]`, not `[48:0]`, and
+`hps_io.sv` changed (walk its port list against `ss.sv`'s instance).
+`audio_out.v` became `audio_out.sv`, and `hdmi_config.sv`, `pll_cfg.v` and
+the old PLL folders went away.
+
 Steps:
 
 1. Move files with `git mv` so history follows. No content edits in the same
@@ -270,7 +287,10 @@ Steps:
 3. Port `ss.sv` to the new framework: `emu_ports.vh`, new outputs
    (`VGA_DISABLE`, `HDMI_BLACKOUT`, `HDMI_BOB_DEINT`, …), the `hps_io` changes,
    the `audio_out.sv` rename. Walk the diff between the old and new
-   `sys/sys_top.v` / `hps_io.sv` for any interface change.
+   `sys/sys_top.v` / `hps_io.sv` for any interface change. Then the three
+   items in the table above: DDR arbitration, the Direct SD decision, RMII
+   removal. This step needs RTL work and a hardware test; it is not a pure
+   move.
 4. Rewrite the qsfs as template qsf + `source files.qip`, keeping the
    project-specific settings (`MISTER_FB=1`, `SS20=true`, the seed and effort
    multipliers).
