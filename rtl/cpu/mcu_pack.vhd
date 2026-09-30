@@ -58,6 +58,22 @@ PACKAGE mcu_pack IS
   CONSTANT FT_INTERNAL    : unsigned(2 DOWNTO 0) :="110"; -- Internal error
   CONSTANT FT_RESERVED    : unsigned(2 DOWNTO 0) :="111"; -- Reserved
 
+  -- MMU registers (ASI 4), index = VA[12:8] (microSPARC-II User's Manual
+  -- Table 19, sun4m System Architecture 3.1.3 and B.I for the SuperSPARC).
+  -- 0x0B-0x0D are TEMLIB's private registers, in the reserved space.
+  -- 0x05/0x06 (AFSR/AFAR) read 0: no asynchronous fault is ever reported.
+  CONSTANT MR_PCR       : unsigned(4 DOWNTO 0) :="00000"; -- 0x000 Processor Control
+  CONSTANT MR_CTPR      : unsigned(4 DOWNTO 0) :="00001"; -- 0x100 Context Table Pointer
+  CONSTANT MR_CXR       : unsigned(4 DOWNTO 0) :="00010"; -- 0x200 Context
+  CONSTANT MR_SFSR      : unsigned(4 DOWNTO 0) :="00011"; -- 0x300 Sync. Fault Status, cleared on read
+  CONSTANT MR_SFAR      : unsigned(4 DOWNTO 0) :="00100"; -- 0x400 Sync. Fault Address
+  CONSTANT MR_SFSR_NC   : unsigned(4 DOWNTO 0) :="01011"; -- 0xB00 SFSR, not cleared (private)
+  CONSTANT MR_TMPR      : unsigned(4 DOWNTO 0) :="01100"; -- 0xC00 scratch (private)
+  CONSTANT MR_SYSCONF   : unsigned(4 DOWNTO 0) :="01101"; -- 0xD00 SYSCONF (private, read by OpenBIOS)
+  CONSTANT MR_TRCR      : unsigned(4 DOWNTO 0) :="10000"; -- 0x1000 TLB Replacement Control (microSPARC-II)
+  CONSTANT MR_SFSR_DIAG : unsigned(4 DOWNTO 0) :="10011"; -- 0x1300 SFSR, writable, not cleared (microSPARC-II)
+  CONSTANT MR_SFAR_DIAG : unsigned(4 DOWNTO 0) :="10100"; -- 0x1400 SFAR, writable (microSPARC-II, SuperSPARC)
+
   CONSTANT ET_INVALID : unsigned(1 DOWNTO 0) := "00";  -- Invalide, non mappé
   CONSTANT ET_PTD     : unsigned(1 DOWNTO 0) := "01";  -- PTD
   CONSTANT ET_PTE     : unsigned(1 DOWNTO 0) := "10";  -- PTE

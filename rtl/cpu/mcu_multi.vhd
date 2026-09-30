@@ -126,7 +126,8 @@ ARCHITECTURE multi OF mcu_mp IS
   SIGNAL mmu_fsr_ow  : std_logic;   -- MMU Fault Status. OverWrite
   SIGNAL mmu_fsr_maj : std_logic;
   
-  SIGNAL mmu_far : unsigned(31 DOWNTO 2);  -- MMU Fault Address Register
+  SIGNAL mmu_far : uv32;            -- MMU Fault Address Register
+  SIGNAL mmu_far_wr : std_logic;    -- SFAR diagnostic write (0x1400)
 
   SIGNAL mmu_tmpr : uv32;
   SIGNAL mmu_tmpr_maj : std_logic;
@@ -638,6 +639,7 @@ BEGIN
     mmu_ctxr_maj<='0';
     mmu_fsr_maj<='0';
     mmu_tmpr_maj<='0';
+    mmu_far_wr<='0';
     cross_req_c<='0';
     
     -------------------------------------------------------------------------
@@ -1042,19 +1044,25 @@ BEGIN
         --     0x000002xx : Context Register
         --     0x000003xx : Fault Status Register
         --     0x000004xx : Fault Address Register
-        IF data2_w.a(11 DOWNTO 8)=x"0" THEN
+        -- Index = VA[12:8] (MR_* in mcu_pack; SuperSPARC map, sun4m B.I): a
+        -- write to a reserved index (0x1000-0x1700 of the Ross/HyperSPARC
+        -- PROM paths included) does nothing.
+        IF data2_w.a(12 DOWNTO 8)=MR_PCR THEN
           -- MMU Control Register
           mmu_cr_maj<=ls_v;
-        ELSIF data2_w.a(11 DOWNTO 8)=x"1" AND NOT MMU_DIS THEN
+        ELSIF data2_w.a(12 DOWNTO 8)=MR_CTPR AND NOT MMU_DIS THEN
           -- Context Table Pointer Register
           mmu_ctxtpr_maj<=ls_v;
-        ELSIF data2_w.a(11 DOWNTO 8)=x"2" AND NOT MMU_DIS THEN
+        ELSIF data2_w.a(12 DOWNTO 8)=MR_CXR AND NOT MMU_DIS THEN
           -- Context Register
           mmu_ctxr_maj<=ls_v;
-        ELSIF data2_w.a(11 DOWNTO 8)=x"3" AND NOT MMU_DIS THEN
-          -- Fault Status Register
-          mmu_fsr_maj<='1';
-        ELSIF data2_w.a(11 DOWNTO 8)=x"C" AND NOT MMU_DIS THEN
+        ELSIF data2_w.a(12 DOWNTO 8)=MR_SFSR AND NOT MMU_DIS THEN
+          -- Fault Status Register: reading clears it, writes have no effect
+          mmu_fsr_maj<=NOT ls_v;
+        ELSIF data2_w.a(12 DOWNTO 8)=MR_SFAR_DIAG AND NOT MMU_DIS THEN
+          -- Fault Address Register, diagnostic: writable
+          mmu_far_wr<=ls_v;
+        ELSIF data2_w.a(12 DOWNTO 8)=MR_TMPR AND NOT MMU_DIS THEN
           -- Tmpr Register
           mmu_tmpr_maj<=ls_v;
         END IF;
@@ -1319,8 +1327,8 @@ BEGIN
       dcache_t_a2<=dcache_t_a;
       
       -------------------------------------------
-      -- Registres
-      IF data_w.a(11 DOWNTO 8)=x"0" THEN
+      -- Registres. Index = VA[12:8] (MR_* in mcu_pack)
+      IF data_w.a(12 DOWNTO 8)=MR_PCR THEN
         -- MMU Control Register
         IF CPUTYPE=CPUTYPE_MS2 THEN
           dreg<=MMU_IMP_VERSION & x"00" &
@@ -1337,51 +1345,37 @@ BEGIN
                  to_unsigned(CPUID,2) & mmu_cr_nf & mmu_cr_e;
         END IF;
         
-      ELSIF data_w.a(11 DOWNTO 8)=x"1" AND NOT MMU_DIS THEN
+      ELSIF data_w.a(12 DOWNTO 8)=MR_CTPR AND NOT MMU_DIS THEN
         -- Context Table Pointer Register
         dreg<=mmu_ctxtpr(35 DOWNTO 6) & "00";
-        
-      ELSIF data_w.a(11 DOWNTO 8)=x"2" AND NOT MMU_DIS THEN
+
+      ELSIF data_w.a(12 DOWNTO 8)=MR_CXR AND NOT MMU_DIS THEN
         -- Context Register
         dreg(31 DOWNTO NB_CONTEXT)<=(OTHERS => '0');
         dreg(NB_CONTEXT-1 DOWNTO 0)<=mmu_ctxr;
-        
-      ELSIF data_w.a(11 DOWNTO 8)=x"3" AND NOT MMU_DIS THEN
-        -- Fault Status Register, update on read
+
+      ELSIF (data_w.a(12 DOWNTO 8)=MR_SFSR OR
+             data_w.a(12 DOWNTO 8)=MR_SFSR_NC) AND NOT MMU_DIS THEN
+        -- Fault Status Register (0x300 clears it, 0xB00 does not)
         dreg<="00000000000000" & MMU_FSR_EBE & mmu_fsr_l &
                    mmu_fsr_at & mmu_fsr_ft & mmu_fsr_fav & mmu_fsr_ow;
-        
-      ELSIF data_w.a(11 DOWNTO 8)=x"B" AND NOT MMU_DIS THEN
-        -- Fault Status Register, no update
-        dreg<="00000000000000" & MMU_FSR_EBE & mmu_fsr_l &
-                   mmu_fsr_at & mmu_fsr_ft & mmu_fsr_fav & mmu_fsr_ow;
-        
-      ELSIF data_w.a(11 DOWNTO 8)=x"C" AND NOT MMU_DIS THEN
+
+      ELSIF (data_w.a(12 DOWNTO 8)=MR_SFAR OR
+             data_w.a(12 DOWNTO 8)=MR_SFAR_DIAG) AND NOT MMU_DIS THEN
+        -- Fault Address Register
+        dreg<=mmu_far;
+
+      ELSIF data_w.a(12 DOWNTO 8)=MR_TMPR AND NOT MMU_DIS THEN
         -- Temp Register
         dreg<=mmu_tmpr;
-        
-      ELSIF data_w.a(11 DOWNTO 8)=x"D" AND NOT MMU_DIS THEN
+
+      ELSIF data_w.a(12 DOWNTO 8)=MR_SYSCONF AND NOT MMU_DIS THEN
         -- Sys Conf Register
         dreg<=SYSCONF;
-        
-      ELSIF data_w.a(11 DOWNTO 8)=x"4" AND NOT MMU_DIS THEN
-        -- Fault Address Register
-        dreg<=mmu_far & "00";
+
       ELSE
-        -- MMU Control Register
-       IF CPUTYPE=CPUTYPE_MS2 THEN
-          dreg<=MMU_IMP_VERSION & x"00" &
-                 mmu_cr_dsnoop & mmu_cr_bm & "0000" & mmu_cr_ice & mmu_cr_dce &
-                 '0' & mmu_cr_l2tlb & "00" & --mmu_cr_wb &
-                 to_unsigned(CPUID,2) & mmu_cr_nf & mmu_cr_e;
-        ELSE
-          dreg<=MMU_IMP_VERSION & x"00" &
-                 '0' & mmu_cr_dsnoop & mmu_cr_bm & "0" &
-                 "10" & mmu_cr_ice & mmu_cr_dce &
-                 '0' & mmu_cr_l2tlb & "00" & ---mmu_cr_wb &
-                 to_unsigned(CPUID,2) & mmu_cr_nf & mmu_cr_e;
-        END IF;
-          
+        -- Reserved, and AFSR/AFAR (0x500/0x600): the SuperSPARC has none
+        dreg<=x"00000000";
       END IF;
       IF data_na_c='0' THEN
         dreg<=dreg;
@@ -2175,6 +2169,11 @@ BEGIN
       IF mmu_tmpr_maj='1' THEN
         mmu_tmpr<=data2_w.d;
       END IF;
+
+      -- Diagnostic write of the SFAR (0x1400, sun4m B.I.4.5)
+      IF mmu_far_wr='1' THEN
+        mmu_far<=data2_w.d;
+      END IF;
       
       -- Evènements :
       --      mmu_fault_data_acc_c : Erreur d'accès data
@@ -2199,7 +2198,7 @@ BEGIN
           mmu_fsr_ft<=mmu_tw_ft;             -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
           mmu_fsr_ow<='0';                -- OverWrite
-          mmu_far<=tw_va(31 DOWNTO 2);
+          mmu_far<=tw_va;
         END IF;
         
       ELSIF mmu_fault_data_acc_c='1' AND NOT MMU_DIS THEN
@@ -2211,7 +2210,7 @@ BEGIN
           mmu_fsr_ft<=data_ft_c;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
           mmu_fsr_ow<=to_std_logic(mmu_fclass=DATA); -- OverWrite
-          mmu_far<=data2_w.a(31 DOWNTO 2);
+          mmu_far<=data2_w.a;
         END IF;
         -- <AVOIR> : !! Cascade de fautes data. Impossible ?
         
@@ -2225,7 +2224,7 @@ BEGIN
           mmu_fsr_fav<='1';               -- Fault Address Valid
           mmu_fsr_ow<=to_std_logic(mmu_fclass=INST); -- OverWrite
           -- L'écriture de FAR est facultative !!!
-          mmu_far<=imux2_w.a(31 DOWNTO 2);
+          mmu_far<=imux2_w.a;
         END IF;
         
       END IF;
