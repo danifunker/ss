@@ -53,3 +53,6 @@ sim/generated/
 sim/obj_*/
 sim/out/
 build*.out
+
+# Claude Code agent worktrees
+.claude/worktrees/

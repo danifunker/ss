@@ -113,7 +113,6 @@ ARCHITECTURE rtl OF ts_sport IS
   SIGNAL rx_iclr     : unsigned(1 TO 2);  -- RX Interrupt Clear
   SIGNAL rx_maj      : unsigned(1 TO 2);  -- RX Conf. update
   SIGNAL tx_iclr     : unsigned(1 TO 2);  -- TX Interrupt Clear
-  SIGNAL tx_cip,tx_mip : unsigned(1 TO 2); -- TX Clear Int. Pending /Mask Int.
   
   SIGNAL tx_fin_pre   : unsigned(1 TO 2);
   SIGNAL rx_avail_pre : unsigned(1 TO 2);
@@ -155,7 +154,6 @@ BEGIN
       rec_pop<="00";
       tx_iclr<="00";
       rx_iclr<="00";
-      tx_cip<="00";
       rx_maj<="00";
       ----------------------------------------------
       cw:=w.dw(31 DOWNTO 24);
@@ -204,22 +202,20 @@ BEGIN
                   -- Enable Interrupt on next RX character
                   
                 WHEN "101" => -- <QEMU>
-                  -- Reset Tx Interrupt pending
-                  -- Pour signaler la fin d'un message, on ne signale pas
-                  -- l'interruption après la fin de l'émission du dernier
-                  -- caractère.
-                  tx_cip(i)<='1';
-                  
-                  
-                WHEN "111" => -- <QEMU>
-                  -- Reset highest Interrupt Under Service
-                  -- <AVOIR> Gestion séparée des 2 voies ?
-                  IF tx_ip(1)='1' THEN
-                    tx_iclr(1)<='1';
-                  ELSIF tx_ip(2)='1' THEN
-                    tx_iclr(2)<='1';
-                  END IF;
-                  
+                  -- Reset Tx Interrupt pending: clears the pending TX
+                  -- interrupt. The next one comes when a newly written
+                  -- character has gone out, as on the Zilog part; nothing
+                  -- is masked (a mask here deadlocked NetBSD's zstty).
+                  tx_iclr(i)<='1';
+
+                WHEN "111" =>
+                  -- Reset highest Interrupt Under Service. Sun boards give
+                  -- the SCC no INTACK, so no IUS bit is ever set and this
+                  -- does nothing on real hardware. NetBSD and Linux issue it
+                  -- after every interrupt; clearing tx_ip here lost TX
+                  -- interrupts.
+                  NULL;
+
                 WHEN OTHERS => -- "110"
                   -- Error Reset
                   NULL;
@@ -645,21 +641,12 @@ BEGIN
         -- Interruptions émissions
         IF parms(i).tx_en='1' AND parms(i).tx_ie='1' AND
           tx_fin(i)='1' AND tx_fin_pre(i)='0' THEN
-          tx_ip(i)<=NOT tx_mip(i);
-          tx_mip(i)<='0';
+          tx_ip(i)<='1';
         END IF;
         IF tx_iclr(i)='1' THEN
           tx_ip(i)<='0';
         END IF;
-
-        IF tx_cip(i)='1' THEN
-          -- Si CIP=1, on inhibe la génération de la prochaine interruption TX
-          -- En fait, "Reset TxInt pend." remet à zéro l'interruption en cours
-          tx_mip(i)<=NOT tx_ip(i);
-          tx_ip(i)<='0';
-        END IF;
         IF parms(i).tx_en='0' THEN
-          tx_mip(i)<='0';
           tx_ip(i)<='0';
         END IF;
         
@@ -677,7 +664,6 @@ BEGIN
       IF reset_n='0' THEN
         rx_ip<="00";
         tx_ip<="00";
-        tx_mip<="00";
       END IF;
     END IF;
   END PROCESS Inter;
