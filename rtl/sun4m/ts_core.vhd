@@ -486,7 +486,10 @@ ARCHITECTURE rtl OF ts_core IS
   
   FUNCTION sel_decodage_nosmp (CONSTANT w : type_plomb_w) RETURN natural IS
   BEGIN
-    IF OBRAM AND w.a(31 DOWNTO 28)=x"F" THEN
+    IF OBRAM AND (w.a(31 DOWNTO 28)=x"F" OR w.a(31 DOWNTO 24)=x"70") THEN
+      -- The boot PROM image in RAM: at 0xF... (OpenBIOS) and at pa
+      -- 0x7000_0000, where the SS5 decodes its PROM (the Sun OBP reads its
+      -- own data there; real-OBP milestone M1)
       RETURN 0; -- OpenBIOS in RAM
     ELSIF w.a(31 DOWNTO 28)=x"0" OR
       (w.a(31 DOWNTO 28)=x"5" AND w.a(23)='1') THEN
@@ -1293,7 +1296,8 @@ BEGIN
         memm_pw.ah<=TCX_ADR_H;
       END IF;
     ELSE
-      IF OBRAM AND mem_pw.a(31 DOWNTO 28)=x"F" THEN
+      IF OBRAM AND (mem_pw.a(31 DOWNTO 28)=x"F" OR
+                    mem_pw.a(31 DOWNTO 24)=x"70") THEN
         memm_pw.a(31 DOWNTO 21)<=OBRAM_ADR(31 DOWNTO 21);
         memm_pw.ah<=OBRAM_ADR_H;
       ELSIF mem_pw.a(31 DOWNTO 28)=x"5" AND mem_pw.a(23)='1' THEN
