@@ -467,7 +467,8 @@ BEGIN
   -- Horloge temps réel & NVRAM
   i_ts_rtc: ENTITY work.ts_rtc
     GENERIC MAP (
-      SYSFREQ => SYSFREQ)
+      SYSFREQ => SYSFREQ,
+      SS20    => SS20)
     PORT MAP (
       sel      => sel.rtc,
       w        => io_w,

@@ -30,7 +30,8 @@ USE work.ts_pack.ALL;
 
 ENTITY ts_rtc IS
   GENERIC (
-    SYSFREQ : natural := 50000000);  
+    SYSFREQ : natural := 50000000;
+    SS20    : boolean := false);
   PORT (
     sel : IN  std_logic;
     w   : IN  type_pvc_w;
@@ -284,6 +285,8 @@ BEGIN
   END PROCESS W_GEN;
   
   i_iramrtc: ENTITY work.iram_rtc -- 8kB
+    GENERIC MAP (
+      MACHINE_TYPE => 16#80# + (16#72# - 16#80#) * boolean'pos(SS20))
     PORT MAP (
       mem_w => m_w,
       mem_r => m_r,
