@@ -805,6 +805,13 @@ BEGIN
   -- UART
   uart_txd<=txd3;
   rxd3<=uart_rxd;
+  -- Unused serial inputs idle high (mark): ttyb's RX was undriven, which
+  -- can read as a permanent break (ZS-7). CTS selects the debug port only
+  -- in the CTS switching mode, which this build does not use.
+  rxd1<='1';
+  rxd2<='1';
+  rxd4<='1';
+  cts<='0';
   
   
   ps2_kbd_data_in <=ps2_o(0);

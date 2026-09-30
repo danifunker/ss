@@ -382,7 +382,10 @@ BEGIN
               --   5 : CTS <Qemu-init, si disabled>
               --   6 : Tx Underrun/EOM <Qemu-init>
               --   7 : Break/Abort <QEMU>
-              cr:=rx_break(i) & "1000" & tx_empty(i) & '0' & rx_avail(i);
+              -- DCD and CTS read 1: there are no modem lines, and with
+              -- both 0 NetBSD blocks opening a tty without CLOCAL and
+              -- CRTSCTS stalls output (kms D, S2).
+              cr:=rx_break(i) & "1101" & tx_empty(i) & '0' & rx_avail(i);
               
             WHEN "0001" | "0101" => -- RR1
               -- Special Receive Conditions Status
