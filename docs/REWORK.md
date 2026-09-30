@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | Stage 0 done except SS5 timing at 65 MHz; Stage 1 done (the simulation); Stage 2 and 5 chipset fixes in progress (session 2); CPU fixes go to Fable (Decisions) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | CPU suite on hardware: SS5 28/32, SS20 27/30; the simulation ([sim/](../sim/README.md)) reproduces the SS5 log exactly; NetBSD 11 and Solaris 8 images built ([disk-images.md](disk-images.md)) |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | Stage 0 done except SS5 timing at 65 MHz (Fable, `ss5-timing`); Stage 1 done; Stages 2, 3 and 5 well under way (session 2): SS5 CPU suite 38/0 on the board, NetBSD and **Solaris 8** boot, the official SS5 ROM runs past its keyboard handshake in simulation. Hand-off: [RESUME-20260930.md](../RESUME-20260930.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris on the board); the CPU suite with `t_chipset.S`: SS5 38/0 on the board and in the simulation ([sim/](../sim/README.md)); SS20 baseline to re-record |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -689,6 +689,17 @@ stages.
   the NAS. The SCSI "replies in Main" design revision was started by an
   agent that ended without output: still to do. Hand-off:
   [RESUME-20260928.md](../RESUME-20260928.md).
+- **2026-09-30, session 2 (continued).** Fable's CPU fixes merged and
+  verified on the board (SS5 38/0). SCSI IDs 3/1/6: NetBSD boots from
+  target 3 and **Solaris 8 boots to a login** (first time on this core). The
+  "65 MHz fails when warm" scare was a stale test ROM plus OpenBIOS's SD
+  probe on the unconnected Direct SD lines (fixed). Real-OBP work: the SS5
+  PROM at `0x7000_0000`, TCX/CG3 FCode, the NVRAM IDPROM, the keyboard
+  command queue (the official ROM deadlocked in `kbd_putc_boot`; in
+  simulation it now runs from RAM). OpenBIOS imported as `bios/` (git
+  subtree), built with Ubuntu's sparc64 GCC (`scripts/build-bios.sh`), with
+  our first changes. Fable started task 2 (65 MHz). Open: the two-disk hang.
+  Hand-off: [RESUME-20260930.md](../RESUME-20260930.md).
 - **2026-09-30, session 2.** GHDL 6.0.0 installed; Stage 1 simulation
   (`sim/`) built and matched to the board. SS20 built and run (CPU suite
   27/30 with a park for CPUs 1-2; OpenBIOS up, disk boot fails). ESCC TX fix:
