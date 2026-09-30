@@ -509,6 +509,21 @@ stages.
   which hung boots at random (fixed: the inputs idle high). The negative
   slack still has to go before a release. That path is CPU work: the
   prompt is `scratch/handoff/fable-ss5-65mhz.md`.
+- **On the board after the fix batch** (`d3f5eb8`, 65 MHz, `scripts/hwtest.sh`):
+  - CPU suite 36/2 with Fable's CPU fixes: the four old failures pass, and so
+    do the new tests; the two failures are FCode and the `0x70…` PROM alias,
+    which came after this build (38/0 in simulation).
+  - NetBSD 11 from HD0 at **target 3**: OpenBIOS boots `sd@3,0`, root on
+    sd0a, a shell on ttya.
+  - **Solaris 8 boots to `console login:`**, the first time on this core
+    (the image is installed at target 3): root login, `uname -a` says
+    `SunOS 5.8 Generic_108528-29 sun4m SUNW,SPARCstation-5`, 256 MB.
+    `psrinfo` shows "0 MHz": OpenBIOS publishes no CPU `clock-frequency`
+    (a feature to port into OpenBIOS).
+- **The official SS5 ROM in simulation** (all of today's real-OBP fixes):
+  silent, as expected before its banner; at 25M cycles it is in
+  `kbd_getc_timeout`, the keyboard-reset wait timed by the processor-0 user
+  timer.
 - **Stage 1, simulation:** see [sim/README.md](../sim/README.md). It found
   that the loader's download writes are not latched (glue G7): words are lost
   whenever the DDR stalls.
