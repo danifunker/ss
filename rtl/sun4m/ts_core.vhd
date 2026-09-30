@@ -168,6 +168,7 @@ ENTITY ts_core IS
     
     dreset      : OUT std_logic;
     sysreset    : OUT std_logic;
+    sysstat     : IN  uv8;
     
     -- Horloge
     sclk        : IN  std_logic

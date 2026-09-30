@@ -732,7 +732,8 @@ BEGIN
   sel2 <=sel  WHEN rising_edge(clk);
   
   ReadMux:PROCESS (sel2,sel,dmaux_r,inter_r,iommu_r,esp_r,lance_r,rtc_r,
-                   vid_r,sport1_r,sport2_r,timer_r,flash_r,ibram_r,audio_r_pvc)
+                   vid_r,sport1_r,sport2_r,timer_r,flash_r,ibram_r,audio_r_pvc,
+                   sysstat)
   BEGIN
     IF sel2.dma2='1' OR sel2.auxio0='1' THEN
       io_r<=dmaux_r;
@@ -760,8 +761,11 @@ BEGIN
       io_r<=ibram_r;
     ELSIF sel2.audio='1' THEN
       io_r<= audio_r_pvc;
-    ELSE
-      io_r.dr<=x"BADACCE5";
+    ELSIF sel2.syscon='1' THEN
+      -- System control/status: bit 1 RS (a software reset happened),
+      -- bit 4 WD (watchdog reset); SR (bit 0) reads 0. Word access, as
+      -- both PROMs use (lda/sta).
+      io_r.dr<=x"000000" & sysstat;
     END IF;
     
     IF sel.dma2='1' OR sel.auxio0='1' THEN

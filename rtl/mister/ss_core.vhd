@@ -179,6 +179,10 @@ ARCHITECTURE rtl OF ss_core IS
   
   TYPE enum_state IS (sWAIT,sCLR,sGAP,sRUN,sDOWNLOAD);
   SIGNAL state : enum_state;
+  -- Download: the 16-bit words of one 8-byte group, merged into one write
+  SIGNAL dl_buf : std_logic_vector(63 DOWNTO 0);
+  SIGNAL dl_be  : std_logic_vector(7 DOWNTO 0);
+  SIGNAL dl_adr : std_logic_vector(28 DOWNTO 0);
   
   SIGNAL ps2_i,ps2_o : uv4;
   CONSTANT iboot : std_logic :='0';
@@ -388,6 +392,7 @@ BEGIN
       aow         => aow,
       dreset      => dreset,
       sysreset    => sysreset,
+      sysstat     => sysstat,
       sclk        => sclk);
   
   ----------------------------------------------------------
@@ -450,7 +455,9 @@ BEGIN
       clk        => sclk,
       reset_n    => reset_n);
   
-  id0_mist<="001" WHEN scsi_conf="011" ELSE "000";
+  -- SCSI IDs as on a real Sun: HD0 at target 3 (the boot disk, sd3 /
+  -- c0t3d0), HD1 at 1, the CD at 6 (REWORK Decisions, 2026-09-28).
+  id0_mist<="011";
   
   ----------------------------------------------------------
   i_scsi_mist2: ENTITY work.scsi_mist
@@ -919,9 +926,15 @@ BEGIN
   
   clk_sys<=sclk;
   
+  -- System control/status register bits (ts_io): RS = bit 1.
+  sysstat<="000000" & sys_rs & '0';
+  
   -----------------------------------
   PROCESS(sclk) IS
     VARIABLE a : std_logic_vector(31 DOWNTO 0);
+    VARIABLE hw : std_logic_vector(15 DOWNTO 0);
+    VARIABLE buf_v : std_logic_vector(63 DOWNTO 0);
+    VARIABLE be_v : std_logic_vector(7 DOWNTO 0);
   BEGIN
     IF rising_edge(sclk) THEN
       ureset<=reset OR NOT spll_locked;      
@@ -947,16 +960,26 @@ BEGIN
           reset_n<='0';
           ioctl_wait<='0';
           ddram2b_address<="00000000000000000000000000000";
+          dl_be<=x"00";
           IF ioctl_download2='1' THEN
             state<=sDOWNLOAD;
-          ELSIF unsigned(ioctl_addr) >= 131072 OR reboot_pending='1' THEN
+          ELSIF reboot_pending='1' THEN
+            -- Software reset (system control SR): memory is kept, as on a
+            -- Sun board; hold reset_n for a few cycles, then run.
+            IF swr_hold=0 THEN
+              state<=sRUN;
+              reboot_pending<='0';
+            ELSE
+              swr_hold<=swr_hold-1;
+            END IF;
+          ELSIF unsigned(ioctl_addr) >= 131072 THEN
+            -- Power-up, OSD reset or new ROM: clear the DRAM
             state<=sCLR;
             IF SIMU=1 THEN
               -- Clearing 512 MB one word at a time takes hours in a
               -- simulator; the simulated DDR starts out zeroed instead.
               state<=sRUN;
             END IF;
-            reboot_pending<='0';
           END IF;
           
         WHEN sCLR =>
@@ -994,36 +1017,58 @@ BEGIN
           
         WHEN sDOWNLOAD =>
           reset_n<='0';
-          ioctl_wait<=ioctl_wr AND NOT ioctl_wr2;
-          
-          a:=std_logic_vector(OBRAM_ADRS);
-          a(19 DOWNTO 0):=ioctl_addr(19 DOWNTO 0);
-          
-          ddram2b_address<=a(31 DOWNTO 3);
-          IF a(2)='0' AND a(1)='0' THEN
-            ddram2b_byteenable<="11000000";
-          ELSIF a(2)='0' AND a(1)='1' THEN
-            ddram2b_byteenable<="00110000";
-          ELSIF a(2)='1' AND a(1)='0' THEN
-            ddram2b_byteenable<="00001100";
-          ELSE -- "11"
-            ddram2b_byteenable<="00000011";
+          ioctl_wait<='0';
+          -- The four 16-bit words of each 8-byte group are merged and
+          -- written once, and a write is held until the DDR accepts it.
+          -- Before, every word was a one-cycle write computed from the live
+          -- ioctl bus: a word arriving while the previous write waited on
+          -- waitrequest, or a write that met waitrequest, was lost (G7).
+          -- Main's block writes do not wait for ioctl_wait, so the slack of
+          -- three words per write is what protects us; ioctl_wait is raised
+          -- as well while a write is pending.
+          IF ddram2b_write='1' AND ddram2_waitrequest='1' THEN
+            ddram2b_write<='1';
+            ddram2b_writedata<=ddram2b_writedata;
+            ddram2b_byteenable<=ddram2b_byteenable;
+            ioctl_wait<='1';
           END IF;
-          
-          ddram2b_writedata<=
-            ioctl_dout(7 DOWNTO 0) & ioctl_dout(15 DOWNTO 8) &
-            ioctl_dout(7 DOWNTO 0) & ioctl_dout(15 DOWNTO 8) &
-            ioctl_dout(7 DOWNTO 0) & ioctl_dout(15 DOWNTO 8) &
-            ioctl_dout(7 DOWNTO 0) & ioctl_dout(15 DOWNTO 8);
-          ddram2b_burstcount<=x"01";
           
           IF ioctl_wr='1' AND ioctl_wr2='0' THEN
+            a:=std_logic_vector(OBRAM_ADRS);
+            a(19 DOWNTO 0):=ioctl_addr(19 DOWNTO 0);
+            hw:=ioctl_dout(7 DOWNTO 0) & ioctl_dout(15 DOWNTO 8);
+            buf_v:=dl_buf;
+            be_v:=dl_be;
+            CASE a(2 DOWNTO 1) IS
+              WHEN "00"   => buf_v(63 DOWNTO 48):=hw; be_v(7 DOWNTO 6):="11";
+              WHEN "01"   => buf_v(47 DOWNTO 32):=hw; be_v(5 DOWNTO 4):="11";
+              WHEN "10"   => buf_v(31 DOWNTO 16):=hw; be_v(3 DOWNTO 2):="11";
+              WHEN OTHERS => buf_v(15 DOWNTO 0) :=hw; be_v(1 DOWNTO 0):="11";
+            END CASE;
+            IF a(2 DOWNTO 1)="11" THEN
+              ddram2b_address<=a(31 DOWNTO 3);
+              ddram2b_writedata<=buf_v;
+              ddram2b_byteenable<=be_v;
+              ddram2b_write<='1';
+              dl_be<=x"00";
+            ELSE
+              dl_buf<=buf_v;
+              dl_be<=be_v;
+              dl_adr<=a(31 DOWNTO 3);
+            END IF;
+          ELSIF ioctl_download2='0' AND dl_be/=x"00" AND
+            NOT (ddram2b_write='1' AND ddram2_waitrequest='1') THEN
+            -- The last, partial group
+            ddram2b_address<=dl_adr;
+            ddram2b_writedata<=dl_buf;
+            ddram2b_byteenable<=dl_be;
             ddram2b_write<='1';
+            dl_be<=x"00";
           END IF;
-          IF ddram2b_write='1' AND ddram2_waitrequest='0' THEN
-            ddram2b_write<='0';
-          END IF;
-          IF ioctl_download2='0' THEN
+          ddram2b_burstcount<=x"01";
+          
+          IF ioctl_download2='0' AND dl_be=x"00" AND
+            NOT (ddram2b_write='1' AND ddram2_waitrequest='1') THEN
             state<=sWAIT;
           END IF;
           
@@ -1040,7 +1085,17 @@ BEGIN
         state<=sWAIT;
         IF sysreset='1' THEN
           reboot_pending<='1';
+          swr_hold<=(OTHERS => '1');
         END IF;
+      END IF;
+      
+      -- System status RS: set by a software reset, cleared only by a
+      -- power-up or the OSD reset (not by the reset it records).
+      IF sysreset='1' THEN
+        sys_rs<='1';
+      END IF;
+      IF ureset='1' THEN
+        sys_rs<='0';
       END IF;
       
       ------------------------------
