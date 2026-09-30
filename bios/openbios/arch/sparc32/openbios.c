@@ -627,6 +627,13 @@ static void setup_cpu(int mid_offset)
         push_str("version");
         fword("property");
 
+        /* The core reports its CPU clock in Hz at AUXIO0 + 8; older cores
+           read 0 there, which leaves the property as it was. */
+        PUSH(aux_reg[2]);
+        fword("encode-int");
+        push_str("clock-frequency");
+        fword("property");
+
         PUSH(4096);
         fword("encode-int");
         push_str("page-size");

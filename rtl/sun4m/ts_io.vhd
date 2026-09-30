@@ -251,7 +251,8 @@ BEGIN
   i_ts_dmaux: ENTITY work.ts_dmaux
     GENERIC MAP (
       HWCONF           => HWCONF,
-      ETHERNET         => ETHERNET)
+      ETHERNET         => ETHERNET,
+      SYSFREQ          => SYSFREQ)
     PORT MAP (
       sel_dma2         => sel.dma2,
       sel_auxio0       => sel.auxio0,

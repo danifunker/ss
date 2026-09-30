@@ -101,7 +101,8 @@ USE work.cpu_conf_pack.ALL;
 ENTITY ts_dmaux IS
   GENERIC (
     HWCONF   : uv8;
-    ETHERNET : boolean);
+    ETHERNET : boolean;
+    SYSFREQ  : natural := 50_000_000);
   PORT (
     sel_dma2   : IN  std_logic;
     sel_auxio0 : IN  std_logic;
@@ -252,6 +253,13 @@ BEGIN
         dr<="0000000" & led_i & HWCONF &
              "0000000" & to_std_logic(ETHERNET) & swconf;
         
+      END IF;
+
+      -------------------------------------------------------------
+      -- AUXIO0 + 8 : the CPU clock in Hz, read-only. OpenBIOS publishes it
+      -- as the cpu nodes' clock-frequency (Solaris psrinfo showed 0 MHz).
+      IF sel_auxio0='1' AND w.req='1' AND w.a(4 DOWNTO 2)="010" THEN
+        dr<=to_unsigned(SYSFREQ,32);
       END IF;
 
       -------------------------------------------------------------
