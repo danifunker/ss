@@ -34,6 +34,18 @@ trap_table:
 
 /* ------------------------------------------------------------------ */
 reset:
+#if defined(TARGET_SS20)
+        /* Every CPU leaves reset and starts here: the core has no MP
+         * start/stop control yet. Only CPU 0 runs the suite; the others
+         * park. The core reports the CPU number in MMU control register
+         * bits 3:2 (the TEMLIB "MID" field, reserved on a real SuperSPARC).
+         * QEMU starts the secondary CPUs halted, and CPU 0 reads 0 there. */
+        lda [%g0] 4, %l0
+        srl %l0, 2, %l0
+        andcc %l0, 3, %g0
+        bne halt
+        nop
+#endif
         wr %g0, (PSR_S | PSR_PS | PSR_PIL_MASK), %psr   /* ET=0 CWP=0 */
         nop ; nop ; nop
         wr %g0, 0, %wim
