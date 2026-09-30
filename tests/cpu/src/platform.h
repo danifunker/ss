@@ -72,7 +72,12 @@
 #define V_TT_RESUME     0x40    /* 1: expected trap re-executes (jmp %l1) */
 #define V_SKIP          0x44    /* set by a test that could not run */
 #define V_SKIP_COUNT    0x48
+#define V_TRAP_PSR      0x4c    /* PSR on entry of the last expected trap */
 #define V_SIZE          0x80
+
+/* ta SVC_SUPER: the runtime resumes after it in supervisor mode; a test
+ * that switched to user mode (PSR.S = 0) comes back with it. */
+#define SVC_SUPER       0x7e
 
 /* Trap types (SPARC V8 table 7-1) */
 #define TT_RESET        0x00

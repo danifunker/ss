@@ -140,6 +140,9 @@ trap_common:
         cmp %l3, TT_WIN_UNF
         be window_underflow
         nop
+        cmp %l3, TT_TICC(SVC_SUPER)
+        be trap_svc_super
+        nop
         ld [%g7 + V_TRAPS], %l4
         add %l4, 1, %l4
         st %l4, [%g7 + V_TRAPS]
@@ -150,8 +153,15 @@ trap_common:
         st %l3, [%g7 + V_TRAP_SEEN]
         st %l1, [%g7 + V_TRAP_PC]
         st %l2, [%g7 + V_TRAP_NPC]
+        st %l0, [%g7 + V_TRAP_PSR]
         mov -1, %l4
         st %l4, [%g7 + V_TRAP_EXPECT]
+        ba trap_skip
+        nop
+trap_svc_super:
+        /* ta SVC_SUPER: resume after it in supervisor mode. The rett below
+         * restores S from PS, so set PS. */
+        or %l0, PSR_PS, %l0
         ba trap_skip
         nop
 trap_unexpected:

@@ -58,6 +58,37 @@ BEGIN(t_rett_supervisor, "trap: rett with traps enabled -> illegal_instruction")
         EXPECT_R(%l1, %l0, 2)
 END
 
+BEGIN(t_rett_user, "trap: rett in user mode -> privileged_instruction (0x03)")
+        /* PSR.S = 0 with ET = 1. With the MMU off, user mode still reads and
+         * writes everything; only privileged instructions and ASIs trap.
+         * ta SVC_SUPER (runtime.S) brings the test back to supervisor mode. */
+        EXPECT_TRAP(TT_PRIV)
+        set 1f, %l2
+        rd %psr, %l0
+        andn %l0, PSR_S, %l1
+        wr %l1, %psr
+        nop ; nop ; nop
+3:      rett %l2                        /* traps; PC = 3b, nPC = 1f */
+1:      ta SVC_SUPER
+        /* If the rett executed instead (a regression), CWP is one window
+         * up: a save restores this test's window. */
+        ld [%g7 + V_TRAP_SEEN], %g1
+        cmp %g1, -1
+        bne 2f
+        nop
+        save %sp, -96, %sp
+2:      CHECK_TRAPPED(TT_PRIV, 1)
+        set 3b, %l3
+        ld [%g7 + V_TRAP_PC], %l1
+        EXPECT_R(%l1, %l3, 2)
+        ld [%g7 + V_TRAP_PSR], %l1      /* the trap came from user mode */
+        and %l1, PSR_PS, %l1
+        EXPECT(%l1, 0, 3)
+        rd %psr, %l1                    /* and the test is back in S = 1 */
+        and %l1, PSR_S, %l1
+        EXPECT(%l1, PSR_S, 4)
+END
+
 BEGIN(t_div_zero, "trap: udiv/sdiv by zero -> division_by_zero (0x2a)")
         wr %g0, %y
         nop ; nop ; nop

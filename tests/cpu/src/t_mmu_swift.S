@@ -66,7 +66,9 @@ END
 /* 0x1000 (TLB replacement control), 0x1300 / 0x1400 (writable diagnostic
  * aliases of SFSR / SFAR) are microSPARC-II registers. A core that decodes
  * only VA[11:8] maps them onto the PCR, SFSR and SFAR: probe for that
- * first, because a walking pattern with bit 0 set would turn the MMU on. */
+ * first, because a walking pattern with bit 0 set would turn the MMU on.
+ * 0x500 / 0x600 are the sun4m AFSR / AFAR: no asynchronous fault is
+ * pending (they read 0 on QEMU and on the core, and not as the PCR). */
 BEGIN(t_mmu_swift_regs, "mmu: Swift TLB replacement control, SFSR/SFAR diag")
         lda [%g0] 0x04, %l6             /* PCR */
         set 0x1000, %l0
@@ -76,6 +78,12 @@ BEGIN(t_mmu_swift_regs, "mmu: Swift TLB replacement control, SFSR/SFAR diag")
         lda [%g0] 0x04, %l2
         sta %l6, [%g0] 0x04             /* restore the PCR in any case */
         EXPECT_R(%l2, %l6, 1)           /* the PCR did not change */
+        mov 0x500, %l0
+        lda [%l0] 0x04, %l1
+        EXPECT(%l1, 0, 2)               /* AFSR */
+        mov 0x600, %l0
+        lda [%l0] 0x04, %l1
+        EXPECT(%l1, 0, 3)               /* AFAR */
         cmp %l2, %l6
         bne 9f                          /* aliased: do not walk */
         nop

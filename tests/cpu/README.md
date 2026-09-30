@@ -68,11 +68,11 @@ row up in `out/alu_vectors.txt`.
 | `t_alu.S` + `gen_alu.py` | 3748 one-instruction vectors over every integer ALU op, register and immediate forms: add/sub with carry, logic, shifts, umul/smul (Y), udiv/sdiv with overflow and divide-by-zero, mulscc, tagged add/sub and their trapping forms. Checks the result, icc and Y, and whether it trapped. Expectations come from a Python model of the V8 manual. Also sethi/simm13 and the Y register. |
 | `t_ldst.S` | load widths and sign extension, byte order, partial stores, ldd/std, ldstub/swap, lda/sta, alignment traps (nothing written, trap PC) |
 | `t_branch.S` | all 16 Bicc and all 16 Ticc conditions against all 16 icc values (`gen/cond_tab.S`), annul bit and delay-slot cases, call/jmpl links, misaligned jmpl |
-| `t_traps.S` | software trap numbers, illegal instructions, rett with ET=1, divide by zero, tag overflow, fp_disabled, cp_disabled |
+| `t_traps.S` | software trap numbers, illegal instructions, rett with ET=1 (illegal_instruction in supervisor mode, privileged_instruction from user mode: the test drops to S=0 and comes back with `ta SVC_SUPER`), divide by zero, tag overflow, fp_disabled, cp_disabled |
 | `t_window.S` | save/restore overlap, CWP arithmetic, 40-deep recursion through the spill/fill handlers, NWINDOWS |
 | `t_psr.S` | read-only impl/ver, PIL, icc, TBR.tt and TBA |
 | `t_fpu.S` | single and double arithmetic, conversions, fcmp/fcc/FBfcc, FSR cexc/aexc |
-| `t_mmu_swift.S` | SS5 only: the POST's microSPARC-II MMU register walking-pattern tests (CTPR, context, TLB replacement control `0x1000`, SFSR/SFAR diagnostic aliases `0x1300`/`0x1400`), with the POST's masks. It probes first whether `0x1000` aliases the PCR, as it does on the core (ASI 4 decoded from VA[11:8]), and reports that instead of walking. |
+| `t_mmu_swift.S` | SS5 only: the POST's microSPARC-II MMU register walking-pattern tests (CTPR, context, TLB replacement control `0x1000`, SFSR/SFAR diagnostic aliases `0x1300`/`0x1400`), with the POST's masks; AFSR/AFAR (`0x500`/`0x600`) read 0. It probes first whether `0x1000` aliases the PCR, as it did on the core before ASI 4 was decoded from VA[12:8] (audit MMU-1), and reports that instead of walking. |
 
 ## Known QEMU 8.2.2 deviations
 
