@@ -56,8 +56,9 @@ run_capture() {
 }
 stop_capture() {   # the local ssh, and the remote cat it started
     kill "$1" 2>/dev/null
-    # tty[S]1: a pattern that its own command line does not match
-    rsh "pkill -f 'cat /dev/tty[S]1'" 2>/dev/null
+    # The MiSTer's busybox has no pkill. tty[S]1: a pattern that the awk
+    # command line itself does not match.
+    rsh "ps | awk '/cat \\/dev\\/tty[S]1/ {print \$1}' | xargs kill" 2>/dev/null
     wait "$1" 2>/dev/null
 }
 # Type on ttya; printf turns \r into Enter. No single quotes in $1.
