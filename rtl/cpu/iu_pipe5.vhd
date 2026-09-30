@@ -161,6 +161,45 @@ ARCHITECTURE pipe5 OF iu IS
       rs<=x"00000000";
     END IF;
   END bypass_sel;
+
+  -- bypass_sel on the raw register field (timing): pipe_x.num_rd=regad(f)
+  -- is (ok_x AND f=r_x) with (r_x,ok_x)=regad_inv(pipe_x.num_rd,cwp_dec),
+  -- computed from registers only, so the instruction word feeds a 5-bit
+  -- compare instead of the window mapping and a 7-bit compare. regad_inv
+  -- is the exact inverse of regad; a field of 0 is the only one that maps
+  -- onto register 0. Same sel/rs as bypass_sel.
+  PROCEDURE bypass_sel_raw (
+    SIGNAL   rs       : OUT uv32;
+    SIGNAL   sel      : OUT unsigned(0 TO 1);
+    CONSTANT f        : IN  uint5;
+    CONSTANT r_dec    : IN  uint5;
+    CONSTANT ok_dec   : IN  std_logic;
+    CONSTANT r_exe    : IN  uint5;
+    CONSTANT ok_exe   : IN  std_logic;
+    CONSTANT r_mem    : IN  uint5;
+    CONSTANT ok_mem   : IN  std_logic;
+    CONSTANT pipe_dec : IN  type_pipe;
+    CONSTANT pipe_exe : IN  type_pipe;
+    CONSTANT pipe_mem : IN  type_pipe) IS
+  BEGIN
+    IF f=0 THEN
+      sel<="11";      -- R0=0
+      rs<=x"00000000";
+    ELSIF ok_dec='1' AND r_dec=f AND pipe_dec.v='1' AND pipe_dec.rd_maj='1' THEN
+      sel<="01";      -- Rebouclage sur place niveau EXE
+      rs<=x"00000000";
+    ELSIF ok_exe='1' AND r_exe=f AND pipe_exe.v='1' AND pipe_exe.rd_maj='1' THEN
+      sel<="11";      -- Injection EXE
+      rs<=pipe_exe.rd;
+    ELSIF ok_mem='1' AND r_mem=f AND pipe_mem.v='1' AND pipe_mem.rd_maj='1' AND
+      BYPASS_WRI THEN
+      sel<="10";      -- Injection WRI
+      rs<=x"00000000";
+    ELSE
+      sel<="00";      -- Accès registre direct
+      rs<=x"00000000";
+    END IF;
+  END bypass_sel_raw;
   
   FUNCTION bypass_mux (
     CONSTANT mux      : IN unsigned(0 TO 1);
@@ -531,8 +570,9 @@ BEGIN
     -- value that maps onto each pending load's destination is computed from
     -- registers (regad_inv), so the instruction word only feeds a 5-bit
     -- compare. Same function as deps(regad(field,cwp_dec),...).
-    VARIABLE hz_dec_r,hz_exe_r   : uint5;
-    VARIABLE hz_dec_ok,hz_exe_ok : std_logic;
+    VARIABLE hz_dec_r,hz_exe_r,hz_mem_r    : uint5;
+    VARIABLE hz_dec_ok,hz_exe_ok,hz_mem_ok : std_logic;
+    VARIABLE f_rs2_v : uint5;           -- the field behind num_rs2_v
     VARIABLE hz_dec_v,hz_exe_v   : std_logic;
     VARIABLE dep_rs1_v,dep_rs2_v,dep_rd_v,dep2_v : boolean;
   BEGIN
@@ -620,10 +660,22 @@ BEGIN
     
     pipe_dec_c.num_rd <=num_rd_v;
     pipe_dec_c.cwp<=next_cwp_v;
-    bypass_sel(pipe_dec_c.by_rs1,pipe_dec_c.by_sel1,
-               num_rs1_v,pipe_dec,pipe_exe,pipe_mem,pipe_wri);
-    bypass_sel(pipe_dec_c.by_rs2,pipe_dec_c.by_sel2,
-               num_rs2_v,pipe_dec,pipe_exe,pipe_mem,pipe_wri);
+    -- Bypass select on the raw fields (bypass_sel_raw): the field values
+    -- that map onto each stage's destination come from registers.
+    regad_inv(pipe_dec.num_rd,cwp_dec,NWINDOWS,hz_dec_r,hz_dec_ok);
+    regad_inv(pipe_exe.num_rd,cwp_dec,NWINDOWS,hz_exe_r,hz_exe_ok);
+    regad_inv(pipe_mem.num_rd,cwp_dec,NWINDOWS,hz_mem_r,hz_mem_ok);
+    IF cycle_dec=0 AND fst_v='0' THEN
+      f_rs2_v:=n_rs2_v;                 -- num_rs2_v is regad(n_rs2_v)
+    ELSE
+      f_rs2_v:=n_rd_v;                  -- num_rs2_v is regad(n_rd_v)
+    END IF;
+    bypass_sel_raw(pipe_dec_c.by_rs1,pipe_dec_c.by_sel1,n_rs1_v,
+                   hz_dec_r,hz_dec_ok,hz_exe_r,hz_exe_ok,hz_mem_r,hz_mem_ok,
+                   pipe_dec,pipe_exe,pipe_mem);
+    bypass_sel_raw(pipe_dec_c.by_rs2,pipe_dec_c.by_sel2,f_rs2_v,
+                   hz_dec_r,hz_dec_ok,hz_exe_r,hz_exe_ok,hz_mem_r,hz_mem_ok,
+                   pipe_dec,pipe_exe,pipe_mem);
     pipe_dec_c.rd<=x"00000000";
     pipe_dec_c.ry<=x"00000000";
     pipe_dec_c.psr<=PSR_0;
@@ -639,8 +691,7 @@ BEGIN
     -- with the fields of the instruction word.
     hz_dec_v:=pipe_dec.cat.mode.l AND pipe_dec.v AND NOT pipe_dec.cat.mode.f;
     hz_exe_v:=pipe_exe.cat.mode.l AND pipe_exe.v AND NOT pipe_exe.cat.mode.f;
-    regad_inv(pipe_dec.num_rd,cwp_dec,NWINDOWS,hz_dec_r,hz_dec_ok);
-    regad_inv(pipe_exe.num_rd,cwp_dec,NWINDOWS,hz_exe_r,hz_exe_ok);
+    -- hz_dec_r/ok, hz_exe_r/ok: regad_inv above (with the bypass select)
     dep_rs1_v:=(hz_dec_v='1' AND hz_dec_ok='1' AND n_rs1_v=hz_dec_r) OR
                (hz_exe_v='1' AND hz_exe_ok='1' AND n_rs1_v=hz_exe_r);
     dep_rs2_v:=(hz_dec_v='1' AND hz_dec_ok='1' AND n_rs2_v=hz_dec_r) OR
