@@ -79,8 +79,20 @@ END ENTITY ts_timer;
 ARCHITECTURE rtl OF ts_timer IS
 
   -- Comptage timers : 2MHz
-  CONSTANT PULSE_PER : natural RANGE 0 TO 255 := SYSFREQ/2/1000000;
-  SIGNAL cpt : natural RANGE 0 TO 255;
+  -- The 2 MHz tick is a phase accumulator, exact on average for any
+  -- SYSFREQ: a plain divider (65 MHz / 32) ran the SS5 timers 1.5625 %
+  -- fast (TMR-1).
+  FUNCTION gcd (CONSTANT a : natural; CONSTANT b : natural) RETURN natural IS
+  BEGIN
+    IF b/=0 THEN
+      RETURN gcd(b,a MOD b);
+    ELSE
+      RETURN a;
+    END IF;
+  END FUNCTION gcd;
+  CONSTANT TICK_INC : natural := 2_000_000/gcd(SYSFREQ,2_000_000);
+  CONSTANT TICK_MOD : natural := SYSFREQ/gcd(SYSFREQ,2_000_000);
+  SIGNAL cpt : natural RANGE 0 TO TICK_MOD+TICK_INC;
   SIGNAL pulse : std_logic;
 
   SIGNAL rsel : std_logic;
@@ -107,13 +119,13 @@ BEGIN
   Pulsar: PROCESS (clk)
   BEGIN
     IF rising_edge(clk) THEN
-      IF cpt=PULSE_PER-1 THEN
-        pulse<='1';
-        cpt<=0;
-      ELSE
-        pulse<='0';
-        IF stopa='0' THEN
-          cpt<=cpt+1;
+      pulse<='0';
+      IF stopa='0' THEN
+        IF cpt+TICK_INC>=TICK_MOD THEN
+          cpt<=cpt+TICK_INC-TICK_MOD;
+          pulse<='1';
+        ELSE
+          cpt<=cpt+TICK_INC;
         END IF;
       END IF;
     END IF;
@@ -177,7 +189,11 @@ BEGIN
               p_cpt(I)(22 DOWNTO 0)<='0' & UNITE;
             END IF;
           END IF;
-          p_ov(I)<='0';
+          -- L is cleared by any access in counter mode, only by writes in
+          -- user-timer mode [S4M 5.3.3] (TMR-3)
+          IF p_mode(I)='0' OR (w.be="1111" AND w.wr='1') THEN
+            p_ov(I)<='0';
+          END IF;
           IF p_mode(I)='0' THEN
             dr<=p_ov(I) & p_cpt(I)(53 DOWNTO 32) & "000000000";
           ELSE
@@ -214,7 +230,7 @@ BEGIN
         IF rsel='1' AND w.a(16 DOWNTO 12)="000" & ad AND w.a(3 DOWNTO 2)="11"
           AND CPUEN(I)='1' THEN
           IF w.be(3)='1' AND w.wr='1' THEN
-            p_run(I)<=w.dw(I);
+            p_run(I)<=w.dw(0);  -- RUN is D<0> for every CPU (TMR-2)
           END IF;
           dr<="0000000000000000000000000000000" & p_run(I);
         END IF;
