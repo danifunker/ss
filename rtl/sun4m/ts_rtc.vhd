@@ -141,7 +141,11 @@ BEGIN
       m_x:=(cpt_m=x"12");
       y_x:=(cpt_y=x"99");
       ------------------------------------------
-      IF cr='0' THEN
+      -- The user registers follow the counters unless READ or WRITE is
+      -- set. While WRITE is set the counters load from them (below): with
+      -- both copies active, a field written with W=1, R=0 and the counter
+      -- traded places on every clock (TOD-1).
+      IF cr='0' AND cw='0' THEN
         mem_y<=cpt_y;
         mem_m<=cpt_m(4 DOWNTO 0);
         mem_d<=cpt_d(5 DOWNTO 0);
