@@ -501,14 +501,24 @@ stages.
   TagRAMBi) through the tag compare and `vcache_hit` (fanout 119) into the
   IU decode and stall logic (`Comb_DECODE`, `na_c`), ending at the enables of
   `inst_w_mem.a` (fanout 31). About 16 ns of logic in one cycle, MCU to IU.
-  Seeds move it by tenths of a ns. Closing 65 MHz needs that path pipelined,
-  which is CPU work (Fable). A seed sweep (5, 7, 11, 13) runs from a frozen
-  worktree in `../ss-seeds/`.
+  Seeds on identical RTL: 3 → -3.52 ns, 5 → -2.42 ns, 7 → -3.01 ns.
+  **It fails on the board once warm.** After an hour of NetBSD, OpenBIOS
+  stopped at a different point on each boot, and the CPU suite stopped at a
+  different test on each run and seed; the better seed got further. The SS20
+  (50 MHz, timing met) passes on the same warm board. Closing 65 MHz needs
+  that path restructured, which is CPU work: the prompt is
+  `scratch/handoff/fable-ss5-65mhz.md`. Until then, SS5 builds used for
+  validation run at 50 MHz (not committed).
 - **Stage 1, simulation:** see [sim/README.md](../sim/README.md). It found
   that the loader's download writes are not latched (glue G7): words are lost
   whenever the DDR stalls.
 - **Machine switching:** `scripts/machine.sh` keeps a `boot.rom`/CFG/slot set
   per machine; `deploy.sh` calls it.
+- **SCSI IDs 3/1/6 and OpenBIOS.** OpenBIOS gives the `disk` alias to the
+  first disk found scanning targets 0-7 (`drivers/esp.c`), so with HD0 alone
+  (target 3) `boot disk` works; with HD1 (target 1) mounted too, `disk` is
+  HD1 and HD0 needs `boot disk1` (or a `boot-device` setting). The Sun OBP
+  means target 3 by `disk`. A fix belongs in `ss_openbios`.
 
 ### Work items (the content of the stages)
 
@@ -611,6 +621,7 @@ stages.
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
+| 2026-09-30 | **If the SS5 cannot close timing at 65 MHz, the core focuses on the SS20 only** (user). The test is Fable's MCU→IU restructuring (`scratch/handoff/fable-ss5-65mhz.md`) |
 | 2026-09-30 | Hardware is the main test bed; the simulation is for short CPU/chipset runs and waveforms |
 
 ### What phase 3 did (session 1)
