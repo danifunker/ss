@@ -42,10 +42,16 @@ ARCHITECTURE rtl OF fpu_regs_2r1w IS
   SHARED VARIABLE mem1h,mem1l : arr_uv32(0 TO 2**N - 1) :=(OTHERS => x"00000000");
   SHARED VARIABLE mem2h,mem2l : arr_uv32(0 TO 2**N - 1) :=(OTHERS => x"00000000");
   
-  ATTRIBUTE ramstyle OF mem1h : VARIABLE IS "M9K, no_rw_check";
-  ATTRIBUTE ramstyle OF mem1l : VARIABLE IS "M9K, no_rw_check";
-  ATTRIBUTE ramstyle OF mem2h : VARIABLE IS "M9K, no_rw_check";
-  ATTRIBUTE ramstyle OF mem2l : VARIABLE IS "M9K, no_rw_check";
+  -- MLABs (SS5 timing): 32 x 32 bits per array, two MLABs each. The read
+  -- is an asynchronous lookup into an ordinary register, so fpu_calc's
+  -- first stage starts from a flip-flop output instead of a block RAM's
+  -- late output (about 2.5 ns after the edge on a Cyclone V M10K). Same
+  -- behaviour: a read of the word being written goes through the Direct
+  -- bypass below, never through the array.
+  ATTRIBUTE ramstyle OF mem1h : VARIABLE IS "MLAB, no_rw_check";
+  ATTRIBUTE ramstyle OF mem1l : VARIABLE IS "MLAB, no_rw_check";
+  ATTRIBUTE ramstyle OF mem2h : VARIABLE IS "MLAB, no_rw_check";
+  ATTRIBUTE ramstyle OF mem2l : VARIABLE IS "MLAB, no_rw_check";
   
   SIGNAL fs1_i,fs2_i : uv64;
   SIGNAL fs1h_i,fs1l_i,fs2h_i,fs2l_i : uv32;
