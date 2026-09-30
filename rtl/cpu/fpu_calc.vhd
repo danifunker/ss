@@ -128,6 +128,7 @@ ARCHITECTURE rtl OF fpu_calc IS
   SIGNAL c2_mds_fs2_man : unsigned(52 DOWNTO 0);
   SIGNAL c2_mds_expo : unsigned(12 DOWNTO 0);
   SIGNAL c2_mds_unf : std_logic;
+  SIGNAL c2_mds_mzero : std_logic;      -- fTOf overflow/underflow: clear the mantissa (in C3)
 
   SIGNAL mul_start,div_start : std_logic;
   SIGNAL mul_end,div_end : std_logic;
@@ -150,6 +151,7 @@ ARCHITECTURE rtl OF fpu_calc IS
   SIGNAL c3_mds_expo,c3p_mds_expo : unsigned(12 DOWNTO 0);
   SIGNAL c3_mds_sticky : std_logic;
   SIGNAL c3_mds_unf : std_logic;
+  SIGNAL c3_mds_mzero : std_logic;
   
   -- C4
   SIGNAL as4_c,c4_rdy : std_logic;
@@ -241,6 +243,8 @@ BEGIN
     VARIABLE unf_v : std_logic;
     VARIABLE rdy_v : std_logic;
     VARIABLE cx_v : type_fpipe;
+    VARIABLE first_v : boolean;         -- first cycle of C2 (operands from C1)
+    VARIABLE mzero_v,mshift_v : std_logic;
   BEGIN
     IF rising_edge(clk) THEN
       rdy_v:='0';
@@ -281,7 +285,14 @@ BEGIN
         c2_asc_diff<=diff_v;
       END IF;
       
-      IF as2_c='1' THEN
+      -- First cycle (operands from C1) or an iteration on C2's own state.
+      -- Decided from registers: whenever the block below runs (as2_c='1'
+      -- or c2_rdy='0'), as2_c='1' implies c2.v='0' or c2_rdy='1', and
+      -- c2_rdy='0' with c2.v='1' implies as2_c='0'. That keeps the stall
+      -- chain (mul/div busy -> as3/as2) off the operand select of the
+      -- whole renormalisation and exponent path (SS5 timing).
+      first_v:=c2.v='0' OR c2_rdy='1';
+      IF first_v THEN
         cx_v:=c1;
         cx_v.fs1_class:=fs1_class_v;
         cx_v.fs2_class:=fs2_class_v;
@@ -311,7 +322,7 @@ BEGIN
           rdy_v:='1';
           
         ELSE
-          IF as2_c='1' THEN
+          IF first_v THEN
             -- 1) MULDIV : Renormalisation itérative pour MUL/DIV
             IF c1.fop=FOP_MUL THEN
               ifs1_man_v:=NOT fs1_class_v(2) & fs1_man0_v;
@@ -360,13 +371,8 @@ BEGIN
           c2i_fs1_deca<=fs1_deca_v;
           c2i_fs2_deca<=fs2_deca_v;
           
-          expo_mds2_v:=expo_mds_v - fs1_deca_v;
-          IF cx_v.fop=FOP_MUL THEN
-            expo_mds2_v:=expo_mds2_v - fs2_deca_v;
-          ELSE
-            expo_mds2_v:=expo_mds2_v + fs2_deca_v;
-          END IF;
-          
+          -- The exponent correction (mds_3 of expo_mds_v - fs1_deca_v
+          -- -/+ fs2_deca_v) is mds_expo below, two adder levels (SS5 timing).
           fs1_man_v:=ifs1_man_v & '0';
           fs2_man_v:=ifs2_man_v;
           
@@ -391,10 +397,14 @@ BEGIN
         IF rdy_v='1' THEN
           -- A la fin du calcul itératif de C2
           c2_mds_fs2_man<=ifs2_man_v;
-          mds_3(fs1_man_v,expo_mds3_v,
-                fs1_man_v,expo_mds2_v,cx_v.fop,cx_v.sdi,cx_v.sdo);
+          mds_expo(expo_mds3_v,mzero_v,mshift_v,
+                   expo_mds_v,fs1_deca_v,fs2_deca_v,cx_v.fop,cx_v.sdi,cx_v.sdo);
+          IF mshift_v='1' THEN
+            fs1_man_v:='0' & fs1_man_v(53 DOWNTO 1);
+          END IF;
           c2_mds_fs1_man<=fs1_man_v;
           c2_mds_expo<=expo_mds3_v;
+          c2_mds_mzero<=mzero_v;
 
         ELSE
           -- Pendant l'itération
@@ -456,6 +466,7 @@ BEGIN
         -----------------------------------------------------------------------
         -- 2) MUL/DIV
         c3_mds_unf<=c2_mds_unf;
+        c3_mds_mzero<=c2_mds_mzero;
         c3p_mds_expo<=c2_mds_expo;
         c3p_mds_fs1_man<=c2_mds_fs1_man;
 
@@ -516,7 +527,7 @@ BEGIN
       clk         => clk);
   
   Comb2_MulDiv:PROCESS (mul_fs_man,mul_inx,div_fs_man,div_inx,
-                 c3,c3p_mds_fs1_man,c3p_mds_expo) IS
+                 c3,c3p_mds_fs1_man,c3p_mds_expo,c3_mds_mzero) IS
     VARIABLE fs_man_v : unsigned(54 DOWNTO 0);
     VARIABLE sticky_v : std_logic;
   BEGIN
@@ -527,8 +538,13 @@ BEGIN
       fs_man_v:=div_fs_man;
       sticky_v:=div_inx;
     ELSE
-      -- Conversion sTOd, dTOs
+      -- Conversion sTOd, dTOs. The dTOs overflow/underflow clear of the
+      -- mantissa is applied here (c3_mds_mzero), one stage after the
+      -- exponent compare that decides it (SS5 timing).
       fs_man_v:='0' & c3p_mds_fs1_man;
+      IF c3_mds_mzero='1' THEN
+        fs_man_v:=(OTHERS => '0');
+      END IF;
       sticky_v:='0';
     END IF;
     -- 3) Conversion

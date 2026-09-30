@@ -203,6 +203,17 @@ PACKAGE fpu_pack IS
     CONSTANT sd        : IN  std_logic;           -- 0=FDIVs 1=FDIVd
     CONSTANT sdo       : IN  std_logic);
 
+  PROCEDURE mds_expo(
+    VARIABLE expo_o    : OUT unsigned(12 DOWNTO 0);
+    VARIABLE mzero     : OUT std_logic;
+    VARIABLE mshift    : OUT std_logic;
+    CONSTANT base      : IN  unsigned(12 DOWNTO 0);
+    CONSTANT deca1     : IN  unsigned(12 DOWNTO 0);
+    CONSTANT deca2     : IN  unsigned(12 DOWNTO 0);
+    CONSTANT fop       : IN  uv4;
+    CONSTANT sd        : IN  std_logic;
+    CONSTANT sdo       : IN  std_logic);
+
   PROCEDURE mds_4(
     VARIABLE fs_man_o : OUT unsigned(53 DOWNTO 0);
     VARIABLE expo_o   : OUT unsigned(12 DOWNTO 0);
@@ -1262,6 +1273,90 @@ PACKAGE BODY fpu_pack IS
     END IF;
 
   END PROCEDURE mds_3;
+
+  -- mds_3's exponent correction together with the renormalisation counts
+  -- (SS5 timing): expo_o = mds_3(base - deca1 -/+ deca2), the same 13-bit
+  -- modular arithmetic, but as two adder levels after base instead of
+  -- four in series. The constant and the counts are summed first (dm),
+  -- in parallel with base, which is the late operand (it comes from the
+  -- register file's exponents). SQRT and fTOf, which shift or compare the
+  -- corrected exponent, take it as one three-operand sum. The mantissa
+  -- operations of mds_3 are returned as flags: mshift, the one-bit right
+  -- shift (DIV, and SQRT on an odd exponent); mzero, the fTOf overflow /
+  -- underflow clear, which the caller applies later in the pipeline.
+  PROCEDURE mds_expo(
+    VARIABLE expo_o    : OUT unsigned(12 DOWNTO 0);
+    VARIABLE mzero     : OUT std_logic;
+    VARIABLE mshift    : OUT std_logic;
+    CONSTANT base      : IN  unsigned(12 DOWNTO 0);
+    CONSTANT deca1     : IN  unsigned(12 DOWNTO 0);
+    CONSTANT deca2     : IN  unsigned(12 DOWNTO 0);
+    CONSTANT fop       : IN  uv4;
+    CONSTANT sd        : IN  std_logic;           -- 0=FDIVs 1=FDIVd
+    CONSTANT sdo       : IN  std_logic) IS        -- 0=FMULs 1=FMULd/FsMULd
+    VARIABLE modu,dm,ex : unsigned(12 DOWNTO 0);
+  BEGIN
+    mzero:='0';
+    mshift:='0';
+    ex:=base - deca1 + deca2;           -- the corrected exponent (not MUL)
+
+    IF fop=FOP_DIV THEN
+      IF sd='1' THEN      -- FDIVd
+        modu:="0001111111111";   -- 1023
+      ELSE                            -- FDIVs
+        modu:="0000001111111";   -- 127
+      END IF;
+      dm:=modu - deca1 + deca2;
+      expo_o:=base + dm;
+      mshift:='1';
+
+    ELSIF fop=FOP_MUL THEN
+      IF sd='0' AND sdo='0' THEN      -- FMULs
+        modu:="1111110000010";   -- 8066 = 8192-127 +1
+      ELSIF sd='0' AND sdo='1' THEN   -- FsMULd
+        modu:="0001100000010";   -- 770 = 1023-127-127 +1
+      ELSE                            -- FMULd
+        modu:="1110000000010";   -- 7170 = 8192-1023 +1
+      END IF;
+      dm:=modu - deca1 - deca2;
+      expo_o:=base + dm;
+
+    ELSIF fop=FOP_SQRT THEN
+      IF ex(0)='1' THEN
+        IF sd='1' THEN
+          modu:="0001000000000";
+        ELSE
+          modu:="0000001000000";
+        END IF;
+        mshift:='1';
+      ELSE
+        IF sd='1' THEN
+          modu:="0000111111111";
+        ELSE
+          modu:="0000000111111";
+        END IF;
+      END IF;
+      expo_o:=(ex(12) & ex(12 DOWNTO 1))+modu;
+
+    ELSE -- fop=FOP_fTOf
+      IF sd='1' THEN
+        -- Double --> Simple
+        IF ex>"0010001111110" THEN --1150 : Overflow
+          expo_o:="0100000000000";
+          mzero:='1';
+        ELSIF ex<="0001101101000" THEN --872 : Underflow
+          expo_o:="0000000000001";
+          mzero:='1';
+        ELSE
+          expo_o:=ex + "1110010000001"; -- 7297 = 8192-1023+127 + 1
+        END IF;
+      ELSE
+        -- Simple --> Double
+        expo_o:=ex + "0001110000001";  -- 897 = 1023-127+1
+      END IF;
+    END IF;
+
+  END PROCEDURE mds_expo;
   
   PROCEDURE mds_4(
     VARIABLE fs_man_o : OUT unsigned(53 DOWNTO 0);
