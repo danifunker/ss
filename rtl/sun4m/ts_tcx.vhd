@@ -303,7 +303,21 @@ BEGIN
       IF sel='1' AND w.req='1' AND w.a(5 DOWNTO 2)="0000" AND
         ((w.a(27 DOWNTO 20)=x"02" AND cg3='0') OR
          (w.a(27 DOWNTO 20)=x"04" AND cg3='1')) AND trans='0' THEN
-        IF w.be(0)='1' AND w.wr='1' THEN
+        IF cg3='1' AND w.wr='1' AND w.be/="0000" THEN
+          -- The CG3 DAC takes every byte written; the last one (the
+          -- lowest-order lane) wins. Linux and NetBSD write the index as a
+          -- word in D[7:0], OpenBIOS as a byte (V2).
+          IF w.be(3)='1' THEN
+            palidx<=to_integer(w.dw(7 DOWNTO 0));
+          ELSIF w.be(2)='1' THEN
+            palidx<=to_integer(w.dw(15 DOWNTO 8));
+          ELSIF w.be(1)='1' THEN
+            palidx<=to_integer(w.dw(23 DOWNTO 16));
+          ELSE
+            palidx<=to_integer(w.dw(31 DOWNTO 24));
+          END IF;
+          palcyc<=0;
+        ELSIF w.be(0)='1' AND w.wr='1' THEN
           palidx<=to_integer(w.dw(31 DOWNTO 24));
           palcyc<=0;
         END IF;
@@ -432,6 +446,11 @@ BEGIN
         palidx<=0;
         palw<='0';
         palcyc<=0;
+        -- A retrace interrupt enabled by the previous OS must not survive
+        -- a reset (V3)
+        cg3_ctrl<=x"00";
+        cg3_int<='0';
+        tcx_misc<=x"00000000";
       END IF;
       -------------------------------------------------------------
     END IF;

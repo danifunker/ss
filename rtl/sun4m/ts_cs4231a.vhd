@@ -536,6 +536,10 @@ BEGIN
                 idx := to_integer(index_reg AND x"1F");
                 IF idx = 16#19# THEN
                   byte_val := x"A0";
+                ELSIF idx = 16#0C# THEN
+                  -- I12 MODE and ID: MODE2 bit plus the CS4231 ID 0xA, as
+                  -- Linux checks after setting MODE2 (A1)
+                  byte_val := (regs(idx) AND x"40") OR x"8A";
                 ELSIF idx = 16#0B# THEN
                   byte_val := regs(idx);
                   IF esi_aci = '1' THEN
