@@ -46,6 +46,7 @@ LIBRARY work;
 USE work.base_pack.ALL;
 USE work.plomb_pack.ALL;
 USE work.ts_pack.ALL;
+USE work.ts_fcode_pack.ALL;
 USE work.vid_pack.ALL;
 
 ENTITY ts_tcx IS
@@ -296,6 +297,18 @@ BEGIN
       IF (pal_be(0) OR pal_be(1) OR pal_be(2) OR pal_be(3))='0' AND
         (acc_etat=sOISIF OR NOT TCX_ACCEL) AND acc_start='0' THEN
         trans<='0';
+      END IF;
+      
+      -------------------------------------------------------------
+      -- 000_0000-000_FFFF : FCode PROM. A Sun OBP probes the slot here and
+      -- builds the display node from it (real-OBP milestone M5); the TACUS
+      -- OpenBIOS uses its own copy and never reads it. See ts_fcode_pack.
+      IF sel='1' AND w.req='1' AND w.a(27 DOWNTO 16)=x"000" AND trans='0' THEN
+        IF cg3='1' THEN
+          dr<=FCODE_CG3(to_integer(w.a(10 DOWNTO 2)));
+        ELSE
+          dr<=FCODE_TCX(to_integer(w.a(10 DOWNTO 2)));
+        END IF;
       END IF;
       
       -------------------------------------------------------------
