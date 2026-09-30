@@ -35,4 +35,10 @@ PASS fpu: double precision arithmetic, even/odd pairs
 PASS fpu: fitos/fitod/fstoi/fdtoi/fstod/fdtos
 PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
-CPUTEST DONE pass=31 fail=2 skip=0
+PASS chipset: system control reads 0 after power-on (RS, WD clear)
+PASS chipset: NVRAM IDPROM format 1, machine type, checksum
+PASS chipset: frame buffer slot starts with FCode (0xf1 header)
+    check 00000001 exp=000000ff obs=00000000
+FAIL chipset: DMA2 E_BASE_ADDR resets to 0xff
+PASS chipset: the PROM answers at pa 0x7000_0000
+CPUTEST DONE pass=35 fail=3 skip=0

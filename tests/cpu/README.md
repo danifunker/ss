@@ -72,6 +72,7 @@ row up in `out/alu_vectors.txt`.
 | `t_window.S` | save/restore overlap, CWP arithmetic, 40-deep recursion through the spill/fill handlers, NWINDOWS |
 | `t_psr.S` | read-only impl/ver, PIL, icc, TBR.tt and TBA |
 | `t_fpu.S` | single and double arithmetic, conversions, fcmp/fcc/FBfcc, FSR cexc/aexc |
+| `t_chipset.S` | not CPU tests: chipset state after a power-on reset and address decode, with the suite's plumbing. The system control register reads RS = WD = 0; the NVRAM IDPROM has format 1, the machine type (0x80 SS5, 0x72 SS20) and a zero XOR checksum; the frame buffer's slot starts with FCode (`0xf1`, sane length); DMA2 E_BASE_ADDR resets to 0xff; on the SS5 the PROM answers at pa `0x7000_0000` |
 | `t_mmu_swift.S` | SS5 only: the POST's microSPARC-II MMU register walking-pattern tests (CTPR, context, TLB replacement control `0x1000`, SFSR/SFAR diagnostic aliases `0x1300`/`0x1400`), with the POST's masks; AFSR/AFAR (`0x500`/`0x600`) read 0. It probes first whether `0x1000` aliases the PCR, as it did on the core before ASI 4 was decoded from VA[12:8] (audit MMU-1), and reports that instead of walking. |
 
 ## Known QEMU 8.2.2 deviations
@@ -90,8 +91,13 @@ checked against QEMU's source at tag `v8.2.2`:
 3. **`wr %tbr` overwrites TBR.tt.** `do_wrtba` moves the whole value into
    `%tbr`; V8 says WRTBR writes TBA only and tt keeps the last trap type.
 
-The core has to follow the manual, not QEMU. On the core, these three
-tests are expected to pass.
+4. **DMA2 E_BASE_ADDR resets to 0.** The DMA2 manual gives 0xff (the
+   Ethernet DMA's high address byte); QEMU leaves the register at 0. Solaris
+   never writes it and assumes 0xff (OpenBIOS `ob_le_init`). New in the
+   11.1.1 references with `t_chipset.S`.
+
+The core has to follow the manual, not QEMU. On the core, these tests are
+expected to pass.
 
 ## Writing a test
 

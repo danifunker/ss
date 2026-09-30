@@ -11,6 +11,7 @@
 #include "t_psr.S"
 #include "t_mmu_swift.S"
 #include "t_fpu.S"
+#include "t_chipset.S"
 
         .section .testtab, "a", @progbits
         .word 0, 0                      /* end of the test table */
