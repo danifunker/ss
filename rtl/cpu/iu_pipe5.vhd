@@ -236,6 +236,7 @@ ARCHITECTURE pipe5 OF iu IS
   SIGNAL pipe_dec,pipe_dec_c : type_pipe;
   SIGNAL as_dec_c : std_logic;  -- AS=Au Suivant
   SIGNAL na_c : std_logic;
+  SIGNAL cat_dec_c : type_cat;          -- raw decode of the DEC word (FPU)
   SIGNAL annul,annul_c : std_logic;
   SIGNAL cycle_dec,cycle_dec_c : natural RANGE 0 TO 2;
   SIGNAL npc_c,npc_p4 : uv32;
@@ -361,7 +362,14 @@ BEGIN
       
   muldiv_op<=pipe_dec.cat.op(21) & pipe_dec.cat.op(19);
 
-  fpu_i.cat   <=pipe_dec_c.cat;
+  -- The FPU decodes the raw instruction word (cat_dec_c), not the DEC
+  -- register input: pipe_dec_c.cat is the held pipe_dec.cat while EXE
+  -- stalls (as_exe_c=0), which put the whole pipeline-advance chain
+  -- (data ready -> as_wri -> as_mem -> as_exe) in front of the FPU's
+  -- dependency check and its rdy, and so of na_c (timing). Whenever the
+  -- FPU acts on its input (req, and the rdy that Comb_DECODE reads with
+  -- as_exe_c=1) the two are the same word.
+  fpu_i.cat   <=cat_dec_c;
   fpu_i.pc    <=pc;
   fpu_i.req   <=fpu_req_c;
   fpu_i.wri   <=fpu_wri_c;
@@ -543,6 +551,7 @@ BEGIN
     
     --------------------------------------------------------------
     decode(inst_d_v,IFLUSH,CASA,cat_v,n_rd_v,n_rs1_v,n_rs2_v);
+    cat_dec_c<=cat_v;
     op_dec(op=>inst_d_v,pc=>pc,npc_o=>npc_v,npc_maj=>npc_mav,
            psr=>psr_c,fcc=>fpu_fcc,fexc=>fpu_fexc,annul_o=>annul_v);
     
