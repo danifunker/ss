@@ -614,6 +614,11 @@ BEGIN
     state_c<=state;
     wb_a_c<=wb_a;
     wb_no_c<=wb_no;
+    -- Hold defaults: without them these are only assigned in sHIT and
+    -- synthesise to latches (44 in the SS20 build).
+    mem_dno_c<=mem_dno;
+    mem_pa_c <=mem_pa;
+    mem_asi_c<=mem_asi;
     idcache_t2_a<=smp_r.a;
     ext_w_c<=ext_w_l;
     rd_fifo_dw_c<=(op=>FILL,dit=>smp_w_l.dit,
