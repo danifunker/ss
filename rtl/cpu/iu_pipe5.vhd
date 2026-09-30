@@ -519,8 +519,16 @@ BEGIN
     VARIABLE inst_code_v : enum_plomb_code;
     VARIABLE inst_dval_v : std_logic;
     VARIABLE fst_v : std_logic;
+    -- Load-use hazard test on the raw register fields (timing): the field
+    -- value that maps onto each pending load's destination is computed from
+    -- registers (regad_inv), so the instruction word only feeds a 5-bit
+    -- compare. Same function as deps(regad(field,cwp_dec),...).
+    VARIABLE hz_dec_r,hz_exe_r   : uint5;
+    VARIABLE hz_dec_ok,hz_exe_ok : std_logic;
+    VARIABLE hz_dec_v,hz_exe_v   : std_logic;
+    VARIABLE dep_rs1_v,dep_rs2_v,dep_rd_v,dep2_v : boolean;
   BEGIN
-    
+
     IF inst_r_lev/=0 THEN
       inst_d_v:=inst_r_mem.d;
       inst_code_v:=inst_r_mem.code;
@@ -617,6 +625,26 @@ BEGIN
                            npc_exe_c,npc);
 
     --------------------------------------
+    -- Pending loads whose destination is reachable from this window: the
+    -- raw field value that would name it (registers only), compared below
+    -- with the fields of the instruction word.
+    hz_dec_v:=pipe_dec.cat.mode.l AND pipe_dec.v AND NOT pipe_dec.cat.mode.f;
+    hz_exe_v:=pipe_exe.cat.mode.l AND pipe_exe.v AND NOT pipe_exe.cat.mode.f;
+    regad_inv(pipe_dec.num_rd,cwp_dec,NWINDOWS,hz_dec_r,hz_dec_ok);
+    regad_inv(pipe_exe.num_rd,cwp_dec,NWINDOWS,hz_exe_r,hz_exe_ok);
+    dep_rs1_v:=(hz_dec_v='1' AND hz_dec_ok='1' AND n_rs1_v=hz_dec_r) OR
+               (hz_exe_v='1' AND hz_exe_ok='1' AND n_rs1_v=hz_exe_r);
+    dep_rs2_v:=(hz_dec_v='1' AND hz_dec_ok='1' AND n_rs2_v=hz_dec_r) OR
+               (hz_exe_v='1' AND hz_exe_ok='1' AND n_rs2_v=hz_exe_r);
+    dep_rd_v :=(hz_dec_v='1' AND hz_dec_ok='1' AND n_rd_v=hz_dec_r) OR
+               (hz_exe_v='1' AND hz_exe_ok='1' AND n_rd_v=hz_exe_r);
+    IF cycle_dec=0 AND fst_v='0' THEN
+      dep2_v:=dep_rs2_v;                -- num_rs2_v is regad(n_rs2_v)
+    ELSE
+      dep2_v:=dep_rd_v;                 -- num_rs2_v is regad(n_rd_v)
+    END IF;
+
+    --------------------------------------
     xx_stall<='0';
     fpu_req_c<='0';
     as_dec_c<='0';
@@ -665,9 +693,9 @@ BEGIN
       pipe_dec_c.rd_maj<='0';
       pipe_dec_c.cat.mode<=CALC;
       
-    ELSIF (deps(num_rs1_v,pipe_dec,pipe_exe) AND
+    ELSIF (dep_rs1_v AND
            cat_v.r_reg(1)='1' AND n_rs1_v/=0)
-      OR (deps(num_rs2_v,pipe_dec,pipe_exe) AND
+      OR (dep2_v AND
           ((cat_v.r_reg(2)='1' AND cycle_dec=0  AND n_rs2_v/=0) OR
            (cat_v.r_reg(3)='1' AND (cycle_dec/=0 OR fst_v='1') AND n_rd_v/=0
             --AND (cat_v.mode.l='0' OR cat_v.mode.s='0')

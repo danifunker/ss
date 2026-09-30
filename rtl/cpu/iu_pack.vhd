@@ -41,6 +41,13 @@ PACKAGE iu_pack IS
     cwp      : unsigned(4 DOWNTO 0);
     NWINDOWS : natural) RETURN natural;
 
+  PROCEDURE regad_inv (
+    CONSTANT num      : IN  natural;
+    CONSTANT cwp      : IN  unsigned(4 DOWNTO 0);
+    CONSTANT NWINDOWS : IN  natural;
+    VARIABLE r        : OUT uint5;
+    VARIABLE ok       : OUT std_logic);
+
   --------------------------------------
   TYPE type_icc IS RECORD
     n : std_logic;    -- PSR 23
@@ -471,6 +478,36 @@ PACKAGE BODY iu_pack IS
       RETURN o - NWINDOWS*16;
     END IF;
   END FUNCTION regad;
+
+  -- Inverse of regad: the register field r (0..31) with regad(r,cwp)=num,
+  -- ok='0' when there is none (num is in another window). A hazard test can
+  -- then compare the raw field of the instruction being decoded with a
+  -- value computed from registers, instead of mapping the field first.
+  PROCEDURE regad_inv (
+    CONSTANT num      : IN  natural;
+    CONSTANT cwp      : IN  unsigned(4 DOWNTO 0);
+    CONSTANT NWINDOWS : IN  natural;
+    VARIABLE r        : OUT uint5;
+    VARIABLE ok       : OUT std_logic) IS
+    VARIABLE base,r1,r2 : integer;
+  BEGIN
+    base:=16*to_integer(cwpfix(cwp,NWINDOWS));
+    r1:=num-base;                       -- regad without the wrap
+    r2:=num+NWINDOWS*16-base;           -- regad with the wrap
+    IF num<8 THEN
+      r:=num;
+      ok:='1';
+    ELSIF r1>=8 AND r1<=31 AND num<NWINDOWS*16+8 THEN
+      r:=r1;
+      ok:='1';
+    ELSIF r2>=8 AND r2<=31 THEN
+      r:=r2;
+      ok:='1';
+    ELSE
+      r:=0;
+      ok:='0';
+    END IF;
+  END PROCEDURE regad_inv;
   
   --------------------------------------
   -- Assemblage registre PSR
