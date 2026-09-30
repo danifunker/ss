@@ -703,7 +703,12 @@ stages.
 - **2026-09-30, Fable timing session (SS5 at 65 MHz), merged as
   `danifunker` = `ss5-timing` at `36f07d3`.** Seed-5 setup slack on the
   core clock: **-0.993 ns** (TNS -49) from -2.345 (TNS -304) at the start of
-  the session and -3.5 before the task; hold +0.25; 21,575 ALMs. SS20 at
+  the session and -3.5 before the task; hold +0.25; 21,575 ALMs. Seeds 3
+  and 7 of the same commit: -2.64 and -1.88, so a typical fit is about -2 ns
+  and seed 5 is the lucky end; the seed-7 leaders are the instruction word
+  (I-cache data, the MCU's output select) through the decode into the
+  bypass select and `pipe_dec.by_rs2` (-1.9), the IU register file through
+  the JMPL adder into the next PC (-1.3), and fpu_calc stage 1 (-1.4). SS20 at
   50 MHz: +4.68 ns. Changes: the I-cache hit vector registered, tags in
   MLABs (`mcu_simple`, `mcu_tagram`); the IU's load-use test on the raw
   fields; the FPU register file in MLABs; the FPU's dependency test from a
