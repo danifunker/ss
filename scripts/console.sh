@@ -20,7 +20,7 @@ done
 CMD="uartmode 0 >/dev/null 2>&1; stty -F /dev/ttyS1 $BAUD raw -echo -hupcl; timeout $SECS cat /dev/ttyS1"
 if [ -n "$OUT" ]; then
     mkdir -p "$(dirname "$OUT")"
-    ssh "${SSH_OPTS[@]}" "$DEV" "$CMD" | tr -d '\r' | tee "$OUT"
+    ssh "${SSH_OPTS[@]}" "$DEV" "$CMD" | stdbuf -o0 tr -d '\r' | tee "$OUT"
 else
-    ssh "${SSH_OPTS[@]}" "$DEV" "$CMD" | tr -d '\r'
+    ssh "${SSH_OPTS[@]}" "$DEV" "$CMD" | stdbuf -o0 tr -d '\r'
 fi
