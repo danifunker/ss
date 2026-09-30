@@ -246,6 +246,10 @@ ARCHITECTURE rtl OF ss_core IS
   SIGNAL rtc_delay : std_logic;
   SIGNAL dreset : std_logic;
   SIGNAL sysreset : std_logic;
+  SIGNAL sys_rs   : std_logic :='0';     -- system status RS: SW reset seen
+  SIGNAL sysstat  : uv8;
+  SIGNAL kbd_leds : unsigned(2 DOWNTO 0);
+  SIGNAL swr_hold : unsigned(4 DOWNTO 0);
   SIGNAL reboot_pending : std_logic := '0';
 
   SIGNAL down : std_logic;
@@ -372,6 +376,7 @@ BEGIN
       rts         => rts,
       ps2_i       => ps2_i,
       ps2_o       => ps2_o,
+      kbd_leds    => kbd_leds,
       preset      => preset,
       reset_n     => reset_n,
       reset_mask_rev => reset_mask_rev,
@@ -824,8 +829,10 @@ BEGIN
   ps2_i(2)<=ps2_mouse_data_out;
   ps2_i(3)<=ps2_mouse_clk_out;
   
-  ps2_kbd_led_status<="000";
-  ps2_kbd_led_use   <="000";
+  -- The Sun keyboard LEDs drive the MiSTer keyboard's (hps_io order:
+  -- 2 Scroll, 1 Num, 0 Caps); Main reads them whatever PS2WE is.
+  ps2_kbd_led_status<=std_logic_vector(kbd_leds);
+  ps2_kbd_led_use   <="111";
 
   ----------------------------------------------------------
   -- RTC

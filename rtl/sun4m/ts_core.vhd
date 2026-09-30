@@ -152,6 +152,7 @@ ENTITY ts_core IS
     -- Direct
     ps2_i       : IN  uv4;
     ps2_o       : OUT uv4;
+    kbd_leds    : OUT unsigned(2 DOWNTO 0);
     
     -- Configuration/Reset
     preset      : IN  std_logic; -- Processor REST
@@ -356,8 +357,10 @@ ARCHITECTURE rtl OF ts_core IS
     PORT (
       led         : OUT std_logic;
       sysreset    : OUT std_logic;
+      sysstat     : IN  uv8;
       ps2_i       : IN  uv4;
       ps2_o       : OUT uv4;
+      kbd_leds    : OUT unsigned(2 DOWNTO 0);
       sync_rs     : IN  std_logic;
       rxd1        : IN  std_logic;
       txd1        : OUT std_logic;
@@ -1345,8 +1348,10 @@ BEGIN
     PORT MAP (
       led         => led_io,
       sysreset    => sysreset,
+      sysstat     => sysstat,
       ps2_i       => ps2_i,
       ps2_o       => ps2_o,
+      kbd_leds    => kbd_leds,
       sync_rs     => sync_rs,
       rxd1        => rxd1,
       txd1        => txd1,

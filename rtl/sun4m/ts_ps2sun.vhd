@@ -46,6 +46,9 @@ ENTITY ts_ps2sun IS
     di2_data : OUT uv8;
     di2_req  : OUT std_logic;
     di2_rdy  : IN  std_logic;
+    
+    -- Sun keyboard LEDs for the MiSTer keyboard: 2 Scroll, 1 Num, 0 Caps
+    kbd_leds : OUT unsigned(2 DOWNTO 0);
     do2_data : IN  uv8;
     do2_req  : IN  std_logic;
     do2_rdy  : OUT std_logic;
@@ -620,8 +623,25 @@ ARCHITECTURE rtl OF ts_ps2sun IS
   TYPE enum_k_stat IS (sOISIF,sRD,sTRANS,sTRANS2,sWRLED,sWRLED2,sWRLED3,sWRLED4);
   SIGNAL k_stat : enum_k_stat;
 
-  TYPE enum_m_stat IS (sOISIF,sRD,sRDT,sMO,sMO2);
+  TYPE enum_m_stat IS (sOISIF,sRD,sRDT,sPREP,sMO,sMO2);
   SIGNAL cmo : natural RANGE 0 TO 6;
+  -- Mouse Systems output: motion accumulated from the PS/2 packets, sent
+  -- as two halves per axis, each clamped to +/-48 so that no delta byte
+  -- looks like a sync byte (NetBSD resyncs on (c AND 0xB0)=0x80).
+  SIGNAL cse : natural RANGE 0 TO 5;
+  SIGNAL acc_x,acc_y : signed(11 DOWNTO 0);
+  SIGNAL m_btn : unsigned(2 DOWNTO 0);   -- M R L, active high
+  SIGNAL m_x1,m_y1,m_x2,m_y2 : uv8;
+  FUNCTION clamp48 (CONSTANT v : integer) RETURN integer IS
+  BEGIN
+    IF v>48 THEN
+      RETURN 48;
+    ELSIF v<-48 THEN
+      RETURN -48;
+    ELSE
+      RETURN v;
+    END IF;
+  END FUNCTION clamp48;
   SIGNAL m_stat : enum_m_stat;
   SIGNAL dmou : unsigned(23 DOWNTO 0);
   
@@ -694,10 +714,12 @@ BEGIN
       
       CASE k_stat IS
         WHEN sOISIF =>
+          -- The LEDs go to Main through ps2_kbd_led_* (kbd_leds). Sending
+          -- ED + value to the emulated PS/2 keyboard made ps2.vhd count
+          -- hps_io's clocks as its own and drop incoming bytes for about
+          -- 40 ms: a lost F0 left a key stuck down (kms A.6).
           IF k_vv2='1' THEN
             k_stat<=sRD;
-          ELSIF ledsm_mem='1' THEN
-            k_stat<=sWRLED;
           END IF;
           
         WHEN sRD =>
@@ -821,10 +843,16 @@ BEGIN
   MOUConv: PROCESS (clk)
     VARIABLE dd_v,do : uv8;
     VARIABLE di_r : std_logic;
+    VARIABLE dx_v,dy_v : integer RANGE -256 TO 255;
+    VARIABLE ax_v,ay_v : integer RANGE -2048 TO 2047;
+    VARIABLE x1_v,y1_v,x2_v,y2_v : integer RANGE -48 TO 48;
   BEGIN
     IF rising_edge(clk) THEN
       m_vv2<=m_vv;
       mfid<=m_fifo_d(m_lev);
+      -- Pop the FIFO only in the cycle a byte is taken (it was never
+      -- cleared, so the FIFO emptied itself after the first byte).
+      di_r:='0';
       
       -------------------------------------------
       -- Souris
@@ -834,6 +862,9 @@ BEGIN
         WHEN sOISIF =>
           IF m_vv2='1' THEN
             m_stat<=sRD;
+          ELSIF acc_x/=0 OR acc_y/=0 THEN
+            -- Motion left over from the previous packet
+            m_stat<=sPREP;
           END IF;
           
         WHEN sRD =>
@@ -850,32 +881,69 @@ BEGIN
           IF cmo/=3 THEN
             m_stat<=sOISIF;
           ELSE
+            -- PS/2: YV XV YS XS 1 M R L | X[7:0] | Y[7:0]. Signed 9-bit
+            -- deltas, saturated on overflow (a flick past 127 counts used
+            -- to reverse direction), added to the pending motion.
+            IF dmou(22)='1' THEN
+              IF dmou(20)='1' THEN dx_v:=-256; ELSE dx_v:=255; END IF;
+            ELSE
+              dx_v:=to_integer(signed(dmou(20) & dmou(15 DOWNTO 8)));
+            END IF;
+            IF dmou(23)='1' THEN
+              IF dmou(21)='1' THEN dy_v:=-256; ELSE dy_v:=255; END IF;
+            ELSE
+              dy_v:=to_integer(signed(dmou(21) & dmou(7 DOWNTO 0)));
+            END IF;
+            ax_v:=to_integer(acc_x)+dx_v;
+            ay_v:=to_integer(acc_y)+dy_v;
+            IF ax_v>1023 THEN ax_v:=1023; ELSIF ax_v<-1024 THEN ax_v:=-1024; END IF;
+            IF ay_v>1023 THEN ay_v:=1023; ELSIF ay_v<-1024 THEN ay_v:=-1024; END IF;
+            acc_x<=to_signed(ax_v,12);
+            acc_y<=to_signed(ay_v,12);
+            m_btn<=dmou(18 DOWNTO 16);
             cmo<=0;
-            m_stat<=sMO;
+            m_stat<=sPREP;
           END IF;
           
-          -- XV YV Y8 X8 1 M R L | X[7:0] | Y[7:0]
+        WHEN sPREP =>
+          ax_v:=to_integer(acc_x);
+          ay_v:=to_integer(acc_y);
+          x1_v:=clamp48(ax_v);
+          x2_v:=clamp48(ax_v-x1_v);
+          y1_v:=clamp48(ay_v);
+          y2_v:=clamp48(ay_v-y1_v);
+          acc_x<=to_signed(ax_v-x1_v-x2_v,12);
+          acc_y<=to_signed(ay_v-y1_v-y2_v,12);
+          m_x1<=unsigned(to_signed(x1_v,8));
+          m_x2<=unsigned(to_signed(x2_v,8));
+          m_y1<=unsigned(to_signed(y1_v,8));
+          m_y2<=unsigned(to_signed(y2_v,8));
+          cse<=0;
+          m_stat<=sMO;
+          
+          -- Mouse Systems: 1 0 0 0 0 ~L ~M ~R | dX1 | dY1 | dX2 | dY2
         WHEN sMO =>
           di2_req<='1';
-          CASE cmo IS
-            WHEN 0 =>                   -- 1 0 0 0 0 L M R
-              di2_data<="10000" & NOT dmou(16) & NOT dmou(18) & NOT dmou(17);
-            WHEN 1 =>                   -- X[7:0]
-              di2_data<=dmou(15 DOWNTO 8);
-            WHEN 2 =>                   -- Y[15:8]
-              di2_data<=dmou(7 DOWNTO 0);
+          CASE cse IS
+            WHEN 0 =>
+              di2_data<="10000" & NOT m_btn(0) & NOT m_btn(2) & NOT m_btn(1);
+            WHEN 1 =>
+              di2_data<=m_x1;
+            WHEN 2 =>
+              di2_data<=m_y1;
+            WHEN 3 =>
+              di2_data<=m_x2;
             WHEN OTHERS =>
-              di2_data<=x"00";
+              di2_data<=m_y2;
           END CASE;
           m_stat<=sMO2;
-          cmo<=cmo+1;
           
         WHEN sMO2 =>
           IF di2_rdy='1' THEN
-            IF cmo=5 THEN
+            IF cse=4 THEN
               m_stat<=sOISIF;
-              cmo<=0;
             ELSE
+              cse<=cse+1;
               m_stat<=sMO;
             END IF;
           END IF;
@@ -905,10 +973,17 @@ BEGIN
         m_lev<=0;
         m_vv<='0';
         m_stat<=sOISIF;
+        cmo<=0;
+        acc_x<=(OTHERS => '0');
+        acc_y<=(OTHERS => '0');
+        m_btn<="000";
       END IF;
 
     END IF;
   END PROCESS MOUConv;
+  
+  -- Sun LED byte: 0 Num Lock, 1 Compose, 2 Scroll Lock, 3 Caps Lock
+  kbd_leds<=leds(2) & leds(0) & leds(3);
   
   -- Souris
   do2_rdy<='1';

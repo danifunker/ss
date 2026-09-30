@@ -41,8 +41,10 @@ ENTITY ts_io IS
     -- Ports série
     led         : OUT std_logic;
     sysreset    : OUT std_logic;
+    sysstat     : IN  uv8;                -- system control/status bits
     ps2_i       : IN  uv4;
     ps2_o       : OUT uv4;
+    kbd_leds    : OUT unsigned(2 DOWNTO 0);  -- 2 Scroll, 1 Num, 0 Caps
     sync_rs     : IN  std_logic;
     rxd1        : IN  std_logic;           -- KB
     txd1        : OUT std_logic;           -- KB
@@ -546,6 +548,7 @@ BEGIN
         di2_data   => di2_data,       -- MOU   --> SPORT
         di2_req    => di2_req,
         di2_rdy    => di2_rdy,
+        kbd_leds   => kbd_leds,
         
         do2_data   => do2_data,       -- SPORT --> MOU
         do2_req    => do2_req,
@@ -558,6 +561,7 @@ BEGIN
 
   -----------------------------------
   GenNoEmu: IF NOT PS2 GENERATE
+    kbd_leds<="000";
     
     -- Baudrate 1200
     i_synth1200: ENTITY work.synth
