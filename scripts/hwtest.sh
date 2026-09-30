@@ -8,7 +8,7 @@
 #   netbsd   OpenBIOS, console on ttya, HD0 = netbsd11.raw: wait for
 #            'login:', log in as root, run a command, check its output
 #   solaris  OpenBIOS, console on ttya, HD0 = sol8.img (target 3): wait for
-#            'console login:'
+#            'console login:', log in as root, run a command, check its output
 #
 #   scripts/hwtest.sh 5 cpu netbsd
 #
@@ -96,19 +96,16 @@ for t in "${TESTS[@]}"; do
             log "$t: FAIL, no '$want' after ${secs}s; last line: $(clean "$log" | tail -1)"
             FAILED=$((FAILED + 1)); continue
         fi
-        if [ "$t" = netbsd ]; then
-            sleep 2; type_tty 'root\r'; sleep 8
-            type_tty 'echo X-$((6*7)); uname -sr\r'; sleep 6
-            stop_capture "$cp"
-            if clean "$log" | grep -q '^X-42$'; then
-                log "netbsd: PASS, login and shell on ttya ($(clean "$log" | grep -a -m1 '^NetBSD [0-9]' || true))"
-            else
-                log "netbsd: FAIL, 'login:' seen but the shell did not answer"
-                FAILED=$((FAILED + 1))
-            fi
+        # Log in and run a command; the marker X-""42 prints X-42, which
+        # the echoed command line cannot match (any shell, Bourne included).
+        sleep 2; type_tty 'root\r'; sleep 8
+        type_tty 'uname -sr; echo X-""42\r'; sleep 8
+        stop_capture "$cp"
+        if clean "$log" | grep -q '^X-42$'; then
+            log "$t: PASS, login and shell on ttya ($(clean "$log" | grep -a -m1 -E '^(NetBSD|SunOS) [0-9]' || true))"
         else
-            stop_capture "$cp"
-            log "solaris: PASS, 'console login:' reached"
+            log "$t: FAIL, '$want' seen but the shell did not answer"
+            FAILED=$((FAILED + 1))
         fi
         ;;
     esac
