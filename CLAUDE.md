@@ -45,7 +45,7 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 - **Quartus 17.0.2 Lite** in `~/intelFPGA_lite/17.0/quartus`: builds run
   here with `scripts/build.sh`. One flow at a time; don't touch the `.qsf`
   while it runs, and restore it afterwards (Quartus rewrites it).
-  lint the SV with Verilator. The VHDL is simulated through `sim/` (GHDL →
+  Lint the SV with Verilator; the VHDL is simulated through `sim/` (GHDL →
   Verilog → Verilator).
 - **Test MiSTer:** `192.168.99.92` (root, default ssh key), set in
   `scripts/local.env`. mrext screenshots: `curl -X POST
