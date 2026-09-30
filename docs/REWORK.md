@@ -22,13 +22,13 @@ first.**
 
 | Phase | What | State |
 |---|---|---|
-| 0 | Distribution blockers (license, ROM redistribution) | **open, needs the user** |
+| 0 | Distribution blockers (license, ROM redistribution) | **open**: the user is asking Grabulosaure for a GPL licence (2026-09-30) |
 | 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | **disassembly done** ([rom-disassembly/](rom-disassembly/README.md): machine code, POST catalogues, Forth dictionaries, device trees, FCode); CPU suite: ISA tests + Swift MMU registers done, more POST-derived hardware tests to lift (1f) |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
-| 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5): see [Bring-up](#bring-up-stage-0-results-session-1). SS20 not built yet |
+| 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | Stage 0 (bring-up) mostly done; the order was reviewed by the user ("looks very good"), later stages **not started, waiting for the user** |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | CPU suite runs on hardware (28/32); NetBSD 11 and Solaris 8 images built ([disk-images.md](disk-images.md)); simulation not started |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | Stage 0 done except SS5 timing at 65 MHz; Stage 1 done (the simulation); Stage 2 and 5 chipset fixes in progress (session 2); CPU fixes go to Fable (Decisions) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | CPU suite on hardware: SS5 28/32, SS20 27/30; the simulation ([sim/](../sim/README.md)) reproduces the SS5 log exactly; NetBSD 11 and Solaris 8 images built ([disk-images.md](disk-images.md)) |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -53,6 +53,12 @@ phases 1–3.
    `github.com/Grabulosaure/ss`, `dev@temlib.org`) what license applies, and
    add `LICENSE` plus fixed headers once it is agreed. Nobody should relicense
    the files on their own.
+   **Intended (user, 2026-09-30): GPL, like other MiSTer cores** (GPL-2+
+   would match `sys/` and upstream's own `ss.sv` header). The user is asking
+   Grabulosaure directly; until he confirms, no `LICENSE` file or header
+   changes.
+   Upstream still had no license on 2026-09-30 (GitHub reports none; last
+   push 2026-07-23).
 2. **Sun PROM images and their disassembly.** The Sun OBP ROMs are Sun/Oracle
    copyright. The images stay in `scratch/` (gitignored) and are never
    committed. **Decided (user, 2026-09-28): commit everything else,** the full
@@ -425,11 +431,11 @@ stages.
 | Stage | What | Depends on | State |
 |---|---|---|---|
 | **0** | Bring-up under the new name: build both revisions, deploy, CPU suite as the BIOS, OpenBIOS `ok`, an OS from disk; baseline area/timing | phase 3 | SS5 **mostly done** (below). Left: SS20 build; close SS5 timing (-2.7 ns); NetBSD to a login on the core; `scripts/` for screenshots |
-| **1** | Full-machine simulation (GHDL → Verilog → Verilator, as the SGI Indy core does) booting OpenBIOS and the CPU suite; regression scripts | a GHDL on this box | not started |
+| **1** | Full-machine simulation (GHDL → Verilog → Verilator, as the SGI Indy core does) booting OpenBIOS and the CPU suite; regression scripts | a GHDL on this box | **done** (session 2): `sim/`, GHDL 6.0.0 in `~/.local/opt`; the CPU suite matches the board; ~60 kHz, so OS boots stay on hardware |
 | **2** | Platform foundations: reset architecture (SW_RST keeps DRAM, RS status bit, reset everything the audits found surviving), bus errors (unmapped → fault), memory-map decisions (SS5 PROM at `0x7000_0000` and `0xF…`; SS20 top-48 MB fold; FCode ROM windows), NVRAM persistence plus the IDPROM | 1 (for fast testing) | not started |
 | **3** | Real Sun OBP on the SS5 (design/sun-obp-boot.md M1-M5), then use it as the hardware regression tool | 2 | not started |
 | **4** | Main-side services on one channel: design the FPGA↔HPS channel once; SCSI replies in Main (IDs 3/1/6), then HPS Ethernet; test with OpenBIOS and the real OBP | 2, the revised SCSI design | not started (the "replies in Main" revision of design/scsi-hps.md is still to write) |
-| **5** | Device and OS fixes in batches (the IMPLEMENTATION_GAPS quick wins: ESCC, timers, TOD, CG3, CS4231, mouse, Stop-A/BREAK, UART CONF_STR, Scaler framebuffer) | 2 | not started |
+| **5** | Device and OS fixes in batches (the IMPLEMENTATION_GAPS quick wins: ESCC, timers, TOD, CG3, CS4231, mouse, Stop-A/BREAK, UART CONF_STR, Scaler framebuffer) | 2 | **in progress** (session 2): ESCC TX fix verified (NetBSD shell on ttya); a batch of chipset fixes awaits a build |
 | **6** | SS20 and MP: MID/MSI/arbiter enable, IOMMU IMPL, 16-bit contexts, the real OBP on the SS20, SMP without debugarm | 2, 4 (area freed) | not started |
 | **7** | Diagnostic POST and polish (the S1-diag items) | 3, 6 | not started |
 | **8** | Release (phase 7) | all | not started |
@@ -478,6 +484,31 @@ stages.
   Screenshots come from mrext: `curl -X POST
   http://<mister>:8182/api/screenshots`, then fetch the newest file in
   `/media/fat/screenshots/SunSparcStation/`.
+
+### Session 2 results (2026-09-30)
+
+- **SS20 built** on this box: 33,228 ALMs (79 %), every clock meets timing at
+  50 MHz (worst +0.41 ns, HDMI PLL). On the board, the CPU suite passes 27/30
+  (`tests/cpu/expected/ss20-core-hw.log`; the same three IU bugs as the SS5).
+  That needed the suite to park CPUs 1-2: every CPU leaves reset and runs the
+  PROM (cpu SMP-2). OpenBIOS boots with 3 CPUs, 464 MB, then stops at
+  "Not a bootable ELF image" with the NetBSD disk that boots on the SS5
+  (Stage 6).
+- **NetBSD 11 on the SS5:** login on the TCX console (6 min to `login:`), then
+  **an interactive root shell on ttya** after the ESCC fix (kms D).
+- **SS5 timing at 65 MHz:** -3.52 ns this fit (-2.72 ns in session 1). All of
+  the 40 worst paths run from the cache tag RAM (`mcu_simple` `iram_bi`
+  TagRAMBi) through the tag compare and `vcache_hit` (fanout 119) into the
+  IU decode and stall logic (`Comb_DECODE`, `na_c`), ending at the enables of
+  `inst_w_mem.a` (fanout 31). About 16 ns of logic in one cycle, MCU to IU.
+  Seeds move it by tenths of a ns. Closing 65 MHz needs that path pipelined,
+  which is CPU work (Fable). A seed sweep (5, 7, 11, 13) runs from a frozen
+  worktree in `../ss-seeds/`.
+- **Stage 1, simulation:** see [sim/README.md](../sim/README.md). It found
+  that the loader's download writes are not latched (glue G7): words are lost
+  whenever the DDR stalls.
+- **Machine switching:** `scripts/machine.sh` keeps a `boot.rom`/CFG/slot set
+  per machine; `deploy.sh` calls it.
 
 ### Work items (the content of the stages)
 
@@ -576,6 +607,11 @@ stages.
 | 2026-09-28 | Builds run on this box (Quartus 17.0.2 Lite in `~/intelFPGA_lite`); the test MiSTer is `192.168.99.92` (in `scripts/local.env`, gitignored) |
 | 2026-09-28 | Disk images: the OSD takes VHD, IMG, HDA and RAW (all raw sector data to the core); slots are remembered (`SC0`-`SC2`). Test images are built in QEMU 11.1.1; the raw copies are kept on the NAS (`Sun-Solaris/SparcStation-Images/`) |
 | 2026-09-28 | QEMU: use the locally built 11.1.1 (`~/.local/qemu-11.1.1`), not Ubuntu's 8.2.2 |
+| 2026-09-30 | License: aim for GPL like the other MiSTer cores; pending Grabulosaure's confirmation (phase 0.1) |
+| 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
+| 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
+| 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
+| 2026-09-30 | Hardware is the main test bed; the simulation is for short CPU/chipset runs and waveforms |
 
 ### What phase 3 did (session 1)
 
@@ -626,3 +662,12 @@ stages.
   the NAS. The SCSI "replies in Main" design revision was started by an
   agent that ended without output: still to do. Hand-off:
   [RESUME-20260928.md](../RESUME-20260928.md).
+- **2026-09-30, session 2.** GHDL 6.0.0 installed; Stage 1 simulation
+  (`sim/`) built and matched to the board. SS20 built and run (CPU suite
+  27/30 with a park for CPUs 1-2; OpenBIOS up, disk boot fails). ESCC TX fix:
+  NetBSD shell on ttya. SS20 MCU latch fix. CPU bugs handed to Fable
+  (`cpu-fixes` branch). Timing analysis of the SS5 miss; a seed sweep. A
+  batch of chipset fixes (AUX-1 system control register and SW reset
+  without the DRAM wipe, INT-1, DMA-1/2, ESP-1, TMR-1/2/3, TOD-1, V2, V3,
+  A1, mouse deltas, the PS/2 LED path, ZS-7, DCD/CTS, SCSI IDs 3/1/6, the
+  loader's download writes, the aspect-ratio option) awaiting a build.
