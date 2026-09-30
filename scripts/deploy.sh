@@ -4,6 +4,7 @@
 # The rbf goes to /media/fat/$MISTER_CORE_FOLDER/<revision>.rbf; boot.rom to
 # /media/fat/games/SunSparcStation/boot.rom, which the framework uploads at
 # every core start (ioctl index 0). The games folder is created if missing.
+# machine.sh first swaps in this revision's boot.rom and config files.
 # Launch: "load_core <rbf>" into /dev/MiSTer_cmd.
 set -u
 . "$(dirname "$0")/common.sh"
@@ -25,6 +26,8 @@ case "$(head -1 "output_files/$REV.fit.summary" 2>/dev/null)" in
 esac
 GAMES="/media/fat/games/$GAMES_DIR"; CORES="/media/fat/$MISTER_CORE_FOLDER"
 ssh "${SSH_OPTS[@]}" "$DEV" "mkdir -p '$GAMES' '$CORES'" || { log "cannot reach $DEV"; exit 1; }
+# The revisions share boot.rom and the config files; make this one's live.
+"$(dirname "$0")/machine.sh" "$REV" || exit 1
 push() {   # local remote
     scp -q "${SSH_OPTS[@]}" "$1" "$DEV:$2" || return 1
     [ "$(md5sum < "$1" | cut -d' ' -f1)" = "$(ssh "${SSH_OPTS[@]}" "$DEV" "md5sum < '$2'" | cut -d' ' -f1)" ] \
