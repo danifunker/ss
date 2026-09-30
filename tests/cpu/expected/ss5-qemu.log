@@ -15,8 +15,9 @@ PASS branch: annul bit and delay slots
 PASS branch: call/jmpl link register, computed jumps
 PASS trap: ta n -> tt 0x80+n, trap PC/nPC, register+imm number
 PASS trap: unimp and invalid opcodes -> illegal_instruction
-    check 00000002 exp=700025c8 obs=700025cc
+    check 00000002 exp=700025e8 obs=700025ec
 FAIL trap: rett with traps enabled -> illegal_instruction
+PASS trap: rett in user mode -> privileged_instruction (0x03)
 PASS trap: udiv/sdiv by zero -> division_by_zero (0x2a)
 PASS trap: taddcctv/tsubcctv -> tag_overflow (0x0a)
 PASS trap: FPop with PSR.EF=0 -> fp_disabled (0x04)
@@ -34,4 +35,4 @@ PASS fpu: double precision arithmetic, even/odd pairs
 PASS fpu: fitos/fitod/fstoi/fdtoi/fstod/fdtos
 PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
-CPUTEST DONE pass=30 fail=2 skip=0
+CPUTEST DONE pass=31 fail=2 skip=0

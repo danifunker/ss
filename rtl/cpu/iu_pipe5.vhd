@@ -1332,7 +1332,8 @@ BEGIN
           wim<=pipe_mem.rd(NWINDOWS-1 DOWNTO 0);
         END IF;
         IF pipe_mem.cat.m_tbr='1' THEN
-          tbr<=(pipe_mem.rd(31 DOWNTO 12),pipe_mem.rd(11 DOWNTO 4));
+          -- WRTBR writes TBA only; tt is set by traps (SPARC V8 4.5)
+          tbr.tba<=pipe_mem.rd(31 DOWNTO 12);
         END IF;
       END IF;
       IF trap_stop_c='1' AND trap_stop='0' AND dstop_c='0' THEN

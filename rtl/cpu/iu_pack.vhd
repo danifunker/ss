@@ -1869,7 +1869,13 @@ PACKAGE BODY iu_pack IS
         psr_o.cwp:=psr_o_cwp;
         npc_maj:='1';
         -- <Le déclenchement de TRAP pendant un RETT est assez fumeux>
-        IF addsub(1 DOWNTO 0)/="00" THEN
+        -- RETT with traps enabled is illegal_instruction (SPARC V8 B.28).
+        -- With S=0 it is privileged_instruction: the PRIV check in
+        -- iu_pipe5 overrides trap_o for that case. The PSR/CWP changes
+        -- below are discarded when the trap is taken (psr_fin is restored).
+        IF psr.et='1' THEN
+          trap_o:=TT_ILLEGAL_INSTRUCTION;
+        ELSIF addsub(1 DOWNTO 0)/="00" THEN
           trap_o:=TT_MEM_ADDRESS_NOT_ALIGNED;
         ELSIF wim(to_integer(psr_o_cwp))='1' THEN
           trap_o:=TT_WINDOW_UNDERFLOW;
@@ -2393,8 +2399,9 @@ PACKAGE BODY iu_pack IS
           -- FP_DISABLED/FP_EXCEPTION -> IU
             
           WHEN "111" => -- CBccc : Coprocessor Conditional Branch
+            -- No coprocessor (PSR.EC=0): cp_disabled, like CPop1/CPop2
+            -- (SPARC V8 B.23).
             trap_o:=TT_CP_DISABLED;
-            trap_o:=TT_ILLEGAL_INSTRUCTION;
             
           WHEN OTHERS =>
             NULL;
