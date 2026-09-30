@@ -21,8 +21,10 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 | `tools/romdis/` | SPARC V8 disassembler, sun4m ROM analyser, OBP Forth decoder, QEMU tracer |
 | `tools/sparc_link.py` | ELF32 SPARC linker for one object (LLVM has none) |
 | `tools/debugarm/` | upstream's ARM-side debug monitor |
-| `tests/cpu/` | bare-metal CPU test suite that runs as the boot PROM (QEMU and core); `expected/ss5-core-hw.log` is the hardware baseline |
-| `scripts/` | `build.sh 5\|20`, `deploy.sh 5\|20 [--rom F]`, `console.sh` (ttya from the MiSTer), `setopt.sh` (OSD options via the .CFG), `mount.sh` (remembered disk slots); machine settings in the gitignored `scripts/local.env` |
+| `tests/cpu/` | bare-metal test suite that runs as the boot PROM (QEMU and core): CPU tests plus `t_chipset.S`; `expected/ss{5,20}-core-hw.log` are the hardware baselines |
+| `sim/` | whole-machine Verilator simulation (GHDL 6 lowers `ss_core`); `run-cputest.sh 5\|20` must match the hardware baseline; see `sim/README.md` |
+| `bios/` | OpenBIOS sources (git subtree of Grabulosaure/ss_openbios); `bios/boot.rom` is the image the MiSTer runs; `scripts/build-bios.sh` builds `bios/build/boot.rom` |
+| `scripts/` | `build.sh 5\|20 [--seed N]`, `deploy.sh 5\|20 [--rom F]`, `hwtest.sh 5\|20 cpu\|netbsd\|solaris` (board regressions), `console.sh` (ttya from the MiSTer), `setopt.sh` (OSD options via the .CFG), `mount.sh` (remembered disk slots), `machine.sh 5\|20` (per-machine boot.rom/CFG sets), `build-bios.sh`; machine settings in the gitignored `scripts/local.env` |
 | `docs/` | plan, gap analyses, `rom-disassembly/` of the Sun PROMs |
 | `scratch/` | reference PDFs (+ `text/` extractions) and Sun ROM images; gitignored, never commit |
 
@@ -42,8 +44,9 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 
 - **Quartus 17.0.2 Lite** in `~/intelFPGA_lite/17.0/quartus`: builds run
   here with `scripts/build.sh`. One flow at a time; don't touch the `.qsf`
-  while it runs. The VHDL has no simulator yet (GHDL/nvc not installed);
-  lint the SV with Verilator.
+  while it runs, and restore it afterwards (Quartus rewrites it).
+  lint the SV with Verilator. The VHDL is simulated through `sim/` (GHDL →
+  Verilog → Verilator).
 - **Test MiSTer:** `192.168.99.92` (root, default ssh key), set in
   `scripts/local.env`. mrext screenshots: `curl -X POST
   http://192.168.99.92:8182/api/screenshots`.
@@ -56,6 +59,9 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
   [docs/disk-images.md](docs/disk-images.md). They are in
   `scratch/images/`, with raw copies on the NAS
   (`Sun-Solaris/SparcStation-Images/`).
+- **GHDL 6.0.0** in `~/.local/opt` (wrapper `~/.local/bin/ghdl`) for `sim/`.
+- **SPARC cross GCC** (`sparc64-linux-gnu-`, Ubuntu packages) and `xsltproc` for
+  `scripts/build-bios.sh`.
 - LLVM 18 (`/usr/lib/llvm-18/bin`) assembles SPARC V8:
   `clang --target=sparc-unknown-elf -mcpu=v8`.
 - iverilog + Verilator 5 for SystemVerilog benches (`rtl/mister/tb/run.sh`).

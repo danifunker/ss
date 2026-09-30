@@ -56,3 +56,6 @@ build*.out
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# OpenBIOS out-of-tree build (scripts/build-bios.sh)
+bios/build/

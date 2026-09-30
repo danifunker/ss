@@ -28,6 +28,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GEN="$ROOT/sim/generated/ss_core_ss$REV.v"
 OBJ="$ROOT/sim/obj_ss$REV"
 [ "$TRACE" = 1 ] && OBJ="${OBJ}_trace"
+# SIM_OBJ=dir builds elsewhere, e.g. while a run still uses the usual model
+[ -n "${SIM_OBJ:-}" ] && OBJ="$ROOT/sim/$SIM_OBJ"
 
 # Regenerate when an RTL file, the file list or the generator is newer.
 stale=0

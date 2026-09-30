@@ -11,6 +11,7 @@
 #            'console login:', log in as root, run a command, check its output
 #
 #   scripts/hwtest.sh 5 cpu netbsd
+#   scripts/hwtest.sh 5 --bios bios/build/boot.rom netbsd   (a new OpenBIOS)
 #
 # The rbf must already be on the MiSTer (deploy.sh --no-launch). Logs go to
 # sim/out/hw-<rev>-<test>.log. One capture at a time: a second reader on
@@ -21,15 +22,18 @@ set -u
 : "${MISTER_HOST:?set MISTER_HOST in scripts/local.env}"
 REV=$(rev_of "${1:-}") || exit 2; shift
 RECORD=0
+BIOS=""
 TESTS=()
-for a in "$@"; do
+while [ $# -gt 0 ]; do
+    a=$1; shift
     case "$a" in
         --record) RECORD=1 ;;
+        --bios) BIOS=$1; shift ;;
         cpu|netbsd|solaris) TESTS+=("$a") ;;
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
-[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] cpu|netbsd|solaris..." >&2; exit 2; }
+[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] cpu|netbsd|solaris..." >&2; exit 2; }
 case "$REV" in
     SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log ;;
     SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log ;;
@@ -87,7 +91,11 @@ for t in "${TESTS[@]}"; do
     netbsd|solaris)
         if [ "$t" = netbsd ]; then img=netbsd11.raw; want='login:'; secs=900
         else img=sol8.img; want='console login:'; secs=1800; fi
-        rsh "cp $G/openbios.rom $G/boot.rom"
+        if [ -n "$BIOS" ]; then
+            scp -q "${SSH_OPTS[@]}" "$BIOS" "$DEV:$G/boot.rom" || exit 1
+        else
+            rsh "cp $G/openbios.rom $G/boot.rom"
+        fi
         scripts/setopt.sh console=serial > /dev/null
         scripts/mount.sh --hd0 "$img" > /dev/null
         cp=$(run_capture "$log" "$secs" "$want")
