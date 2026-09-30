@@ -10,6 +10,7 @@
 #include "t_window.S"
 #include "t_psr.S"
 #include "t_mmu_swift.S"
+#include "t_cache.S"
 #include "t_fpu.S"
 #include "t_chipset.S"
 
