@@ -175,6 +175,9 @@ ARCHITECTURE simple OF fpu IS
   -- The only difference from the live test: an instruction that depends on
   -- a result completing in this very cycle waits one more cycle.
   SIGNAL busy,busy_c : unsigned(0 TO 31);
+  SIGNAL busy_eff_c : unsigned(0 TO 31); -- busy plus the entry pushed last cycle
+  SIGNAL pushed : std_logic;             -- an entry was pushed last cycle
+  SIGNAL push_v_s : std_logic;           -- push_v, for the pushed register
   SIGNAL fs1r,mem_fs1r,fs2r,fd_c : uv64;
   SIGNAL fd_maj_c : uv2;
   SIGNAL do_c : uv32;
@@ -228,7 +231,7 @@ BEGIN
                        fs1r,mem_fs1r,exception,calc_rdy,
                        ld_hilo,st_hilo,dfq_lev_i,dfq_lev_o,
                        fifo_lv,calc_fd,calc_fin,calc_fcc,calc_exc,calc_unf,
-                       fifo,fifo_lev,opls,busy) IS
+                       fifo,fifo_lev,opls,busy,pushed) IS
     VARIABLE deco_v : type_decode;
     VARIABLE fifo_out_v,fifo_in_v : type_fifo;
     VARIABLE fsr_v  : type_fsr;
@@ -440,7 +443,20 @@ BEGIN
     END IF;
     
     ------------------------------------------------------
-    -- Dépendances (busy: see busy_c below)
+    -- Dépendances. busy holds the entries that survived last cycle's pop;
+    -- the entry pushed last cycle, if any, is fifo(0) now: added here from
+    -- registers, so that the map never depends on the push itself (which
+    -- depends on rdy, which the IU's accept depends on: a loop through
+    -- both units, the SS5's worst path at 65 MHz once the rest was cut).
+    busy_eff_c<=busy;
+    IF pushed='1' THEN
+      IF fifo(0).sd='1' THEN
+        busy_eff_c(to_integer(fifo(0).n_fd(4 DOWNTO 1) & '0'))<='1';
+        busy_eff_c(to_integer(fifo(0).n_fd(4 DOWNTO 1) & '1'))<='1';
+      ELSE
+        busy_eff_c(to_integer(fifo(0).n_fd))<='1';
+      END IF;
+    END IF;
     IF i.cat.mode.f='1' AND (i.cat.mode.l='1' OR i.cat.mode.s='1') THEN
       IF fifo_lv='1' AND opls=OP THEN
         o.rdy<='0';
@@ -450,7 +466,7 @@ BEGIN
     IF i.cat.op(31 DOWNTO 30)="11" AND i.cat.op(21)='1' THEN -- STORE FP
       -- Test dépendances STORE [op(21)=1 : Store] après LOAD
       --< AVOIR : EXception pour STDFQ : On ne bloque pas!
-      IF pend(i.cat.op(29 DOWNTO 25),i.cat.op(20),busy) THEN
+      IF pend(i.cat.op(29 DOWNTO 25),i.cat.op(20),busy_eff_c) THEN
         o.rdy<='0';
       END IF;
     END IF;
@@ -466,8 +482,8 @@ BEGIN
         o.rdy<='0';
       END IF;
       
-      IF (deco_v.bin='1' AND pend(fs1_v,deco_v.sdi,busy)) OR
-         pend(fs2_v,deco_v.sdi,busy) THEN
+      IF (deco_v.bin='1' AND pend(fs1_v,deco_v.sdi,busy_eff_c)) OR
+         pend(fs2_v,deco_v.sdi,busy_eff_c) THEN
         o.rdy<='0';
       END IF;
     END IF;
@@ -502,6 +518,7 @@ BEGIN
     fifo_lev_c<=fifo_lev;
     fifo_lv_c<=fifo_lv;
     
+    push_v_s<=push_v;
     IF push_v='1' THEN
       fifo_c<=fifo_in_v & fifo(0 TO FIFO_MAX-2);
     END IF;
@@ -519,16 +536,18 @@ BEGIN
     END IF;
     
     ---------------------------
-    -- Pending-write map for the next cycle: the entries valid after this
-    -- cycle's push and pop (fifo_c(0 TO fifo_lev_c) when fifo_lv_c).
+    -- Pending-write map for the next cycle: the entries that survive this
+    -- cycle's pop (the oldest, fifo(fifo_lev), leaves when pop_v). The
+    -- entry pushed this cycle is not in it: it is fifo(0) next cycle and
+    -- busy_eff_c adds it then (pushed).
     busy_c<=(OTHERS => '0');
     FOR k IN 0 TO FIFO_MAX-1 LOOP
-      IF fifo_lv_c='1' AND k<=fifo_lev_c THEN
-        IF fifo_c(k).sd='1' THEN
-          busy_c(to_integer(fifo_c(k).n_fd(4 DOWNTO 1) & '0'))<='1';
-          busy_c(to_integer(fifo_c(k).n_fd(4 DOWNTO 1) & '1'))<='1';
+      IF fifo_lv='1' AND k<=fifo_lev AND NOT (pop_v='1' AND k=fifo_lev) THEN
+        IF fifo(k).sd='1' THEN
+          busy_c(to_integer(fifo(k).n_fd(4 DOWNTO 1) & '0'))<='1';
+          busy_c(to_integer(fifo(k).n_fd(4 DOWNTO 1) & '1'))<='1';
         ELSE
-          busy_c(to_integer(fifo_c(k).n_fd))<='1';
+          busy_c(to_integer(fifo(k).n_fd))<='1';
         END IF;
       END IF;
     END LOOP;
@@ -557,6 +576,7 @@ BEGIN
       fifo_lev<=fifo_lev_c;
       fifo_lv<=fifo_lv_c;
       busy<=busy_c;
+      pushed<=push_v_s;
       dfq_lev_i<=dfq_lev_i_c;
       dfq_lev_o<=dfq_lev_o_c;
       
@@ -576,6 +596,7 @@ BEGIN
         fifo_lev<=0;
         fifo_lv<='0';
         busy<=(OTHERS => '0');
+        pushed<='0';
         st_hilo<='0';
       ELSE
         calc_flush<='0';
@@ -603,6 +624,7 @@ BEGIN
         fifo_lev<=0;
         fifo_lv<='0';
         busy<=(OTHERS => '0');
+        pushed<='0';
         dfq_lev_i<=0;
         dfq_lev_o<=0;
         wri_cpt<=0;
