@@ -422,10 +422,14 @@ BEGIN
   sd_clk_i<=sd_clk_o;
   
   sd_dat<=std_logic_vector(sd_dat_o) WHEN sd_dat_en='1' ELSE "ZZZZ";
-  sd_dat_i<=unsigned(sd_dat);
-  
   sd_cmd<=sd_cmd_o WHEN sd_cmd_en='1' ELSE 'Z';
-  sd_cmd_i<=sd_cmd;
+  -- Direct SD is gone: the top leaves these pins unconnected, so reading
+  -- them back gave undefined values, and OpenBIOS's SD probe (run at every
+  -- boot, 'INIT SDCARD') hung on some boots and not others. An SD bus with
+  -- no card idles high: no response, so the probe times out ('No MMC, no
+  -- SD, no SDHC').
+  sd_dat_i<="1111";
+  sd_cmd_i<='1';
 
   -- SCSI_CONF
   -- 000 : HD Image
