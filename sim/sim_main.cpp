@@ -84,6 +84,7 @@ struct Ddr {
     int wr_left = 0;
     bool stress = false;          // random waitrequest
     uint64_t log_left = 0;        // --ddr-log: accesses still to print
+    uint64_t log_from = 0;        // --ddr-log-from: first cycle to log
     // The core's own byte address for a DDR word address, and back.
     static uint32_t core_addr(uint32_t a) { return ((a - BASE) ^ (0x1FFu << 17)) << 3; }
     static uint32_t ddr_word(uint32_t core) { return BASE | (((core >> 3) ^ (0x1FFu << 17)) & (WORDS - 1)); }
@@ -123,7 +124,7 @@ struct Ddr {
     void step(Vsim_top *t, uint64_t cyc, bool rd, bool we, uint32_t addr, int bc,
               uint64_t din, uint8_t be, bool busy_was) {
         if (!busy_was) {
-            if (log_left && (we ? wr_left == 0 : rd)) {
+            if (log_left && cyc >= log_from && (we ? wr_left == 0 : rd)) {
                 log_left--;
                 if (we)
                     fprintf(stderr, "[ddr] %" PRIu64 " WR %08x x%d be=%02x d=%016" PRIx64 "\n", cyc,
@@ -374,6 +375,7 @@ static void usage() {
         "                      it into DDR and send only the last word)\n"
         "  --dl-gap N          cycles between download words (default 32)\n"
         "  --ddr-log N         print the first N DDR commands (core addresses)\n"
+        "  --ddr-log-from C    ... starting at cycle C\n"
         "  --rtc 'YYYY-MM-DD hh:mm:ss'   RTC value (default 2026-01-01 00:00:00)\n"
         "  --trace FILE.vcd    waveform (model built with sim/build.sh --trace)\n"
         "  --trace-from N      start the waveform at cycle N\n"
@@ -391,6 +393,7 @@ int main(int argc, char **argv) {
     std::vector<Send> sends;
     uint64_t max_cycles = 200000000ull, trace_from = 0, ddr_log = 0;
     int dl_gap = 32;
+    uint64_t ddr_log_from = 0;
     bool readonly = false, video = false, noautoboot = false, cg3 = false,
          nocache = false, quiet = false, progress = false, stress = false,
          full_download = false;
@@ -424,6 +427,7 @@ int main(int argc, char **argv) {
         else if (a == "--full-download") full_download = true;
         else if (a == "--dl-gap") dl_gap = (int)parse_count(next().c_str());
         else if (a == "--ddr-log") ddr_log = parse_count(next().c_str());
+        else if (a == "--ddr-log-from") ddr_log_from = parse_count(next().c_str());
         else if (a == "--rtc") {
             if (!strptime(next().c_str(), "%Y-%m-%d %H:%M:%S", &rtc_tm)) usage();
         }
@@ -512,6 +516,7 @@ int main(int argc, char **argv) {
     Ddr ddr;
     ddr.stress = stress;
     ddr.log_left = ddr_log;
+    ddr.log_from = ddr_log_from;
     Uart uart((double)SIM_SYSFREQ / 115200.0);
     Video vid;
     std::string console;          // everything printed so far (tail kept)

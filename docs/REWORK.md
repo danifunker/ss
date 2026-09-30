@@ -621,6 +621,7 @@ stages.
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
+| 2026-09-30 | Firmware goal restated (user): compatibility with the official Sun ROMs where possible; where they cannot work (the clock speeds may prevent it), port their missing features into OpenBIOS instead |
 | 2026-09-30 | **If the SS5 cannot close timing at 65 MHz, the core focuses on the SS20 only** (user). The test is Fable's MCU→IU restructuring (`scratch/handoff/fable-ss5-65mhz.md`) |
 | 2026-09-30 | Hardware is the main test bed; the simulation is for short CPU/chipset runs and waveforms |
 
