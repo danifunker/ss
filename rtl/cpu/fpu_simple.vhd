@@ -166,6 +166,15 @@ ARCHITECTURE simple OF fpu IS
   SIGNAL req2 : std_logic;
 
   SIGNAL n_fs1_c,n_fs1,n_fs2_c,n_fs2,n_fd_c : unsigned(5 DOWNTO 0);
+
+  -- Pending writes, one bit per single register (SS5 timing). Set from the
+  -- FIFO's next state (this cycle's push and pop applied), so the
+  -- dependency test of the next instruction is a lookup in a register
+  -- instead of four compares against the FIFO entries gated by the live
+  -- pop (calc_fin, wri, di_maj). A double destination marks both halves.
+  -- The only difference from the live test: an instruction that depends on
+  -- a result completing in this very cycle waits one more cycle.
+  SIGNAL busy,busy_c : unsigned(0 TO 31);
   SIGNAL fs1r,mem_fs1r,fs2r,fd_c : uv64;
   SIGNAL fd_maj_c : uv2;
   SIGNAL do_c : uv32;
@@ -178,6 +187,18 @@ ARCHITECTURE simple OF fpu IS
   BEGIN    
     RETURN fs(4 DOWNTO 1)=pipe.n_fd(4 DOWNTO 1) AND
       (sd='1' OR pipe.sd='1' OR fs(0)=pipe.n_fd(0));
+  END;
+
+  -- Same test as deps() against the pending-write map: the register, and
+  -- its pair when the source is double (busy already holds both halves of
+  -- a double destination).
+  FUNCTION pend(
+    CONSTANT fs   : unsigned(4 DOWNTO 0);
+    CONSTANT sd   : std_logic;
+    CONSTANT busy : unsigned(0 TO 31)) RETURN boolean IS
+  BEGIN
+    RETURN busy(to_integer(fs))='1' OR
+      (sd='1' AND busy(to_integer(fs XOR "00001"))='1');
   END;
 
 BEGIN
@@ -207,14 +228,13 @@ BEGIN
                        fs1r,mem_fs1r,exception,calc_rdy,
                        ld_hilo,st_hilo,dfq_lev_i,dfq_lev_o,
                        fifo_lv,calc_fd,calc_fin,calc_fcc,calc_exc,calc_unf,
-                       fifo,fifo_lev,opls) IS
+                       fifo,fifo_lev,opls,busy) IS
     VARIABLE deco_v : type_decode;
     VARIABLE fifo_out_v,fifo_in_v : type_fifo;
     VARIABLE fsr_v  : type_fsr;
     VARIABLE push_v,pop_v : std_logic;
     VARIABLE push_fq_v,pop_fq_v : std_logic;
     VARIABLE fs1_v,fs2_v : unsigned(4 DOWNTO 0);
-    VARIABLE fifo_l0,fifo_l1,fifo_l2,fifo_l3 : boolean;
   BEGIN
     
     fifo_out_v:=fifo(fifo_lev);
@@ -420,12 +440,7 @@ BEGIN
     END IF;
     
     ------------------------------------------------------
-    -- Dépendances
-    fifo_l0:=fifo_lv='1' AND (fifo_lev>0 OR pop_v='0');
-    fifo_l1:=fifo_lev>0  AND (fifo_lev>1 OR pop_v='0');
-    fifo_l2:=fifo_lev>1  AND (fifo_lev>2 OR pop_v='0');
-    fifo_l3:=fifo_lev>2  AND pop_v='0';
-    
+    -- Dépendances (busy: see busy_c below)
     IF i.cat.mode.f='1' AND (i.cat.mode.l='1' OR i.cat.mode.s='1') THEN
       IF fifo_lv='1' AND opls=OP THEN
         o.rdy<='0';
@@ -435,10 +450,7 @@ BEGIN
     IF i.cat.op(31 DOWNTO 30)="11" AND i.cat.op(21)='1' THEN -- STORE FP
       -- Test dépendances STORE [op(21)=1 : Store] après LOAD
       --< AVOIR : EXception pour STDFQ : On ne bloque pas!
-      IF (deps(i.cat.op(29 DOWNTO 25),i.cat.op(20),fifo(0)) AND fifo_l0) OR
-         (deps(i.cat.op(29 DOWNTO 25),i.cat.op(20),fifo(1)) AND fifo_l1) OR
-         (deps(i.cat.op(29 DOWNTO 25),i.cat.op(20),fifo(2)) AND fifo_l2) OR
-         (deps(i.cat.op(29 DOWNTO 25),i.cat.op(20),fifo(3)) AND fifo_l3) THEN
+      IF pend(i.cat.op(29 DOWNTO 25),i.cat.op(20),busy) THEN
         o.rdy<='0';
       END IF;
     END IF;
@@ -454,15 +466,8 @@ BEGIN
         o.rdy<='0';
       END IF;
       
-      IF (deco_v.bin='1' AND
-          ((deps(fs1_v,deco_v.sdi,fifo(0)) AND fifo_l0) OR
-           (deps(fs1_v,deco_v.sdi,fifo(1)) AND fifo_l1) OR
-           (deps(fs1_v,deco_v.sdi,fifo(2)) AND fifo_l2) OR
-           (deps(fs1_v,deco_v.sdi,fifo(3)) AND fifo_l3))) OR
-         ( (deps(fs2_v,deco_v.sdi,fifo(0)) AND fifo_l0) OR
-           (deps(fs2_v,deco_v.sdi,fifo(1)) AND fifo_l1) OR
-           (deps(fs2_v,deco_v.sdi,fifo(2)) AND fifo_l2) OR
-           (deps(fs2_v,deco_v.sdi,fifo(3)) AND fifo_l3)) THEN
+      IF (deco_v.bin='1' AND pend(fs1_v,deco_v.sdi,busy)) OR
+         pend(fs2_v,deco_v.sdi,busy) THEN
         o.rdy<='0';
       END IF;
     END IF;
@@ -514,6 +519,21 @@ BEGIN
     END IF;
     
     ---------------------------
+    -- Pending-write map for the next cycle: the entries valid after this
+    -- cycle's push and pop (fifo_c(0 TO fifo_lev_c) when fifo_lv_c).
+    busy_c<=(OTHERS => '0');
+    FOR k IN 0 TO FIFO_MAX-1 LOOP
+      IF fifo_lv_c='1' AND k<=fifo_lev_c THEN
+        IF fifo_c(k).sd='1' THEN
+          busy_c(to_integer(fifo_c(k).n_fd(4 DOWNTO 1) & '0'))<='1';
+          busy_c(to_integer(fifo_c(k).n_fd(4 DOWNTO 1) & '1'))<='1';
+        ELSE
+          busy_c(to_integer(fifo_c(k).n_fd))<='1';
+        END IF;
+      END IF;
+    END LOOP;
+
+    ---------------------------
     -- DFQ : La FQ ne contient que des instructions validées.
     IF push_fq_v='1' THEN
       dfq_lev_i_c<=(dfq_lev_i + 1) MOD (DFQ_MAX+1);
@@ -536,6 +556,7 @@ BEGIN
       fifo<=fifo_c;
       fifo_lev<=fifo_lev_c;
       fifo_lv<=fifo_lv_c;
+      busy<=busy_c;
       dfq_lev_i<=dfq_lev_i_c;
       dfq_lev_o<=dfq_lev_o_c;
       
@@ -554,6 +575,7 @@ BEGIN
         flush_pend<='0';
         fifo_lev<=0;
         fifo_lv<='0';
+        busy<=(OTHERS => '0');
         st_hilo<='0';
       ELSE
         calc_flush<='0';
@@ -580,6 +602,7 @@ BEGIN
         exception<='0';
         fifo_lev<=0;
         fifo_lv<='0';
+        busy<=(OTHERS => '0');
         dfq_lev_i<=0;
         dfq_lev_o<=0;
         wri_cpt<=0;
