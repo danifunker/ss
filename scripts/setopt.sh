@@ -8,7 +8,7 @@
 #
 #   disks=hd0|hd0+hd1        O[1]
 #   cdrom=off|2048|512       O[5:4]
-#   aspect=4:3|16:9|arc1|arc2 O[7:6]
+#   aspect=4:3|full|arc1|arc2 O[7:6]
 #   autoboot=on|off          O[8]
 #   console=video|serial     O[9]    OpenBIOS console ("Boot" in the OSD)
 #   video=tcx|cg3            O[10]
@@ -31,7 +31,7 @@ import sys
 F = {
     "disks":    (1, 1, {"hd0": 0, "hd0+hd1": 1}),
     "cdrom":    (4, 2, {"off": 0, "2048": 1, "512": 2}),
-    "aspect":   (6, 2, {"4:3": 0, "16:9": 1, "arc1": 2, "arc2": 3}),
+    "aspect":   (6, 2, {"4:3": 0, "full": 1, "arc1": 2, "arc2": 3}),
     "autoboot": (8, 1, {"on": 0, "off": 1}),
     "console":  (9, 1, {"video": 0, "serial": 1}),
     "video":    (10, 1, {"tcx": 0, "cg3": 1}),

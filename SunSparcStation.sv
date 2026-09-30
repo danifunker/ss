@@ -80,7 +80,7 @@ localparam CONF_STR = {
     "SC1,VHDIMGHDARAW,HD2;" ,
     "O45,CDROM,OFF,2048,512;" ,
     "SC2,ISO,CDROM;" ,
-    "O6,Aspect ratio,4:3,16:9,[ARC1],[ARC2];" ,
+    "O67,Aspect ratio,4:3,Full Screen,[ARC1],[ARC2];" ,
     "O8,AutoBoot,ON,OFF;" ,
     "O9,Boot,Video,Serial;" ,
     "OA,Video,TCX,CG3;" ,
