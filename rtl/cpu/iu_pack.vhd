@@ -2393,8 +2393,9 @@ PACKAGE BODY iu_pack IS
           -- FP_DISABLED/FP_EXCEPTION -> IU
             
           WHEN "111" => -- CBccc : Coprocessor Conditional Branch
+            -- No coprocessor (PSR.EC=0): cp_disabled, like CPop1/CPop2
+            -- (SPARC V8 B.23).
             trap_o:=TT_CP_DISABLED;
-            trap_o:=TT_ILLEGAL_INSTRUCTION;
             
           WHEN OTHERS =>
             NULL;
