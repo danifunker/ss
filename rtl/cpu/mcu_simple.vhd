@@ -279,6 +279,28 @@ ARCHITECTURE simple OF mcu IS
   SIGNAL icache_t_mem : arr_uv32(0 TO WAY_ICACHE-1);
   SIGNAL icache_tmux  : arr_uv32(0 TO WAY_DCACHE-1);
   SIGNAL icache_blo_c : std_logic;
+
+  -- I-cache hit vector, registered. The word mux, the FSM and so the IU
+  -- only ever see this register, never the live tag compare, which ends
+  -- here. (At 65 MHz the critical path was tag RAM -> compare -> word ->
+  -- IU decode -> fetch enables.) A cacheable access to a line other than
+  -- ihit_va waits one cycle while its compare is registered; the accesses
+  -- that follow on the same line go through at once. Virtual tags: the
+  -- vector is valid for the line until a tag write or a context change.
+  SIGNAL ihit_reg  : unsigned(0 TO WAY_ICACHE-1);  -- hit per way
+  SIGNAL ihit_va   : unsigned(31 DOWNTO NB_LINE+2); -- line of ihit_reg
+  SIGNAL ihit_ok   : std_logic;                     -- ihit_reg is valid
+  SIGNAL ihit_live_c : unsigned(0 TO WAY_ICACHE-1); -- the live compare
+  SIGNAL ihit_load_c : std_logic;                   -- register it now
+  SIGNAL ihit_kill_c : std_logic;                   -- tags or context change
+  SIGNAL idiag2,idiag2_c : std_logic;   -- 2nd cycle of an ASI tag read
+
+  -- No LRU-history update on cache reads (mcu_pack's LF_* stay the SS20's).
+  -- That update stalled every hit on a non-MRU way (na_v=0) and put the
+  -- tag compare on the ack path. Replacement: an invalid way first, else
+  -- the least recently filled one.
+  CONSTANT LF_ICACHE_S : type_rcache_mode := N;
+  CONSTANT LF_DCACHE_S : type_rcache_mode := N;
   SIGNAL icache_t_wr : uv0_3;
   SIGNAL icache_cpt : natural RANGE 0 TO WAY_ICACHE-1;  -- Cpt. aléatoire
  
@@ -419,9 +441,12 @@ BEGIN
   TagRAMBi:IF NB_DCACHE-NB_LINE<=10 AND NB_DCACHE=NB_ICACHE AND
               WAY_ICACHE=WAY_DCACHE GENERATE
     Gen_IDCacheT2: FOR i IN 0 TO WAY_ICACHE-1 GENERATE
+      -- VAR=1: the tags in MLABs, so that the tag compare starts from a
+      -- flip-flop output rather than a block RAM's late output (timing).
       i_cache_tag: ENTITY work.iram_bi
         GENERIC MAP (
           N   => NB_DCACHE - NB_LINE,
+          VAR => 1,
           OCT => false)
         PORT MAP (
           mem1_w   => dcache_t_w(i),
@@ -586,7 +611,7 @@ BEGIN
       hist_v(i*2+1 DOWNTO i*2):=dcache_tmux(i)(3 DOWNTO 2);
     END LOOP;
     
-    rmaj_v:=lru_rmaj(hist_v,nohit_v,LF_DCACHE,WAY_DCACHE);
+    rmaj_v:=lru_rmaj(hist_v,nohit_v,LF_DCACHE_S,WAY_DCACHE);
 
     -- Si pas de hit, sélection de la ligne à évincer
     nofill_v:=tag_selfill(dcache_tmux,hist_v);
@@ -1350,7 +1375,9 @@ BEGIN
                     itlb,itlb_hitv,itlb_hit,inst_cont,
                     inst_jat,itlb_mem,imux2_cx,imux3_cx,
                     inst_ext_rdy,tw_pte,ext_dr,ext_dreq_inst,
-                    tw_err,tw_done_inst,cross_req_c,cross) IS
+                    tw_err,tw_done_inst,cross_req_c,cross,
+                    ihit_reg,ihit_va,ihit_ok,idiag2,icache_t_mem,
+                    mmu_ctxr_maj,mmu_cr_maj) IS
     -- MMU
     VARIABLE us_v,ls_v : std_logic;         -- User/Super Load/Store
     VARIABLE c_v,m_v,s_v : std_logic;       -- Cachable Modified Super
@@ -1376,7 +1403,8 @@ BEGIN
     VARIABLE iout_v : type_push;
     VARIABLE na_v,write_v,readlru_v,write_tag_v,inval_v : std_logic;
     VARIABLE hist_v : uv8;
-    
+    VARIABLE isame_v : std_logic;       -- access is on the line of ihit_reg
+
   BEGIN
     -------------------------------------------------------------
     -- Recherche dans les TLBs pendant que les adresses sont positionnées
@@ -1441,9 +1469,9 @@ BEGIN
     inst_at_c<=ls_v & '1' & us_v;       -- FSR.AccessType
 
     -------------------------------------------------------------------------
-    -- Test hit & inval cache (§2)
-    cache_tag_v:=x"0000_0000";
-    cache_d_v  :=x"0000_0000";
+    -- Test hit & inval cache (§2). The live compare only goes to the
+    -- ihit_reg register; everything below works from that register, which
+    -- is meaningful when the access is on its line (isame_v).
     FOR i IN 0 TO WAY_ICACHE-1 LOOP
       IF IPTAG THEN
         ptag_test(vcache_hit_v(i),vcache_inv_v(i),vcache_flu_v(i),
@@ -1453,12 +1481,24 @@ BEGIN
                   icache_t_dr(i),imux2_w.a,mmu_ctxr,imux2_w.asi,
                   NB_ICACHE,NB_CONTEXT,MMU_DIS);
       END IF;
+    END LOOP;
+    ihit_live_c<=vcache_hit_v;
+    IF ihit_ok='1' AND imux2_w.a(31 DOWNTO NB_LINE+2)=ihit_va THEN
+      isame_v:='1';
+    ELSE
+      isame_v:='0';
+    END IF;
+    vcache_hit_v:=ihit_reg;
+
+    cache_tag_v:=x"0000_0000";
+    cache_d_v  :=x"0000_0000";
+    FOR i IN 0 TO WAY_ICACHE-1 LOOP
       IF vcache_hit_v(i)='1' THEN
         cache_tag_v:=cache_tag_v OR icache_t_dr(i);
         cache_d_v  :=cache_d_v   OR icache_d_dr(i);
       END IF;
     END LOOP;
-    
+
     cache_hit_v:=v_or(vcache_hit_v); -- Si HIT sur une des voies
     nohit_v:=ff1(vcache_hit_v);      -- Numéro de la voie HIT
     icache_blo_c<='0';
@@ -1467,7 +1507,7 @@ BEGIN
       hist_v(i*2+1 DOWNTO i*2):=icache_tmux(i)(3 DOWNTO 2);
     END LOOP;
     
-    rmaj_v:=lru_rmaj(hist_v,nohit_v,LF_ICACHE,WAY_ICACHE);
+    rmaj_v:=lru_rmaj(hist_v,nohit_v,LF_ICACHE_S,WAY_ICACHE);
     
     -- Si pas de hit, sélection de la ligne à évincer
     nofill_v:=tag_selfill(icache_tmux,hist_v);
@@ -1504,6 +1544,8 @@ BEGIN
     itlb_sel_c<='0';
     itlb_twm_c<='0';
     itlb_inval_c<='0';
+    ihit_load_c<='0';
+    idiag2_c<='0';
     
     write_v:='0';
     readlru_v:='0';
@@ -1626,6 +1668,17 @@ BEGIN
                 ---------------------------------
               ELSIF (mmu_cr_e='1' OR MMU_DIS) AND tlb_hitv_v='1' AND
                 ft_v=FT_NONE AND
+                c_v='1' AND mmu_cr_ice='1' AND isame_v='0' THEN
+                -- Cacheable access to a line other than ihit_va: register
+                -- the tag compare now and decide next cycle from ihit_reg
+                -- (the access stays in imux2, na_v=0). The arms below rely
+                -- on cache_hit_v, which is only valid with isame_v.
+                ihit_load_c<='1';
+                inst_txt<="TAG_LATCH";
+
+                ---------------------------------
+              ELSIF (mmu_cr_e='1' OR MMU_DIS) AND tlb_hitv_v='1' AND
+                ft_v=FT_NONE AND
                 c_v='1' AND mmu_cr_ice='1' AND cache_hit_v='1' AND ls_v='0' THEN
                 -- Lecture en cache. Simplement.
                 iout_v.d:=cache_d_v;
@@ -1708,20 +1761,28 @@ BEGIN
             WHEN ASI_CACHE_TAG_INSTRUCTION =>
               IF ASICACHE THEN
                 -- Cet ASI est généré via la passerelle DATA -> INST
-                iout_v.d:=icache_t_dr(0);
+                -- The tag is returned from icache_t_mem (registered at the
+                -- end of the first cycle): a read takes two cycles, so the
+                -- tag RAM output never reaches the IU directly.
+                iout_v.d:=icache_t_mem(0);
                 -- <AFAIRE> Sélection voie selon addresse...
                 iout_v.code:=PB_OK;
                 iout_v.cx:=imux2_cx;
-                ireq_v:='1';
                 IF ls_v='1' THEN
                   -- Ecriture TAG
+                  ireq_v:='1';
                   write_tag_v:='1';
                   inst_clr_c<='1';
                   inst_txt<="ITAG_ECRI";
+                ELSIF idiag2='0' THEN
+                  -- Lecture TAG, first cycle
+                  idiag2_c<='1';
+                  inst_txt<="ITAG_LEC1";
                 ELSE
                   -- Lecture TAG
+                  ireq_v:='1';
                   na_v:='1';
-                  inst_txt<="ITAG_LECT";                
+                  inst_txt<="ITAG_LECT";
                 END IF;
               ELSE
                 iout_v.code:=PB_OK;
@@ -1924,9 +1985,14 @@ BEGIN
       icache_t_a <=imux_w.a(NB_ICACHE-1 DOWNTO 2+NB_LINE);
       icache_t_dw<=tags_v;
       icache_t_wr<="0000";
-      
+
     END IF;
-    
+
+    -- The registered hit vector is stale after any tag write (fill, inval,
+    -- LRU or tag update) or when the context or the MMU mode changes.
+    ihit_kill_c<=ext_ifill OR inval_v OR write_v OR readlru_v OR write_tag_v
+                 OR mmu_ctxr_maj OR mmu_cr_maj;
+
   END PROCESS Comb_Inst;
 
   inst_r<=inst_r_c;
@@ -2041,10 +2107,21 @@ BEGIN
       END IF;
       
       filling_i2<=filling_i;
-      inst_dr<=inst_dr_c;      
+      inst_dr<=inst_dr_c;
       IF icache_blo_c='1' THEN
         icache_t_mem<=icache_t_dr;
       END IF;
+
+      -------------------------------------------
+      -- Registered I-cache hit vector (see ihit_reg)
+      IF ihit_kill_c='1' THEN
+        ihit_ok<='0';
+      ELSIF ihit_load_c='1' THEN
+        ihit_reg<=ihit_live_c;
+        ihit_va<=imux2_w.a(31 DOWNTO NB_LINE+2);
+        ihit_ok<='1';
+      END IF;
+      idiag2<=idiag2_c;
 
       -------------------------------------------
       -- Machine à états
@@ -2063,7 +2140,9 @@ BEGIN
         itlb_twm<='0';
         cross<='0';
         itlb_hist<=x"00";
-      END IF;  
+        ihit_ok<='0';
+        idiag2<='0';
+      END IF;
     END IF;
   END PROCESS Sync_Inst;
 
