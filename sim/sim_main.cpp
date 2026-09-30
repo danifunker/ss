@@ -125,8 +125,11 @@ struct Ddr {
         if (!busy_was) {
             if (log_left && (we ? wr_left == 0 : rd)) {
                 log_left--;
-                fprintf(stderr, "[ddr] %" PRIu64 " %s %08x x%d\n", cyc, we ? "WR" : "RD",
-                        core_addr(addr), bc);
+                if (we)
+                    fprintf(stderr, "[ddr] %" PRIu64 " WR %08x x%d be=%02x d=%016" PRIx64 "\n", cyc,
+                            core_addr(addr), bc, be, din);
+                else
+                    fprintf(stderr, "[ddr] %" PRIu64 " RD %08x x%d\n", cyc, core_addr(addr), bc);
             }
             if (we) {
                 if (wr_left == 0) { wr_addr = addr; wr_left = bc ? bc : 1; }
@@ -369,6 +372,7 @@ static void usage() {
         "  --ddr-stress        random DDR waitrequest\n"
         "  --full-download     send the whole ROM through ioctl (slow; default: preload\n"
         "                      it into DDR and send only the last word)\n"
+        "  --dl-gap N          cycles between download words (default 32)\n"
         "  --ddr-log N         print the first N DDR commands (core addresses)\n"
         "  --rtc 'YYYY-MM-DD hh:mm:ss'   RTC value (default 2026-01-01 00:00:00)\n"
         "  --trace FILE.vcd    waveform (model built with sim/build.sh --trace)\n"
@@ -386,6 +390,7 @@ int main(int argc, char **argv) {
     struct Send { std::string pat, text; bool done; };
     std::vector<Send> sends;
     uint64_t max_cycles = 200000000ull, trace_from = 0, ddr_log = 0;
+    int dl_gap = 32;
     bool readonly = false, video = false, noautoboot = false, cg3 = false,
          nocache = false, quiet = false, progress = false, stress = false,
          full_download = false;
@@ -417,6 +422,7 @@ int main(int argc, char **argv) {
         else if (a == "--frame") frame_path = next();
         else if (a == "--ddr-stress") stress = true;
         else if (a == "--full-download") full_download = true;
+        else if (a == "--dl-gap") dl_gap = (int)parse_count(next().c_str());
         else if (a == "--ddr-log") ddr_log = parse_count(next().c_str());
         else if (a == "--rtc") {
             if (!strptime(next().c_str(), "%Y-%m-%d %H:%M:%S", &rtc_tm)) usage();
@@ -566,7 +572,10 @@ int main(int argc, char **argv) {
         switch (dl_phase) {
         case 0:                       // reset, then start the download
             if (cyc == 16) t->reset = 0;
-            if (cyc == 64) { t->ioctl_download = 1; dl_phase = 1; }
+            // hps_io raises ioctl_download well before the first word; the
+            // loader needs a few cycles to enter its download state.
+            if (cyc == 64) t->ioctl_download = 1;
+            if (cyc == 80) dl_phase = 1;
             break;
         case 1:                       // 16-bit words, spaced as hps_io would
             if (dl_sub == 0 && !iowait) {
@@ -583,10 +592,10 @@ int main(int argc, char **argv) {
                 dl_sub = 1;
             } else if (dl_sub > 0) {
                 t->ioctl_wr = 0;
-                // ss_core holds ioctl_wait for one cycle only, not until its
-                // DDR write completes; hps_io's pace is what keeps a word
-                // from overwriting the previous one. 32 cycles is safe here.
-                if (++dl_sub == 32) dl_sub = 0;
+                // Cycles from one word to the next (--dl-gap). Main does not
+                // wait on ioctl_wait inside a block, so this also tests how
+                // much DDR stall the loader tolerates.
+                if (++dl_sub >= dl_gap) dl_sub = 0;
             }
             break;
         case 2:                       // mount the images, as Main does after the ROM
