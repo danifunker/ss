@@ -327,7 +327,8 @@ BEGIN
   -- IOMMU
   i_ts_iommu: ENTITY work.ts_iommu
     GENERIC MAP (
-      IOMMU_VER => IOMMU_VER)
+      IOMMU_VER => IOMMU_VER,
+      SS20      => SS20)
     PORT MAP (
       sel      => sel.iommu,
       w        => io_w,

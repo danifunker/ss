@@ -62,7 +62,8 @@ USE work.ts_pack.ALL;
 
 ENTITY ts_iommu IS
   GENERIC (
-    IOMMU_VER : uv8);
+    IOMMU_VER : uv8;
+    SS20      : boolean := false);
   PORT (
     sel  : IN  std_logic;
     w    : IN  type_pvc_w;
@@ -189,7 +190,13 @@ BEGIN
           de<=w.dw(1);
           rag<=w.dw(4 DOWNTO 2);
         END IF;
-        dr<=IOMMU_VER & ZERO(23 DOWNTO 5) & rag & de & me;
+        IF SS20 THEN
+          dr<=IOMMU_VER & ZERO(23 DOWNTO 5) & rag & de & me;
+        ELSE
+          -- microSPARC-II: DE (bit 1) and bits 23:5 are not implemented
+          -- and read 0 [MS2 5.7.1]; the SS5 POST checks it (IOM-3)
+          dr<=IOMMU_VER & ZERO(23 DOWNTO 5) & rag & '0' & me;
+        END IF;
       END IF;
 
       -- 0004 : IOMMU Base Address Register
@@ -197,7 +204,12 @@ BEGIN
         IF w.be="1111" AND w.wr='1' THEN
           iba<=w.dw(31 DOWNTO 10);
         END IF;
-        dr<=iba & ZERO(9 DOWNTO 0);
+        IF SS20 THEN
+          dr<=iba & ZERO(9 DOWNTO 0);
+        ELSE
+          -- microSPARC-II: IBA[30:14] in bits 26:10; 31:27 read 0 (IOM-3)
+          dr<="00000" & iba(30 DOWNTO 14) & ZERO(9 DOWNTO 0);
+        END IF;
       END IF;
 
       flush<='0';
