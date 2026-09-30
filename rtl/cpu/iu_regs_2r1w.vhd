@@ -41,6 +41,16 @@ ARCHITECTURE beh OF iu_regs_2r1w IS
   SHARED VARIABLE mem1 : arr_uv32(0 TO NREGS-1) :=(OTHERS => x"00000000");
   SHARED VARIABLE mem2 : arr_uv32(0 TO NREGS-1) :=(OTHERS => x"00000000");
 
+  -- MLABs (SS5 timing): the read data is an ordinary register after an
+  -- asynchronous lookup, instead of a block RAM's late output (about
+  -- 2.5 ns after the edge on a Cyclone V M10K) in front of the bypass
+  -- muxes, the ALU and, for JMPL, the next fetch address. 136 x 32 bits
+  -- per port. A read of the word being written is covered by the
+  -- pipeline's own bypass (BYPASS_WRI), as it was with the block RAM.
+  ATTRIBUTE ramstyle : string;
+  ATTRIBUTE ramstyle OF mem1 : VARIABLE IS "MLAB, no_rw_check";
+  ATTRIBUTE ramstyle OF mem2 : VARIABLE IS "MLAB, no_rw_check";
+
   SIGNAL rs1_direct,rs2_direct : std_logic;
   SIGNAL rs1_i,rs2_i : uv32;
   SIGNAL rd_mem : uv32;
