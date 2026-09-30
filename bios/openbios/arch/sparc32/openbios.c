@@ -1703,7 +1703,10 @@ arch_init( void )
     printk("INIT VIDEO\n");
     init_video();
     printk("INIT SDCARD\n");
-    init_sdcard(0);
+    /* The MiSTer core has no Direct SD any more (disks come through the
+       HPS): with no card on the lines, the probe only ran out its timeouts. */
+    if (((*aux_reg & 0xFF0000)>>16) != HWCONF_MiSTer)
+        init_sdcard(0);
     if (((*aux_reg & 0xFF0000)>>16)==HWCONF_C5G && (*aux_reg & 2)) {
         // C5G : Double SDcard option
         init_sdcard(1);

@@ -653,6 +653,11 @@ ob_esp_init(unsigned int slot, uint64_t base, unsigned long espoffset,
             add_alias(nodebuff, esp->sd[id].media_str[0]);
             add_alias(nodebuff, esp->sd[id].media_str[1]);
         }
+        /* On a Sun, "disk" is the boot disk at target 3, whatever else is
+           attached: without this, a disk at target 1 took the alias. */
+        if (id == 3 && esp->sd[id].media != TYPE_ROM) {
+            add_alias(nodebuff, esp->sd[id].media_str[0]);
+        }
         snprintf(aliasbuff, sizeof(aliasbuff), "%s%d",
                  esp->sd[id].media_str[0], *counter_ptr);
         add_alias(nodebuff, aliasbuff);
