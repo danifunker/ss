@@ -236,7 +236,8 @@ BEGIN
       
       -- 1C : E_BASE_ADDR : DMA2 Ethernet. Base Address Ethernet
       IF sel_dma2='1' AND w.req='1' AND w.a(5 DOWNTO 2)="00111" THEN
-        IF w.be(3)='1' AND w.wr='1' THEN
+        -- The byte at offset 0 (D31:24): its byte enable is be(0) (DMA-2)
+        IF w.be(0)='1' AND w.wr='1' THEN
           dma_eth_ba_i<=w.dw(31 DOWNTO 24);
         END IF;
         dr<=dma_eth_ba_i & x"000000";
@@ -324,6 +325,13 @@ BEGIN
       
       -------------------------------------------------------------
       IF reset_n='0' THEN
+        -- All D_CSR bits default to 0 on an SBus reset [DMA2] (DMA-1);
+        -- E_BASE_ADDR defaults to 0xFF (DMA-2): Solaris never writes it.
+        dma_esp_iena_i<='0';
+        dma_esp_reset_i<='0';
+        dma_esp_write_i<='0';
+        dma_esp_endma_i<='0';
+        dma_eth_ba_i<=x"FF";
         dma_eth_reset_i<='0';
         dma_eth_iena_i<='0';
         led_i<='0';

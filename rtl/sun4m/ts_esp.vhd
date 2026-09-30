@@ -645,6 +645,24 @@ BEGIN
         scsi_atn<='0';
         scsi_bsy<='0';
         cmd<=CMD_NOP;
+        -- An SBus reset resets the whole ESP [DMA2 D_RESET]: without this
+        -- a reset in mid-transfer left the FSM waiting for a target and a
+        -- stale level-4 interrupt pending (ESP-1).
+        state<=sIDLE;
+        state_pre<=sIDLE;
+        int_rst<='0';
+        int_disc<='0';
+        int_sr<='0';
+        int_so<='0';
+        inter<='0';
+        scsi_reset<='0';
+        scsi_ena<='0';
+        istate<="000";
+        dma_mode<='0';
+        reg_cr1<=x"00";
+        reg_cr2<=x"00";
+        reg_cr3<=x"00";
+        dest_id<="000";
       END IF;
     END IF;
   END PROCESS Sync;

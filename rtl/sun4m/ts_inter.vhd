@@ -311,6 +311,7 @@ BEGIN
         softint2<="000000000000000";
         softint3<="000000000000000";
         mask<=x"7FFFFFFF";
+        itr<="00";  -- ITR = 0 after reset [Slavio Table 6-21] (INT-1)
       END IF;
     END IF;    
   END PROCESS Interrupteur;
