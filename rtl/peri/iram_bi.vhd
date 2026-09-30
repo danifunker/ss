@@ -25,7 +25,6 @@ USE work.plomb_pack.ALL;
 ENTITY iram_bi IS
   GENERIC (
     N    : uint8   :=10;                -- 2^N octets
-    VAR  : uint8   :=0;                 -- Variante d'instanciation (iram)
     OCT  : boolean :=true;              -- Accès par octets
     INIT : string  :="void.sr");        -- Fichier d'initialisation
   PORT (

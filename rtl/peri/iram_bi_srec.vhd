@@ -42,18 +42,18 @@ BEGIN
   iram1:iram
     GENERIC MAP (
       N   => N,
-      VAR => VAR,
+      VAR => 0,
       OCT => OCT,
       INIT=> INIT)
    PORT MAP (
      mem_w    => mem1_w,
      mem_r    => mem1_r,
      clk      => clk);
-
+    
   iram2:iram
     GENERIC MAP (
       N   => N,
-      VAR => VAR,
+      VAR => 0,
       OCT => OCT,
       INIT=> INIT)
    PORT MAP (

@@ -57,6 +57,7 @@ set_global_assignment -name VHDL_FILE rtl/cpu/iu_regs_2r1w.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu/mcu.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu/smpmux.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu/mcu_pack.vhd
+set_global_assignment -name VHDL_FILE rtl/cpu/mcu_tagram.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu/mcu_tw.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu/mcu_simple.vhd
 set_global_assignment -name VHDL_FILE rtl/cpu/asi_pack.vhd

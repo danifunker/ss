@@ -441,18 +441,21 @@ BEGIN
   TagRAMBi:IF NB_DCACHE-NB_LINE<=10 AND NB_DCACHE=NB_ICACHE AND
               WAY_ICACHE=WAY_DCACHE GENERATE
     Gen_IDCacheT2: FOR i IN 0 TO WAY_ICACHE-1 GENERATE
-      -- VAR=1: the tags in MLABs, so that the tag compare starts from a
-      -- flip-flop output rather than a block RAM's late output (timing).
-      i_cache_tag: ENTITY work.iram_bi
+      -- The tags in MLABs (mcu_tagram), so that a tag compare starts from
+      -- a flip-flop output rather than a block RAM's late output (timing).
+      i_dcache_tag: ENTITY work.mcu_tagram
         GENERIC MAP (
-          N   => NB_DCACHE - NB_LINE,
-          VAR => 1,
-          OCT => false)
+          N => NB_DCACHE - NB_LINE)
         PORT MAP (
-          mem1_w   => dcache_t_w(i),
-          mem1_r   => dcache_t_r(i),
-          mem2_w   => icache_t_w(i),
-          mem2_r   => icache_t_r(i),
+          mem_w    => dcache_t_w(i),
+          mem_r    => dcache_t_r(i),
+          clk      => clk);
+      i_icache_tag: ENTITY work.mcu_tagram
+        GENERIC MAP (
+          N => NB_ICACHE - NB_LINE)
+        PORT MAP (
+          mem_w    => icache_t_w(i),
+          mem_r    => icache_t_r(i),
           clk      => clk);
     END GENERATE Gen_IDCacheT2;
   END GENERATE TagRAMBi;
