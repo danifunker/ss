@@ -368,8 +368,6 @@ BEGIN
     VARIABLE mce_falling   : std_logic;
 
     VARIABLE v_buf_finished : boolean;
-    VARIABLE v_wr_addr, v_wr_bytes : boolean;  -- DMAPVA / DMAPVC written
-    VARIABLE v_abort        : boolean;         -- abort flush this cycle
 
     VARIABLE pipeline_empty : std_logic;
     VARIABLE pi_next        : std_logic;
@@ -454,9 +452,6 @@ BEGIN
         new_dma_csr := dma_csr;
         v_buf_finished := false;
         v_dma_error := dma_error;
-        v_wr_addr   := false;
-        v_wr_bytes  := false;
-        v_abort     := false;
 
         --------------------------------------------------------------------
         -- 1. CS4231 Init State Machine
@@ -699,12 +694,12 @@ BEGIN
             ------------------------------------------------------------------
             WHEN 12 =>
               IF w.be = "1111" THEN
-                v_wr_addr := true;      -- applied after the DMA step (7b)
+                next_addr := w.dw;
               END IF;
 
             WHEN 13 =>
               IF w.be = "1111" THEN
-                v_wr_bytes := true;     -- applied after the DMA step (7b)
+                next_bytes := unsigned(w.dw);
               END IF;
 
             WHEN 14 =>
@@ -743,7 +738,6 @@ BEGIN
           dma_pnc        <= (OTHERS => '0');
           fifo_reset_req <= '1';
           fifo_wr_ptr    <= (OTHERS => '0');
-          v_abort        := true;
         END IF;
 
         --------------------------------------------------------------------
@@ -876,23 +870,6 @@ BEGIN
           WHEN DMA_PROCESS =>
             dma_state <= DMA_IDLE;
         END CASE;
-
-        --------------------------------------------------------------------
-        -- 7b. DMAPVA / DMAPVC writes, applied after the DMA step (timing).
-        -- Decoded from the bus, they fed the byte-lane select, the adders
-        -- and the sample FIFO data of a step in the same cycle: 17 ns from
-        -- the MCU's bus address register, the SS5's worst path once the
-        -- cache tags were off the critical path at 65 MHz. The step above
-        -- works from the registered address and count, which is where its
-        -- data was fetched from anyway; the written value replaces the
-        -- advanced one. An abort flush in the same cycle keeps its zero.
-        --------------------------------------------------------------------
-        IF v_wr_addr THEN
-          next_addr := w.dw;
-        END IF;
-        IF v_wr_bytes AND NOT v_abort THEN
-          next_bytes := unsigned(w.dw);
-        END IF;
 
         --------------------------------------------------------------------
         -- 8. Pipe Empty / Drained Status (PM/PD)
