@@ -700,6 +700,28 @@ stages.
   subtree), built with Ubuntu's sparc64 GCC (`scripts/build-bios.sh`), with
   our first changes. Fable started task 2 (65 MHz). Open: the two-disk hang.
   Hand-off: [RESUME-20260930.md](../RESUME-20260930.md).
+- **2026-09-30, Fable timing session (SS5 at 65 MHz), merged as
+  `danifunker` = `ss5-timing` at `36f07d3`.** Seed-5 setup slack on the
+  core clock: **-0.993 ns** (TNS -49) from -2.345 (TNS -304) at the start of
+  the session and -3.5 before the task; hold +0.25; 21,575 ALMs. SS20 at
+  50 MHz: +4.68 ns. Changes: the I-cache hit vector registered, tags in
+  MLABs (`mcu_simple`, `mcu_tagram`); the IU's load-use test on the raw
+  fields; the FPU register file in MLABs; the FPU's dependency test from a
+  registered pending-write map; the FPU decodes the raw instruction word
+  (the pipeline-advance chain off its rdy); fpu_calc's stage 1 in two adder
+  levels (exhaustively checked against the old chain); and, with the user's
+  leave, the CS4231 DMAPVA/DMAPVC write path (`ts_cs4231a`). The SS5 suite
+  is 39/39 (t_cache added, SS5 only) and the SS20 35/35 in simulation, cycle
+  counts unchanged by the FPU/IU changes (15,732,403 / 16,270,280). What is
+  left, -1.0 to -0.6 ns: the in-order pipeline's advance chain (D-cache hit
+  → data ready → as_wri/as_mem/as_exe → next PC and fetch enables), the
+  JMPL adder, the I-side FSM into the same registers, and the CS4231 sample
+  FIFO from the DDR bridge's FIFO state (-0.76). The likely next step is a
+  registered D-cache hit vector (as on the I side), which costs a cycle per
+  D-line change: a performance trade for the user to decide. Reports and
+  scripts: `scratch/handoff/ss5-timing-36f07d3/`, `scratch/handoff/sta-*.tcl`,
+  `group-paths.py`. The hardware baseline `ss5-core-hw.log` still has 38
+  tests: to be re-recorded from the board with t_cache.
 - **2026-09-30, session 2.** GHDL 6.0.0 installed; Stage 1 simulation
   (`sim/`) built and matched to the board. SS20 built and run (CPU suite
   27/30 with a park for CPUs 1-2; OpenBIOS up, disk boot fails). ESCC TX fix:
