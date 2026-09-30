@@ -47,3 +47,9 @@ __pycache__/
 scripts/local.env*
 !scripts/local.env.sample
 build_*.log
+
+# Verilator simulation (sim/): generated Verilog, models, run output
+sim/generated/
+sim/obj_*/
+sim/out/
+build*.out

@@ -24,7 +24,8 @@ ENTITY ss_core IS
     NCPUS     : natural := 1; --2;     -- 1..4. SS20 if >=2
     FPU_MULTI : natural := 0; --false = Separate FPUs | true = Shared
     TCX_ACCEL : natural := 1;  -- false = Disable | true = Accelerator
-    TRACE     : natural := 1 -- false = No trace blocks 
+    TRACE     : natural := 1; -- false = No trace blocks
+    SIMU      : natural := 0  -- 1 = simulation: skip the DRAM clear (sim/)
     );
   PORT (
     -- Master input clock
@@ -936,6 +937,11 @@ BEGIN
             state<=sDOWNLOAD;
           ELSIF unsigned(ioctl_addr) >= 131072 OR reboot_pending='1' THEN
             state<=sCLR;
+            IF SIMU=1 THEN
+              -- Clearing 512 MB one word at a time takes hours in a
+              -- simulator; the simulated DDR starts out zeroed instead.
+              state<=sRUN;
+            END IF;
             reboot_pending<='0';
           END IF;
           

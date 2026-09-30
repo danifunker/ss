@@ -1,0 +1,673 @@
+// sim_main.cpp - Verilator harness for the whole machine (sim_top.sv).
+//
+// It plays the MiSTer side: the DDR3 behind ddram_arb, hps_io's ROM
+// download and SD-block service for the disk images, the RTC, and a
+// terminal on ttya. The run ends when the console prints a --stop string
+// (exit 0), a --fail string (exit 1), or after --cycles (exit 2).
+//
+//   Vsim_top --rom tests/cpu/out/ss5/cputest.rom --stop "PASS" --cycles 50M
+//   Vsim_top --rom boot.rom --hd0 netbsd.img --send "ok =>boot disk\r"
+//
+// Cycle accounting: one cycle is one clk_sys period; with the PLL stub every
+// clock in the machine is this clock. Rates such as the UART bit time are
+// derived from SIM_SYSFREQ, the SYSFREQ the model was generated with.
+
+#include "Vsim_top.h"
+#include "verilated.h"
+#if VM_TRACE
+#include "verilated_vcd_c.h"
+#endif
+
+#include <sys/mman.h>
+#include <sys/time.h>
+#include <cinttypes>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <deque>
+#include <string>
+#include <vector>
+
+#ifndef SIM_SYSFREQ
+#define SIM_SYSFREQ 65000000
+#endif
+
+static double now_s() {
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return tv.tv_sec + tv.tv_usec * 1e-6;
+}
+
+static uint64_t parse_count(const char *s) {
+    char *end;
+    double v = strtod(s, &end);
+    if (*end == 'k' || *end == 'K') v *= 1e3;
+    else if (*end == 'M') v *= 1e6;
+    else if (*end == 'G') v *= 1e9;
+    return (uint64_t)v;
+}
+
+// "\r", "\n", "\t", "\\", "\xHH" in command-line strings.
+static std::string unescape(const std::string &s) {
+    std::string o;
+    for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] != '\\' || i + 1 == s.size()) { o += s[i]; continue; }
+        char c = s[++i];
+        if (c == 'r') o += '\r';
+        else if (c == 'n') o += '\n';
+        else if (c == 't') o += '\t';
+        else if (c == 'x' && i + 2 < s.size() + 1) {
+            o += (char)strtol(s.substr(i + 1, 2).c_str(), nullptr, 16);
+            i += 2;
+        } else o += c;
+    }
+    return o;
+}
+
+// ---------------------------------------------------------------------------
+// DDR3: 512 MB of 64-bit words, zeroed (the SIMU core skips its own clear).
+// ss_core puts its memory in the MiSTer's FPGA window, byte addresses
+// 0x2000_0000-0x3FFF_FFFF: word-address bits 28:26 are "001" (and 25:17 are
+// inverted, which is invisible here).
+// Reads are pipelined (up to DDR_QUEUE bursts outstanding, first beat after
+// DDR_LAT cycles); write bursts take one beat per cycle.
+struct Ddr {
+    static const uint64_t WORDS = 64ull << 20;   // 512 MB
+    static const int DDR_LAT = 8;
+    static const size_t DDR_QUEUE = 8;
+    uint64_t *mem;
+    struct Rd { uint32_t addr; int count; uint64_t start; };
+    std::deque<Rd> rq;
+    uint32_t wr_addr = 0;
+    int wr_left = 0;
+    bool stress = false;          // random waitrequest
+    uint64_t log_left = 0;        // --ddr-log: accesses still to print
+    // The core's own byte address for a DDR word address, and back.
+    static uint32_t core_addr(uint32_t a) { return ((a - BASE) ^ (0x1FFu << 17)) << 3; }
+    static uint32_t ddr_word(uint32_t core) { return BASE | (((core >> 3) ^ (0x1FFu << 17)) & (WORDS - 1)); }
+    // Store bytes where ss_core's loader would put them: file byte k of each
+    // 8 lands in DDR lane k (the loader's lane choice and ss_core's byte
+    // reversal cancel out).
+    void backdoor(uint32_t core, const uint8_t *p, size_t n) {
+        for (size_t i = 0; i < n; i += 8) {
+            uint64_t w = 0;
+            for (int k = 0; k < 8 && i + k < n; k++) w |= (uint64_t)p[i + k] << (8 * k);
+            at(ddr_word(core + i)) = w;
+        }
+    }
+    uint32_t lfsr = 0xACE1u;
+    uint64_t oob = 0;
+
+    Ddr() {
+        mem = (uint64_t *)mmap(nullptr, WORDS * 8, PROT_READ | PROT_WRITE,
+                               MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+        if (mem == MAP_FAILED) { perror("mmap"); exit(3); }
+    }
+    static const uint32_t BASE = 0x04000000;     // word address of 0x2000_0000
+    uint64_t &at(uint32_t a) {
+        a -= BASE;
+        if (a >= WORDS) {
+            if (oob++ < 4) fprintf(stderr, "[sim] DDR word address %08x outside the FPGA window\n", a + BASE);
+            static uint64_t dummy;
+            dummy = 0;
+            return dummy;
+        }
+        return mem[a];
+    }
+    bool rnd() { lfsr = (lfsr >> 1) ^ (-(lfsr & 1u) & 0xB400u); return lfsr & 1; }
+
+    // Called after the rising edge with the outputs the core showed before it
+    // and the busy it was given; drives the inputs for the next cycle.
+    void step(Vsim_top *t, uint64_t cyc, bool rd, bool we, uint32_t addr, int bc,
+              uint64_t din, uint8_t be, bool busy_was) {
+        if (!busy_was) {
+            if (log_left && (we ? wr_left == 0 : rd)) {
+                log_left--;
+                fprintf(stderr, "[ddr] %" PRIu64 " %s %08x x%d\n", cyc, we ? "WR" : "RD",
+                        core_addr(addr), bc);
+            }
+            if (we) {
+                if (wr_left == 0) { wr_addr = addr; wr_left = bc ? bc : 1; }
+                uint64_t &w = at(wr_addr);
+                for (int i = 0; i < 8; i++)
+                    if (be & (1 << i)) w = (w & ~(0xFFull << (8 * i))) | (din & (0xFFull << (8 * i)));
+                wr_addr++;
+                wr_left--;
+            } else if (rd) {
+                rq.push_back({addr, bc ? bc : 1, cyc + DDR_LAT});
+            }
+        }
+        t->ddr_dout_ready = 0;
+        if (!rq.empty() && rq.front().start <= cyc) {
+            Rd &r = rq.front();
+            t->ddr_dout = at(r.addr);
+            t->ddr_dout_ready = 1;
+            r.addr++;
+            if (--r.count == 0) rq.pop_front();
+        }
+        t->ddr_busy = (rq.size() >= DDR_QUEUE) || (stress && rnd() && rnd());
+    }
+};
+
+// ---------------------------------------------------------------------------
+// hps_io SD-block service for one image. The core raises sd_rd/sd_wr with
+// sd_lba; we raise sd_ack for the length of the transfer (the core drops its
+// request when it sees ack) and move 256 16-bit words through the buffer
+// port, low byte first, at hps_io's pace.
+struct Disk {
+    FILE *f = nullptr;
+    std::string path;
+    uint64_t size = 0;
+    bool ro = false;
+    uint64_t reads = 0, writes = 0;
+    bool open(const std::string &p, bool readonly) {
+        path = p;
+        ro = readonly;
+        f = fopen(p.c_str(), readonly ? "rb" : "r+b");
+        if (!f) { perror(p.c_str()); return false; }
+        fseeko(f, 0, SEEK_END);
+        size = ftello(f);
+        return true;
+    }
+};
+
+struct SdHost {
+    enum { IDLE, DELAY, RD_WORD, WR_WORD, END } st = IDLE;
+    int slot = -1, word = 0, sub = 0, wait = 0;
+    bool is_write = false;
+    uint32_t lba = 0;
+    uint8_t buf[512];
+    Disk *disks[3] = {nullptr, nullptr, nullptr};
+
+    void step(Vsim_top *t, uint8_t sd_rd, uint8_t sd_wr, const uint32_t lbas[3],
+              uint16_t din[3]) {
+        t->sd_buff_wr = 0;
+        switch (st) {
+        case IDLE:
+            for (int n = 0; n < 3; n++) {
+                if (!((sd_rd | sd_wr) & (1 << n))) continue;
+                slot = n;
+                is_write = sd_wr & (1 << n);
+                lba = lbas[n];
+                memset(buf, 0, sizeof buf);
+                Disk *d = disks[n];
+                if (!is_write && d && d->f && (uint64_t)lba * 512 < d->size) {
+                    fseeko(d->f, (off_t)lba * 512, SEEK_SET);
+                    if (fread(buf, 1, 512, d->f) == 0) {}
+                    d->reads++;
+                }
+                st = DELAY;
+                wait = 40;     // Main's poll and SD latency, shortened
+                break;
+            }
+            break;
+        case DELAY:
+            if (--wait > 0) break;
+            t->sd_ack = 1 << slot;
+            t->sd_buff_addr = 0;
+            word = 0;
+            sub = 0;
+            st = is_write ? WR_WORD : RD_WORD;
+            break;
+        case RD_WORD:
+            // addr and data, then the write strobe, then the next address
+            if (sub == 0) {
+                t->sd_buff_addr = word;
+                t->sd_buff_dout = buf[2 * word] | (buf[2 * word + 1] << 8);
+            } else if (sub == 1) {
+                t->sd_buff_wr = 1;
+            }
+            if (++sub == 4) {
+                sub = 0;
+                if (++word == 256) { st = END; wait = 4; }
+            }
+            break;
+        case WR_WORD:
+            if (sub == 0) t->sd_buff_addr = word;
+            else if (sub == 3) {
+                buf[2 * word] = din[slot] & 0xFF;
+                buf[2 * word + 1] = din[slot] >> 8;
+            }
+            if (++sub == 4) {
+                sub = 0;
+                if (++word == 256) {
+                    Disk *d = disks[slot];
+                    if (d && d->f && !d->ro && (uint64_t)lba * 512 < d->size) {
+                        fseeko(d->f, (off_t)lba * 512, SEEK_SET);
+                        fwrite(buf, 1, 512, d->f);
+                        d->writes++;
+                    }
+                    st = END;
+                    wait = 4;
+                }
+            }
+            break;
+        case END:
+            if (--wait > 0) break;
+            t->sd_ack = 0;
+            st = IDLE;
+            break;
+        }
+    }
+};
+
+// ---------------------------------------------------------------------------
+// ttya at 115200 8N1: decode the core's TX line, and type into its RX line.
+struct Uart {
+    double bit;                    // cycles per bit
+    // receiver (core -> us)
+    int rx_state = -1;             // -1 idle, else bit index
+    double rx_next = 0;
+    int rx_byte = 0;
+    int last_txd = 0;              // wait for the line to go idle first
+    // transmitter (us -> core)
+    std::deque<uint8_t> tx_q;
+    int tx_bit = -1;
+    double tx_next = 0;
+    uint8_t tx_byte = 0;
+    int rxd = 1;
+
+    explicit Uart(double cyc_per_bit) : bit(cyc_per_bit) {}
+
+    // Returns a received character, or -1.
+    int step_rx(uint64_t cyc, int txd) {
+        int out = -1;
+        if (rx_state < 0) {
+            if (last_txd && !txd) { rx_state = 0; rx_next = cyc + bit * 1.5; rx_byte = 0; }
+        } else if (cyc >= rx_next) {
+            if (rx_state < 8) {
+                rx_byte |= txd << rx_state;
+                rx_state++;
+                rx_next += bit;
+            } else {
+                out = rx_byte;       // stop bit position; framing not checked
+                rx_state = -1;
+            }
+        }
+        last_txd = txd;
+        return out;
+    }
+    void step_tx(uint64_t cyc) {
+        if (tx_bit < 0) {
+            if (tx_q.empty() || cyc < tx_next) return;
+            tx_byte = tx_q.front();
+            tx_q.pop_front();
+            tx_bit = 0;
+            rxd = 0;                 // start bit
+            tx_next = cyc + bit;
+        } else if (cyc >= tx_next) {
+            if (tx_bit < 8) { rxd = (tx_byte >> tx_bit) & 1; tx_bit++; }
+            else if (tx_bit == 8) { rxd = 1; tx_bit++; }            // stop bit
+            else { tx_bit = -1; tx_next = cyc + bit * 2; return; }  // idle gap
+            tx_next += bit;
+        }
+    }
+};
+
+// ---------------------------------------------------------------------------
+// The last complete video frame, for --frame.
+struct Video {
+    std::vector<uint32_t> cur, last;
+    int x = 0, y = 0, w = 0, h = 0, lw = 0, lh = 0;
+    int last_de = 0, last_vs = 0;
+    uint64_t frames = 0;
+    void step(int r, int g, int b, int de, int vs) {
+        if (vs && !last_vs) {
+            if (y > 0 && w > 0) { last = cur; lw = w; lh = y; frames++; }
+            y = 0;
+            x = 0;
+        }
+        if (de) {
+            if (x == 0 && (int)cur.size() < (y + 1) * 2048) cur.resize((y + 1) * 2048);
+            if (x < 2048) cur[y * 2048 + x] = (r << 16) | (g << 8) | b;
+            x++;
+        } else if (last_de) {
+            if (x > w) w = x;
+            y++;
+            x = 0;
+        }
+        last_de = de;
+        last_vs = vs;
+    }
+    bool save(const char *path) {
+        if (!lw || !lh) return false;
+        FILE *f = fopen(path, "wb");
+        if (!f) return false;
+        fprintf(f, "P6\n%d %d\n255\n", lw, lh);
+        for (int yy = 0; yy < lh; yy++)
+            for (int xx = 0; xx < lw; xx++) {
+                uint32_t p = last[yy * 2048 + xx];
+                uint8_t c[3] = {(uint8_t)(p >> 16), (uint8_t)(p >> 8), (uint8_t)p};
+                fwrite(c, 1, 3, f);
+            }
+        fclose(f);
+        return true;
+    }
+};
+
+static volatile sig_atomic_t g_stop = 0;
+static void on_signal(int) { g_stop = 1; }
+
+static void usage() {
+    fprintf(stderr,
+        "usage: Vsim_top --rom FILE [options]\n"
+        "  --rom FILE          boot PROM image (downloaded as boot.rom, index 0)\n"
+        "  --hd0 FILE, --hd1 FILE, --cd FILE   SCSI images (--hd1 selects HD0+HD1)\n"
+        "  --ro                open the disk images read-only\n"
+        "  --cycles N          stop after N cycles (k/M/G suffixes; default 200M)\n"
+        "  --stop STR          end the run, exit 0, at the end of the line that prints STR\n"
+        "  --fail STR          end the run, exit 1, at the end of the line that prints STR\n"
+        "  --send PAT=>TEXT    type TEXT on ttya once PAT has been printed (\\r etc.)\n"
+        "  --log FILE          copy of the console output\n"
+        "  --video             console on the screen (default: ttya)\n"
+        "  --noautoboot        OSD AutoBoot OFF\n"
+        "  --cg3               CG3 instead of TCX\n"
+        "  --nocache           OSD Cachena OFF\n"
+        "  --frame FILE.ppm    save the last complete video frame at the end\n"
+        "  --ddr-stress        random DDR waitrequest\n"
+        "  --full-download     send the whole ROM through ioctl (slow; default: preload\n"
+        "                      it into DDR and send only the last word)\n"
+        "  --ddr-log N         print the first N DDR commands (core addresses)\n"
+        "  --rtc 'YYYY-MM-DD hh:mm:ss'   RTC value (default 2026-01-01 00:00:00)\n"
+        "  --trace FILE.vcd    waveform (model built with sim/build.sh --trace)\n"
+        "  --trace-from N      start the waveform at cycle N\n"
+        "  --quiet             do not echo the console to stdout\n"
+        "  --progress          report speed every 10M cycles on stderr\n");
+    exit(3);
+}
+
+static uint8_t bcd(int v) { return (uint8_t)(((v / 10) << 4) | (v % 10)); }
+
+int main(int argc, char **argv) {
+    std::string rom, hd[3], log_path, frame_path, trace_path;
+    std::vector<std::string> stops, fails;
+    struct Send { std::string pat, text; bool done; };
+    std::vector<Send> sends;
+    uint64_t max_cycles = 200000000ull, trace_from = 0, ddr_log = 0;
+    bool readonly = false, video = false, noautoboot = false, cg3 = false,
+         nocache = false, quiet = false, progress = false, stress = false,
+         full_download = false;
+    struct tm rtc_tm = {};
+    rtc_tm.tm_year = 126; rtc_tm.tm_mon = 0; rtc_tm.tm_mday = 1;
+
+    for (int i = 1; i < argc; i++) {
+        std::string a = argv[i];
+        auto next = [&]() -> std::string { if (i + 1 >= argc) usage(); return argv[++i]; };
+        if (a == "--rom") rom = next();
+        else if (a == "--hd0") hd[0] = next();
+        else if (a == "--hd1") hd[1] = next();
+        else if (a == "--cd") hd[2] = next();
+        else if (a == "--ro") readonly = true;
+        else if (a == "--cycles") max_cycles = parse_count(next().c_str());
+        else if (a == "--stop") stops.push_back(unescape(next()));
+        else if (a == "--fail") fails.push_back(unescape(next()));
+        else if (a == "--send") {
+            std::string s = next();
+            size_t p = s.find("=>");
+            if (p == std::string::npos) usage();
+            sends.push_back({unescape(s.substr(0, p)), unescape(s.substr(p + 2)), false});
+        }
+        else if (a == "--log") log_path = next();
+        else if (a == "--video") video = true;
+        else if (a == "--noautoboot") noautoboot = true;
+        else if (a == "--cg3") cg3 = true;
+        else if (a == "--nocache") nocache = true;
+        else if (a == "--frame") frame_path = next();
+        else if (a == "--ddr-stress") stress = true;
+        else if (a == "--full-download") full_download = true;
+        else if (a == "--ddr-log") ddr_log = parse_count(next().c_str());
+        else if (a == "--rtc") {
+            if (!strptime(next().c_str(), "%Y-%m-%d %H:%M:%S", &rtc_tm)) usage();
+        }
+        else if (a == "--trace") trace_path = next();
+        else if (a == "--trace-from") trace_from = parse_count(next().c_str());
+        else if (a == "--quiet") quiet = true;
+        else if (a == "--progress") progress = true;
+        else usage();
+    }
+    if (rom.empty()) usage();
+
+    std::vector<uint8_t> romdata;
+    {
+        FILE *f = fopen(rom.c_str(), "rb");
+        if (!f) { perror(rom.c_str()); return 3; }
+        uint8_t b[65536];
+        size_t n;
+        while ((n = fread(b, 1, sizeof b, f)) > 0) romdata.insert(romdata.end(), b, b + n);
+        fclose(f);
+        if (romdata.size() & 1) romdata.push_back(0xFF);
+        if (romdata.size() < 131072) {
+            // The loader only starts the machine after at least 128 KB.
+            romdata.resize(131072, 0xFF);
+        }
+    }
+
+    Disk disks[3];
+    SdHost sd;
+    for (int n = 0; n < 3; n++) {
+        if (hd[n].empty()) continue;
+        if (!disks[n].open(hd[n], readonly || n == 2)) return 3;
+        sd.disks[n] = &disks[n];
+    }
+
+    FILE *logf = nullptr;
+    if (!log_path.empty() && !(logf = fopen(log_path.c_str(), "w"))) { perror(log_path.c_str()); return 3; }
+
+    signal(SIGINT, on_signal);
+    signal(SIGTERM, on_signal);
+
+    VerilatedContext *ctx = new VerilatedContext;
+    ctx->commandArgs(argc, argv);
+    Vsim_top *t = new Vsim_top{ctx};
+
+#if VM_TRACE
+    VerilatedVcdC *tfp = nullptr;
+    if (!trace_path.empty()) ctx->traceEverOn(true);
+#else
+    if (!trace_path.empty()) { fprintf(stderr, "this model was built without --trace\n"); return 3; }
+#endif
+
+    // Options and fixed inputs
+    t->opt_disks2 = !hd[1].empty();
+    t->opt_cdrom = hd[2].empty() ? 0 : 1;
+    t->opt_noautoboot = noautoboot;
+    t->opt_serial = !video;
+    t->opt_cg3 = cg3;
+    t->opt_nocache = nocache;
+    t->opt_l2tlb = 0;
+    t->opt_wb = 0;
+    t->opt_aow = 0;
+    t->opt_iommu = 0;
+    t->uart_rxd = 1;
+    t->ddr_busy = 0;
+    t->ddr_dout_ready = 0;
+    t->ioctl_download = 0;
+    t->ioctl_wr = 0;
+    t->ioctl_index = 0;
+    t->ioctl_addr = 0;
+    t->img_mounted = 0;
+    t->sd_ack = 0;
+    t->sd_buff_wr = 0;
+    {
+        // MiSTer RTC: BCD sec, min, hour, date, month, year, weekday; bit 64
+        // toggles on each update.
+        mktime(&rtc_tm);
+        uint64_t v = (uint64_t)bcd(rtc_tm.tm_sec) | ((uint64_t)bcd(rtc_tm.tm_min) << 8) |
+                     ((uint64_t)bcd(rtc_tm.tm_hour) << 16) | ((uint64_t)bcd(rtc_tm.tm_mday) << 24) |
+                     ((uint64_t)bcd(rtc_tm.tm_mon + 1) << 32) | ((uint64_t)bcd(rtc_tm.tm_year % 100) << 40) |
+                     ((uint64_t)bcd(rtc_tm.tm_wday + 1) << 48);
+        t->rtc[0] = (uint32_t)v;
+        t->rtc[1] = (uint32_t)(v >> 32);
+        t->rtc[2] = 1;
+    }
+
+    Ddr ddr;
+    ddr.stress = stress;
+    ddr.log_left = ddr_log;
+    Uart uart((double)SIM_SYSFREQ / 115200.0);
+    Video vid;
+    std::string console;          // everything printed so far (tail kept)
+    size_t send_from = 0;         // --send patterns match after this offset
+    int result = 2, end_result = -1;
+    const char *why = "cycle limit";
+
+    // ROM download. The loader starts the machine when a download ends with
+    // ioctl_addr >= 128 KB. Unless --full-download, the image is preloaded at
+    // OBRAM (0x1D00_0000) and only its last word goes through ioctl; the
+    // whole download, paced at 32 cycles a word, costs millions of cycles.
+    const uint32_t OBRAM = 0x1D000000;
+    size_t dl_pos = 0;
+    if (!full_download) {
+        ddr.backdoor(OBRAM, romdata.data(), romdata.size());
+        dl_pos = romdata.size() - 2;
+    }
+    int dl_phase = 0;             // 0 reset, 1 download, 2 mount, 3 run
+    int dl_sub = 0;
+    uint64_t phase_at = 0;
+    int mount_slot = 0;
+
+    double t0 = now_s(), tp = t0;
+    uint64_t cyc = 0, pcyc = 0;
+    t->reset = 1;
+    t->clk = 0;
+    t->eval();
+
+    for (; cyc < max_cycles && !g_stop; cyc++) {
+        // Sample what the core shows before this rising edge.
+        bool rd = t->ddr_rd, we = t->ddr_we, busy = t->ddr_busy;
+        uint32_t addr = t->ddr_addr;
+        int bc = t->ddr_burstcnt;
+        uint64_t din = t->ddr_din;
+        uint8_t be = t->ddr_be;
+        uint8_t sd_rd = t->sd_rd, sd_wr = t->sd_wr;
+        uint32_t lbas[3] = {t->sd_lba0, t->sd_lba1, t->sd_lba2};
+        uint16_t sdin[3] = {t->sd_buff_din0, t->sd_buff_din1, t->sd_buff_din2};
+        int txd = t->uart_txd;
+        bool iowait = t->ioctl_wait;
+
+        t->clk = 1;
+        t->eval();
+#if VM_TRACE
+        if (!trace_path.empty() && !tfp && cyc >= trace_from) {
+            tfp = new VerilatedVcdC;
+            t->trace(tfp, 99);
+            tfp->open(trace_path.c_str());
+        }
+        if (tfp) tfp->dump(cyc * 2 + 1);
+#endif
+
+        // Models, driving the inputs for the next cycle.
+        ddr.step(t, cyc, rd, we, addr, bc, din, be, busy);
+        sd.step(t, sd_rd, sd_wr, lbas, sdin);
+        vid.step(t->vga_r, t->vga_g, t->vga_b, t->vga_de, t->vga_vs);
+
+        switch (dl_phase) {
+        case 0:                       // reset, then start the download
+            if (cyc == 16) t->reset = 0;
+            if (cyc == 64) { t->ioctl_download = 1; dl_phase = 1; }
+            break;
+        case 1:                       // 16-bit words, spaced as hps_io would
+            if (dl_sub == 0 && !iowait) {
+                if (dl_pos >= romdata.size()) {
+                    t->ioctl_download = 0;   // ioctl_addr keeps the last address
+                    dl_phase = 2;
+                    phase_at = cyc;
+                    break;
+                }
+                t->ioctl_addr = dl_pos;
+                t->ioctl_dout = romdata[dl_pos] | (romdata[dl_pos + 1] << 8);
+                t->ioctl_wr = 1;
+                dl_pos += 2;
+                dl_sub = 1;
+            } else if (dl_sub > 0) {
+                t->ioctl_wr = 0;
+                // ss_core holds ioctl_wait for one cycle only, not until its
+                // DDR write completes; hps_io's pace is what keeps a word
+                // from overwriting the previous one. 32 cycles is safe here.
+                if (++dl_sub == 32) dl_sub = 0;
+            }
+            break;
+        case 2:                       // mount the images, as Main does after the ROM
+            t->img_mounted = 0;
+            if (cyc < phase_at + 32) break;
+            phase_at = cyc;
+            while (mount_slot < 3 && !sd.disks[mount_slot]) mount_slot++;
+            if (mount_slot == 3) { dl_phase = 3; break; }
+            t->img_size = disks[mount_slot].size;
+            t->img_readonly = disks[mount_slot].ro;
+            t->img_mounted = 1 << mount_slot;
+            mount_slot++;
+            break;
+        }
+
+        int ch = uart.step_rx(cyc, txd);
+        uart.step_tx(cyc);
+        t->uart_rxd = uart.rxd;
+        if (ch >= 0) {
+            if (!quiet) { fputc(ch, stdout); fflush(stdout); }
+            if (logf) { fputc(ch, logf); fflush(logf); }
+            console += (char)ch;
+            // A stop or fail string ends the run at the end of its line, so
+            // the log keeps the whole line.
+            for (auto &s : stops)
+                if (end_result < 0 && console.size() >= s.size() &&
+                    console.compare(console.size() - s.size(), s.size(), s) == 0) {
+                    end_result = 0; why = "stop string";
+                }
+            for (auto &s : fails)
+                if (end_result < 0 && console.size() >= s.size() &&
+                    console.compare(console.size() - s.size(), s.size(), s) == 0) {
+                    end_result = 1; why = "fail string";
+                }
+            if (end_result >= 0 && (ch == '\n' || ch == '\r')) { result = end_result; g_stop = 1; }
+            for (auto &s : sends) {
+                if (s.done) continue;
+                size_t p = console.find(s.pat, send_from);
+                if (p != std::string::npos) {
+                    for (char c : s.text) uart.tx_q.push_back((uint8_t)c);
+                    s.done = true;
+                    send_from = p + s.pat.size();
+                }
+                break;               // in order: one pending send at a time
+            }
+        }
+
+        t->clk = 0;
+        t->eval();
+#if VM_TRACE
+        if (tfp) tfp->dump(cyc * 2 + 2);
+#endif
+
+        if (progress && cyc - pcyc >= 10000000ull) {
+            double tn = now_s();
+            fprintf(stderr, "[sim] %" PRIu64 "M cycles, %.0f kHz\n", cyc / 1000000,
+                    (cyc - pcyc) / (tn - tp) / 1e3);
+            tp = tn;
+            pcyc = cyc;
+        }
+    }
+
+    double el = now_s() - t0;
+    if (end_result >= 0 && result == 2) result = end_result;   // line never ended
+    else if (g_stop && result == 2) why = "interrupted";
+    fprintf(stderr, "\n[sim] %s after %" PRIu64 " cycles (%.3f s of machine time), "
+            "%.1f s, %.0f kHz; disk reads %" PRIu64 ", writes %" PRIu64 ", frames %" PRIu64 "\n",
+            why, cyc, cyc / (double)SIM_SYSFREQ, el, cyc / el / 1e3,
+            disks[0].reads + disks[1].reads + disks[2].reads,
+            disks[0].writes + disks[1].writes, vid.frames);
+    if (ddr.oob) fprintf(stderr, "[sim] %" PRIu64 " DDR accesses outside the FPGA window\n", ddr.oob);
+    if (!frame_path.empty() && !vid.save(frame_path.c_str()))
+        fprintf(stderr, "[sim] no complete video frame to save\n");
+
+#if VM_TRACE
+    if (tfp) tfp->close();
+#endif
+    if (logf) fclose(logf);
+    for (auto &d : disks) if (d.f) fclose(d.f);
+    t->final();
+    delete t;
+    delete ctx;
+    return result;
+}
