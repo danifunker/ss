@@ -72,15 +72,27 @@ ARCHITECTURE rtl OF ts_sunkb IS
   CONSTANT MAX : natural := 1_000; --<_000;  -- Délai 20ms
   SIGNAL cpt : natural RANGE 0 TO MAX;
   
+  -- Commands from the host, queued. A Sun keyboard is full duplex: it takes
+  -- a command while it is still sending a reply. Taking commands only when
+  -- idle made the ESCC hold the byte, so RR1 All Sent stayed 0 while the
+  -- keyboard waited for the host to read its reply: the Sun OBP, which
+  -- polls All Sent after each command (kbd_putc_boot), deadlocked. A
+  -- command arriving in sREC or sLAYOUT2 was also dropped.
+  TYPE arr_cmd IS ARRAY(0 TO 3) OF uv8;
+  SIGNAL cmdq : arr_cmd;
+  SIGNAL cmdq_n : natural RANGE 0 TO 4;
+  
 BEGIN
 
   Machine: PROCESS (clk)
+    VARIABLE pop : boolean;
+    VARIABLE n : natural RANGE 0 TO 4;
   BEGIN
     IF rising_edge(clk) THEN
       kb_rdy<='0';
       si_req<='0';
-      so_rdy<='1';
       ledsm<='0';
+      pop:=false;
       
       CASE etat IS
           --------------------------------------
@@ -90,15 +102,15 @@ BEGIN
           IF kb_req='1' THEN
             etat<=sREC;
             si_req<='1';
-          ELSIF so_req='1' THEN
-            IF so_data=CMD_RESET THEN
+          ELSIF cmdq_n>0 THEN
+            pop:=true;
+            IF cmdq(0)=CMD_RESET THEN
               etat<=sRESET;
-            ELSIF so_data=CMD_LED THEN
+            ELSIF cmdq(0)=CMD_LED THEN
               etat<=sLED;
-            ELSIF so_data=CMD_LAYOUT THEN
+            ELSIF cmdq(0)=CMD_LAYOUT THEN
               etat<=sLAYOUT;
             END IF;
-            so_rdy<='0';
           END IF;
           
           --------------------------------------
@@ -123,7 +135,6 @@ BEGIN
           ELSE
             si_req<='1';
           END IF;
-          so_rdy<='0';
           IF si_rdy='1'  THEN
             etat<=sRESET2;
             si_req<='0';
@@ -137,7 +148,6 @@ BEGIN
           ELSE
             si_req<='1';
           END IF;
-          so_rdy<='0';
           IF si_rdy='1' THEN
             etat<=sRESET3;
             si_req<='0';
@@ -151,7 +161,6 @@ BEGIN
           ELSE
             si_req<='1';
           END IF;
-          so_rdy<='0';
           IF si_rdy='1' THEN
             etat<=sOISIF;
             si_req<='0';
@@ -162,10 +171,10 @@ BEGIN
         WHEN sLED =>
           si_data<=layout;
           si_req<='0';
-          IF so_req='1' THEN
-            so_rdy<='0';
+          IF cmdq_n>0 THEN
+            pop:=true;
             etat<=sOISIF;
-            leds<=so_data(3 DOWNTO 0);
+            leds<=cmdq(0)(3 DOWNTO 0);
             ledsm<='1';
           END IF;
           
@@ -177,7 +186,6 @@ BEGIN
           ELSE
             si_req<='1';
           END IF;
-          so_rdy<='0';
           IF si_rdy='1'  THEN
             etat<=sLAYOUT2;
             si_req<='0';
@@ -200,8 +208,28 @@ BEGIN
           --------------------------------------
       END CASE;
       
+      -- Command queue: pop what the machine took, push what the ESCC sends
+      n:=cmdq_n;
+      IF pop THEN
+        cmdq(0 TO 2)<=cmdq(1 TO 3);
+        n:=n-1;
+      END IF;
+      IF so_req='1' AND n<4 THEN
+        cmdq(n)<=so_data;
+        n:=n+1;
+      END IF;
+      cmdq_n<=n;
+      -- Ready while there is room, with a slot of margin for a request
+      -- already on its way
+      IF n<3 THEN
+        so_rdy<='1';
+      ELSE
+        so_rdy<='0';
+      END IF;
+      
       IF reset_n='0' THEN
         etat<=sOISIF;
+        cmdq_n<=0;
       END IF;
 
     END IF;
