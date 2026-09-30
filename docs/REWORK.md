@@ -502,13 +502,13 @@ stages.
   IU decode and stall logic (`Comb_DECODE`, `na_c`), ending at the enables of
   `inst_w_mem.a` (fanout 31). About 16 ns of logic in one cycle, MCU to IU.
   Seeds on identical RTL: 3 → -3.52 ns, 5 → -2.42 ns, 7 → -3.01 ns.
-  **It fails on the board once warm.** After an hour of NetBSD, OpenBIOS
-  stopped at a different point on each boot, and the CPU suite stopped at a
-  different test on each run and seed; the better seed got further. The SS20
-  (50 MHz, timing met) passes on the same warm board. Closing 65 MHz needs
-  that path restructured, which is CPU work: the prompt is
-  `scratch/handoff/fable-ss5-65mhz.md`. Until then, SS5 builds used for
-  validation run at 50 MHz (not committed).
+  No functional failure has been observed at 65 MHz: the CPU suite passes
+  (28/4, 4 runs, 2 seeds, warm board). Two apparent failures were other
+  bugs: a stale CPU-suite ROM on the MiSTer (its rett test crashes the
+  core), and OpenBIOS's SD probe reading the unconnected Direct SD pins,
+  which hung boots at random (fixed: the inputs idle high). The negative
+  slack still has to go before a release. That path is CPU work: the
+  prompt is `scratch/handoff/fable-ss5-65mhz.md`.
 - **Stage 1, simulation:** see [sim/README.md](../sim/README.md). It found
   that the loader's download writes are not latched (glue G7): words are lost
   whenever the DDR stalls.
