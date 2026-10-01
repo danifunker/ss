@@ -127,23 +127,101 @@ halt:   ba halt
         nop
 
 #if defined(TARGET_SS20)
-/* CPU n (1-3, in %l0) parks here: forever, it copies the MSI MID register
+/* CPU n (1-3, in %l0) parks here. Forever, it copies the MSI MID register
  * into MP_MID + 4n and increments MP_COUNT + 4n, uncached (MMU off, caches
- * off), so every iteration is MBus traffic. t_msi.S watches it. */
+ * off), so every iteration is MBus traffic (t_msi.S watches it), and it
+ * polls its mailbox MP_CMD + 0x10n: a non-zero FN word is a function to
+ * call with ARG0/ARG1 in %o0/%o1; its %o0 goes to RES and FN is cleared
+ * last. The function runs in boot mode with the MMU off, PSR.ET = 0 and
+ * no stack: leaf code, any register but %g7, a trap is error mode. It may
+ * turn its own MMU and caches on (mmu_on/mmu_off in mmu_setup.S). The
+ * loop recomputes its pointers from the CPU number every iteration, so
+ * the function may clobber them. */
 mp_park:
-        sll %l0, 2, %l0
+1:      lda [%g0] 4, %l0                /* MCNTL bits 3:2: the CPU number */
+        srl %l0, 2, %l0
+        and %l0, 3, %l0
+        sll %l0, 2, %l0                 /* 4n */
         set MP_MID, %l1
         add %l1, %l0, %l1
         set MP_COUNT, %l2
         add %l2, %l0, %l2
         set MSI_MID_PA, %l3
-1:      lda [%l3] 0x2f, %l4
+        lda [%l3] 0x2f, %l4
         sta %l4, [%l1] 0x20
         lda [%l2] 0x20, %l4
         add %l4, 1, %l4
         sta %l4, [%l2] 0x20
+        sll %l0, 2, %l5                 /* 16n */
+        set MP_CMD, %l6
+        add %l6, %l5, %l6
+        lda [%l6] 0x20, %l7             /* FN */
+        tst %l7
+        be 1b
+        nop
+        add %l6, MP_CMD_ARG0, %l1
+        lda [%l1] 0x20, %o0
+        add %l6, MP_CMD_ARG1, %l1
+        lda [%l1] 0x20, %o1
+        call %l7
+        nop
+        add %l6, MP_CMD_RES, %l1
+        sta %o0, [%l1] 0x20
+        sta %g0, [%l6] 0x20             /* done */
         ba 1b
         nop
+
+/* CPU 0 side of the dispatcher. Leaf routines, %o0-%o5 only. */
+/* mp_post(n %o0, fn %o1, arg0 %o2, arg1 %o3): post a call to CPU n */
+        .globl mp_post
+mp_post:
+        sll %o0, 4, %o0
+        set MP_CMD, %o4
+        add %o4, %o0, %o4
+        add %o4, MP_CMD_ARG0, %o5
+        sta %o2, [%o5] 0x20
+        add %o4, MP_CMD_ARG1, %o5
+        sta %o3, [%o5] 0x20
+        retl
+        sta %o1, [%o4] 0x20             /* FN last: starts the call */
+
+/* mp_wait(n %o0): wait until CPU n has cleared FN, MP_WAIT_POLLS at most.
+ * Returns %o0 = RES, %o1 = 0, or %o1 = 1 when it timed out. */
+        .globl mp_wait
+mp_wait:
+        sll %o0, 4, %o0
+        set MP_CMD, %o4
+        add %o4, %o0, %o4
+        set MP_WAIT_POLLS, %o3
+1:      lda [%o4] 0x20, %o2
+        tst %o2
+        be 2f
+        mov 0, %o1
+        subcc %o3, 1, %o3
+        bne 1b
+        nop
+        mov 1, %o1
+2:      add %o4, MP_CMD_RES, %o4
+        retl
+        lda [%o4] 0x20, %o0
+
+/* mp_alive(n %o0): %o0 = 1 when CPU n's park counter moves during a short
+ * delay (QEMU keeps the secondary CPUs halted: 0 there) */
+        .globl mp_alive
+mp_alive:
+        sll %o0, 2, %o0
+        set MP_COUNT, %o1
+        add %o1, %o0, %o1
+        lda [%o1] 0x20, %o2
+        set 2000, %o3
+1:      subcc %o3, 1, %o3
+        bne 1b
+        nop
+        lda [%o1] 0x20, %o0
+        sub %o0, %o2, %o0
+        subcc %g0, %o0, %g0             /* carry = moved */
+        retl
+        addx %g0, 0, %o0
 #endif
 
 /* ------------------------------------------------------------------ */

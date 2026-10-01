@@ -66,6 +66,8 @@ PACKAGE asi_pack IS
   CONSTANT ASI_MMU_PHYSICAL_PASS_THROUGH_2D       : uv8 := x"2D"; --MMU 
   CONSTANT ASI_MMU_PHYSICAL_PASS_THROUGH_2E       : uv8 := x"2E"; --MMU 
   CONSTANT ASI_MMU_PHYSICAL_PASS_THROUGH_2F       : uv8 := x"2F"; --MMU
+  CONSTANT ASI_FLASH_CLEAR_INST                   : uv8 := x"36"; --SuperSPARC I-cache
+  CONSTANT ASI_FLASH_CLEAR_DATA                   : uv8 := x"37"; --SuperSPARC D-cache
 
   CONSTANT ASI_USER_INSTRUCTION_NOSPEC            : uv8 := x"28"; --CPU Ibus
   CONSTANT ASI_SUPER_INSTRUCTION_NOSPEC           : uv8 := x"29"; --CPU Ibus
@@ -114,7 +116,7 @@ PACKAGE BODY asi_pack IS
     "RESERVED_30     ",    "RESERVED_31     ", -- 30
     "RESERVED_32     ",    "RESERVED_33     ", -- 32
     "RESERVED_34     ",    "RESERVED_35     ", -- 34
-    "RESERVED_36     ",    "RESERVED_37     ", -- 36
+    "FLASH_CLEAR_INST",    "FLASH_CLEAR_DATA", -- 36
     "TW_USER_INST    ",    "TW_SUPER_INST   ", -- 38
     "TW_USER_DATA    ",    "TW_SUPER_DATA   ", -- 3A
     "RESERVED_3C     ",    "RESERVED_3D     ", -- 3C

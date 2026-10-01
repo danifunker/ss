@@ -48,4 +48,20 @@ PASS chipset: the PROM answers at pa 0x7000_0000
     check 00000001 exp=000000c3 obs=00000080
     check 00000006 exp=00000071 obs=00000021
 FAIL chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
-CPUTEST DONE pass=36 fail=4 skip=0
+PASS mmu: a changed PTE is seen after the matching ASI 3 flush, not before
+    check 0000000b exp=00000000 obs=000100ee
+FAIL mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserved
+    check 0000000b exp=000003aa obs=000000aa
+    check 0000000d exp=0000030e obs=0000000e
+FAIL mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
+PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: a patched instruction runs after FLUSH
+PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
+PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
+PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
+PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
+    check 00000001 exp=00000002 obs=ffffffff
+    check 00000002 exp=00000002 obs=ffffffff
+    check 00000003 exp=00000002 obs=ffffffff
+FAIL trap: reserved ASRs and CASA -> illegal_instruction
+CPUTEST DONE pass=43 fail=7 skip=0

@@ -983,9 +983,25 @@ BEGIN
          pipe_dec.cat.op(24 DOWNTO 22)="110")) THEN
       IF psr.ef='0' THEN
         trap_exe_v:=TT_FP_DISABLED;
-      ELSIF fpu_fexc='1' THEN
+      ELSIF fpu_fexc='1' AND trap_exe_v.t='0' THEN
+        -- V8 table 7-1: the load/store trap (mem_address_not_aligned,
+        -- priority 10) comes before fp_exception (11); the exception
+        -- stays pending for the next FP instruction
         trap_exe_v:=TT_FP_EXCEPTION;
       END IF;
+    END IF;
+    -- The V8 coprocessor loads/stores (op = 3, op3 0x30-0x37 but the
+    -- unassigned 0x32): no coprocessor, cp_disabled (V8 table 7-1 priority
+    -- 8, before the load/store traps). The debug monitor's injected
+    -- LDFA/STFA (dstop) keep their V9-style decode.
+    IF pipe_dec.cat.op(31 DOWNTO 30)="11" AND pipe_dec.cat.op(24 DOWNTO 22)="110"
+      AND pipe_dec.cat.op(24 DOWNTO 19)/="110010" AND dstop='0' THEN
+      trap_exe_v:=TT_CP_DISABLED;
+    END IF;
+    -- WRPSR with CWP >= NWINDOWS: illegal_instruction (V8 B.29)
+    IF pipe_dec.cat.m_psr='1' AND trap_exe_v.t='0' AND
+      to_integer(rd_v(4 DOWNTO 0))>=NWINDOWS THEN
+      trap_exe_v:=TT_ILLEGAL_INSTRUCTION;
     END IF;
     -- Privilegied instruction trap (higher priority)
     IF pipe_dec.cat.priv='1' AND psr.s='0' AND dstop='0' THEN

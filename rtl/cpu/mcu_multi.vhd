@@ -115,6 +115,7 @@ ARCHITECTURE multi OF mcu_mp IS
   SUBTYPE type_context IS unsigned(NB_CONTEXT-1 DOWNTO 0);
   SIGNAL mmu_ctxr : type_context;            -- MMU Context Register
   SIGNAL mmu_ctxr_maj : std_logic;           -- MMU Context Register. MàJ
+  SIGNAL mmu_ctxhi_maj : std_logic;          -- Context bits above 7 change
   SIGNAL mmu_ctxtpr : unsigned(35 DOWNTO 6); -- MMU Context Table Pointer reg.
   SIGNAL mmu_ctxtpr_maj : std_logic;         -- MMU Context Table Pointer. MàJ
   
@@ -131,6 +132,12 @@ ARCHITECTURE multi OF mcu_mp IS
 
   SIGNAL mmu_tmpr : uv32;
   SIGNAL mmu_tmpr_maj : std_logic;
+  -- SuperSPARC MMU breakpoint registers (CPU ASI 0x38: value, mask,
+  -- control, status at va 0, 0x100, 0x200, 0x300, 64 bits each): plain
+  -- storage, OBP 2.25 keeps its MID in the first (audit SMP-1). The
+  -- table-walk ASI of the same number exists only on the external bus.
+  SIGNAL mmu_bp : arr_uv32(0 TO 7);
+  SIGNAL mmu_bp_wr : std_logic;
 
   TYPE enum_mmu_fclass IS (RIEN,DATA,INST,WALK);
   SIGNAL mmu_fclass : enum_mmu_fclass;  -- Type de faute mémorisée
@@ -141,7 +148,8 @@ ARCHITECTURE multi OF mcu_mp IS
   
   ------------------------------------------------------------------------------
   -- DATA
-  TYPE enum_data_etat IS (sOISIF,sREGISTRE,sCROSS,sCROSS_DATA,
+  TYPE enum_data_etat IS (sOISIF,sREGISTRE,sCROSS,sCROSS_DATA,sFLASH,
+                          sWAIT_FLUSH,
                           sTABLEWALK,sEXT_READ,sWAIT_FILL,sWAIT_FILL2,
                           sWAIT_SHARE);
   SIGNAL data_etat_c,data_etat : enum_data_etat;
@@ -158,6 +166,7 @@ ARCHITECTURE multi OF mcu_mp IS
   
   SIGNAL data_ft_c : unsigned(2 DOWNTO 0);
   SIGNAL data_at_c : unsigned(2 DOWNTO 0);
+  SIGNAL data_st_c : uv2;              -- level of the entry hit (SFSR.L)
   
   -- MMU
   SIGNAL dtlb : arr_tlb(0 TO N_DTLB-1); -- TLBs Data
@@ -168,6 +177,13 @@ ARCHITECTURE multi OF mcu_mp IS
   SIGNAL dtlb_inv_c,dtlb_inv : unsigned(0 TO N_DTLB-1);
   SIGNAL dtlb_inval_c : std_logic;
   SIGNAL dtlb_maj_c : std_logic;
+  -- Flash clear (SuperSPARC ASI 0x37 / 0x36, and after reset): a sweep
+  -- that writes every tag of every way invalid, one index per cycle, while
+  -- the bus side stalls. FLASH_MAX indexes, then one cycle to finish.
+  CONSTANT DFLASH_MAX : natural := 2**(NB_DCACHE-NB_LINE-2);
+  CONSTANT IFLASH_MAX : natural := 2**(NB_ICACHE-NB_LINE-2);
+  SIGNAL dflash_cpt : natural RANGE 0 TO DFLASH_MAX;
+  SIGNAL iflash_cpt : natural RANGE 0 TO IFLASH_MAX;
   SIGNAL dtlb_sel_c : std_logic;
   SIGNAL mmu_fault_data_acc_c : std_logic;
   SIGNAL dtlb_mem : type_tlb;
@@ -205,7 +221,7 @@ ARCHITECTURE multi OF mcu_mp IS
   
   --------------------------------------------------------
   -- INST
-  TYPE enum_inst_etat IS (sOISIF,sTABLEWALK,sEXT_READ);
+  TYPE enum_inst_etat IS (sOISIF,sTABLEWALK,sEXT_READ,sIFLASH);
   SIGNAL inst_etat_c,inst_etat : enum_inst_etat;
   
   SIGNAL imux_w : type_plomb_w;         -- Bus instructions multiplexé
@@ -222,6 +238,7 @@ ARCHITECTURE multi OF mcu_mp IS
   
   SIGNAL inst_ft_c : unsigned(2 DOWNTO 0);
   SIGNAL inst_at_c : unsigned(2 DOWNTO 0);
+  SIGNAL inst_st_c : uv2;
   SIGNAL inst_dr_c,inst_dr : type_push;
   
   -- MMU
@@ -307,6 +324,7 @@ ARCHITECTURE multi OF mcu_mp IS
   
   SIGNAL dbusy,ibusy : std_logic;
   SIGNAL hitmaj : std_logic;
+  SIGNAL flushdone : std_logic;
   SIGNAL xxx_dwthru,xxx_dwback,xxx_dreadlru : std_logic;
   SIGNAL xxx_dexr : uint8;
   SIGNAL xxx_dexmax : std_logic;
@@ -456,7 +474,7 @@ BEGIN
   -- Interface bus de Données
   
   -- Process combinatoire bus DATA
-  Comb_Data:PROCESS (data_etat,reset,dreg,
+  Comb_Data:PROCESS (data_etat,reset,dreg,dflash_cpt,mmu_bp,flushdone,
                      tw_op,tw_va,
                      data_tw_rdy,mmu_ctxr,mmu_cr_e,mmu_cr_dce,mmu_cr_nf,
                      data_w,data2_w,filling_d2,filldone,ext_dfill,
@@ -559,6 +577,7 @@ BEGIN
     
     data_ft_c<=ft_v;                    -- FSR.FaultType
     data_at_c<=ls2_v & '0' & us_v;      -- FSR.AccessType
+    data_st_c<=tlb_sel_v.st;
     
     -------------------------------------------------------------------------
     -- Test hit & flush cache (§2)
@@ -637,9 +656,11 @@ BEGIN
     mmu_cr_maj<='0';
     mmu_ctxtpr_maj<='0';
     mmu_ctxr_maj<='0';
+    mmu_ctxhi_maj<='0';
     mmu_fsr_maj<='0';
     mmu_tmpr_maj<='0';
     mmu_far_wr<='0';
+    mmu_bp_wr<='0';
     cross_req_c<='0';
     
     -------------------------------------------------------------------------
@@ -962,13 +983,25 @@ BEGIN
               -- Broadcast flush vers les autres procs
               data_ext_c.op<=FLUSH;
               data_ext_c.pw.mode<=PB_MODE_RD;  -- Utile ?
+              data_ext_c.twls<='0';            -- a walk here sets no M bit
               IF ls_v='1' THEN
-                IF dbusy='0' THEN
+                IF mmu_cr_e='1' AND tlb_hitv_v='0' AND NOT MMU_DIS THEN
+                  -- DTLB miss: translate first, or the flush would take
+                  -- PA = VA (audit C-3). An unmapped VA ends the flush
+                  -- without a trap (sTABLEWALK).
+                  data_ext_c.twop<=LS;
+                  data_tw_req_c<='1';
+                  IF data_tw_rdy='1' THEN
+                    data_etat_c<=sTABLEWALK;
+                  END IF;
+                ELSIF dbusy='0' THEN
                   data_ext_req_c<='1';
                   IF data_ext_rdy='1' THEN
-                    dreq_v:='1';
-                    na_v:='1';
-                    dout_v.code:=PB_OK;
+                    -- Not posted: the flush is acknowledged once it has
+                    -- reached the tags (flushdone), so that the next
+                    -- fetch or load cannot hit the line it removes (V8
+                    -- FLUSH; the suite's t_selfmod and t_smp_nosnoop)
+                    data_etat_c<=sWAIT_FLUSH;
                   END IF;
                 END IF;
               ELSE
@@ -983,6 +1016,30 @@ BEGIN
               dreq_v:='1';
               na_v:='1';
               dout_v.code:=PB_OK;
+              
+              --------------------------
+            WHEN ASI_FLASH_CLEAR_DATA =>
+              -- SuperSPARC D-cache flash clear (a store; VA bit 31 selects
+              -- the lock bits on the real module, the same sweep here)
+              IF ls_v='1' THEN
+                data_etat_c<=sFLASH;
+              ELSE
+                dreq_v:='1';
+                na_v:='1';
+                dout_v.code:=PB_OK;
+              END IF;
+              
+              --------------------------
+            WHEN ASI_FLASH_CLEAR_INST =>
+              -- SuperSPARC I-cache flash clear, through the DATA -> INST
+              -- gateway like the I-cache tag ASI
+              IF ls_v='1' THEN
+                data_etat_c<=sCROSS;
+              ELSE
+                dreq_v:='1';
+                na_v:='1';
+                dout_v.code:=PB_OK;
+              END IF;
               
               --------------------------
             WHEN ASI_BLOCK_FILL =>
@@ -1028,6 +1085,15 @@ BEGIN
               END IF;
               
               --------------------------
+            WHEN ASI_USER_INSTRUCTION_TABLEWALK =>
+              -- From the CPU: the MMU breakpoint registers (mmu_bp)
+              dout_v.d:=mmu_bp(to_integer(data2_w.a(9 DOWNTO 8) & data2_w.a(2)));
+              dout_v.code:=PB_OK;
+              mmu_bp_wr<=ls_v;
+              dreq_v:='1';
+              na_v:='1';
+              
+              --------------------------
             WHEN OTHERS =>
               dreq_v:='1';
               na_v:='1';
@@ -1056,6 +1122,8 @@ BEGIN
         ELSIF data2_w.a(12 DOWNTO 8)=MR_CXR AND NOT MMU_DIS THEN
           -- Context Register
           mmu_ctxr_maj<=ls_v;
+          mmu_ctxhi_maj<=ls_v AND to_std_logic(
+            data2_w.d(NB_CONTEXT-1 DOWNTO 8)/=mmu_ctxr(NB_CONTEXT-1 DOWNTO 8));
         ELSIF data2_w.a(12 DOWNTO 8)=MR_SFSR AND NOT MMU_DIS THEN
           -- Fault Status Register: reading clears it, writes have no effect
           mmu_fsr_maj<=NOT ls_v;
@@ -1110,10 +1178,10 @@ BEGIN
           ELSIF tw_err='1' THEN -- MMU_ERROR
             na_v:='1';
             dreq_v:='1';
-            IF mmu_cr_nf='0' THEN
+            IF mmu_cr_nf='0' AND data2_w.asi(7 DOWNTO 4)/=x"1" THEN
               dout_v.code:=PB_FAULT;
             ELSE
-              dout_v.code:=PB_OK;
+              dout_v.code:=PB_OK;    -- NF, or a line flush of an unmapped VA
             END IF;
           END IF;
         END IF;
@@ -1149,6 +1217,31 @@ BEGIN
           data_etat_c<=sOISIF;
         END IF;
         
+        ----------------------------------------------------
+      WHEN sWAIT_FLUSH =>
+        -- The line flush is on the bus; acknowledge it when the tags
+        -- have been updated
+        IF flushdone='1' THEN
+          dreq_v:='1';
+          na_v:='1';
+          dout_v.code:=PB_OK;
+          data_etat_c<=sOISIF;
+        END IF;
+        
+        ----------------------------------------------------
+      WHEN sFLASH =>
+        -- Tag sweep (the tag port is driven below). The last cycle
+        -- acknowledges the store that asked for it; after a reset there
+        -- is none.
+        IF dflash_cpt=DFLASH_MAX THEN
+          data_etat_c<=sOISIF;
+          na_v:='1';
+          IF data2_w.req='1' THEN
+            dreq_v:='1';
+            dout_v.code:=PB_OK;
+          END IF;
+        END IF;
+        
     END CASE;
 
     -------------------------------------------------------------
@@ -1178,7 +1271,13 @@ BEGIN
     xxx_dwback<=wback_v;
     xxx_dreadlru<=readlru_v;
       
-    IF wthru_v='1' OR wback_v='1' OR readlru_v='1' THEN
+    IF data_etat=sFLASH AND dflash_cpt/=DFLASH_MAX THEN
+      -- Flash clear: this index, every way, invalid
+      dcache_t_a <=to_unsigned(dflash_cpt,dcache_t_a'length);
+      dcache_t_dw<=(OTHERS => x"00000000");
+      dcache_t_wr<="1111";
+      
+    ELSIF wthru_v='1' OR wback_v='1' OR readlru_v='1' THEN
       -- Second cycle. écriture simple. On modifie les données pas les tags
       IF wthru_v='1' OR wback_v='1' THEN
         dcache_d_wr(nohit_v)<=data2_w.be;
@@ -1295,8 +1394,7 @@ BEGIN
       -- Pipeline accès DATA
       IF data_na_c='1' THEN
         -- Si pas de bloquage, au suivant
-        data2_w<=data_w;
-        data2_w.asi(7 DOWNTO 6)<="00";  -- ASI sur 6 bits...
+        data2_w<=data_w;                -- the whole 8-bit ASI (MMU-12)
       END IF;
       IF data_clr_c='1' THEN
         data2_w.req<='0';
@@ -1385,10 +1483,19 @@ BEGIN
       -- Machine à états
       data_etat<=data_etat_c;
 
+      IF data_etat=sFLASH THEN
+        IF dflash_cpt/=DFLASH_MAX THEN
+          dflash_cpt<=dflash_cpt+1;
+        END IF;
+      ELSE
+        dflash_cpt<=0;
+      END IF;
+
       -------------------------------------------
       IF reset_n='0' THEN
         dtlb_cpt<=0;
-        data_etat<=sOISIF;
+        data_etat<=sFLASH;              -- the tags are swept after a reset
+        dflash_cpt<=0;
         data2_w.req<='0';
         FOR I IN 0 TO N_DTLB-1 LOOP
           dtlb(I).v<='0';
@@ -1411,7 +1518,7 @@ BEGIN
   --   - Bypass flush ICACHE (plus tard, aussi le probe contenu & tags)
   --   - Bypass flush ITLB
   
-  Comb_Inst:PROCESS(inst_etat,reset,tw_op,inst_tw_rdy,
+  Comb_Inst:PROCESS(inst_etat,reset,tw_op,inst_tw_rdy,iflash_cpt,
                     mmu_ctxr,mmu_cr_bm,mmu_cr_e,mmu_cr_ice,mmu_cr_nf,
                     inst_w,imux_w,imux2_w,data2_w,filling_i2,
                     ext_ifill,icache_t_dr,icache_d_dr,icache_tmux,
@@ -1510,6 +1617,7 @@ BEGIN
     
     inst_ft_c<=ft_v;                    -- FSR.FaultType
     inst_at_c<=ls_v & '1' & us_v;       -- FSR.AccessType
+    inst_st_c<=tlb_sel_v.st;
 
     -------------------------------------------------------------------------
     -- Test hit & inval cache (§2)
@@ -1772,6 +1880,18 @@ BEGIN
               END IF;
               
               --------------------------
+            WHEN ASI_FLASH_CLEAR_INST =>
+              -- I-cache flash clear, through the DATA -> INST gateway
+              iout_v.cx:=imux2_cx;
+              IF ls_v='1' THEN
+                inst_etat_c<=sIFLASH;
+              ELSE
+                iout_v.code:=PB_OK;
+                ireq_v:='1';
+                na_v:='1';
+              END IF;
+              
+              --------------------------
             WHEN ASI_CACHE_TAG_INSTRUCTION =>
               IF ASICACHE THEN
                 -- Cet ASI est généré via la passerelle DATA -> INST
@@ -1842,6 +1962,20 @@ BEGIN
           ireq_v:='1';
           inst_etat_c<=sOISIF;
         END IF;
+        
+        ----------------------------------------------------
+      WHEN sIFLASH =>
+        -- Tag sweep (the tag port is driven below); the last cycle
+        -- acknowledges the gateway access, after a reset there is none
+        iout_v.code:=PB_OK;
+        iout_v.cx:=imux2_cx;
+        IF iflash_cpt=IFLASH_MAX THEN
+          inst_etat_c<=sOISIF;
+          na_v:='1';
+          IF imux2_w.req='1' THEN
+            ireq_v:='1';
+          END IF;
+        END IF;
     END CASE;
     
     -------------------------------------------------------------
@@ -1905,7 +2039,13 @@ BEGIN
     icache_t_dw<=tags_v;
     icache_t_wr<="0000";
       
-    IF wthru_v='1' OR readlru_v='1' THEN
+    IF inst_etat=sIFLASH AND iflash_cpt/=IFLASH_MAX THEN
+      -- Flash clear: this index, every way, invalid
+      icache_t_a <=to_unsigned(iflash_cpt,icache_t_a'length);
+      icache_t_dw<=(OTHERS => x"00000000");
+      icache_t_wr<="1111";
+      
+    ELSIF wthru_v='1' OR readlru_v='1' THEN
       -- Second cycle,écriture simple. On modifie les données, pas les tags
       IF wthru_v='1' THEN
         icache_d_wr(nohit_v)<=imux2_w.be;
@@ -2062,10 +2202,19 @@ BEGIN
       inst_etat<=inst_etat_c;
       cross<=cross_c;
 
+      IF inst_etat=sIFLASH THEN
+        IF iflash_cpt/=IFLASH_MAX THEN
+          iflash_cpt<=iflash_cpt+1;
+        END IF;
+      ELSE
+        iflash_cpt<=0;
+      END IF;
+
       -------------------------------------------
       IF reset_n='0' THEN
         itlb_cpt<=0;
-        inst_etat<=sOISIF;
+        inst_etat<=sIFLASH;             -- the tags are swept after a reset
+        iflash_cpt<=0;
         imux2_w.req<='0';
         FOR I IN 0 TO N_ITLB-1 LOOP
           itlb(I).v<='0';
@@ -2146,10 +2295,11 @@ BEGIN
       mmu_cr_wb <= wback;
       mmu_cr_aw <= '0'; --aow;
       
-      -- Ecriture MMU Context Table Pointer Register
+      -- Context Table Pointer Register: PA[35:6], no alignment: the walk
+      -- adds the context (OpenBIOS keeps its table 8 KB aligned with
+      -- mmu-nctx 256; OBP 2.25 allocates 256 KB for 65536 contexts)
       IF mmu_ctxtpr_maj='1' THEN
         mmu_ctxtpr<=data2_w.d(31 DOWNTO 2);
-        mmu_ctxtpr(NB_CONTEXT+1 DOWNTO 6)<=(OTHERS => '0');  -- Aligne NCONTEXT
       END IF;
       
       -- Ecriture MMU Context Register
@@ -2159,15 +2309,21 @@ BEGIN
 
       -- Acquittement MMU Fault Status Register
       IF mmu_fsr_maj='1' THEN
-        -- On sait que c'est lu, donc pas d'OW
+        -- Read: the whole register clears
         mmu_fsr_ow<='0';
         mmu_fsr_ft<=FT_NONE;
+        mmu_fsr_l<="00";
+        mmu_fsr_at<="000";
         mmu_fclass<=RIEN;
         mmu_fsr_fav<='0';   -- RAZ Fault Address Valid
       END IF;
 
       IF mmu_tmpr_maj='1' THEN
         mmu_tmpr<=data2_w.d;
+      END IF;
+      
+      IF mmu_bp_wr='1' THEN
+        mmu_bp(to_integer(data2_w.a(9 DOWNTO 8) & data2_w.a(2)))<=data2_w.d;
       END IF;
 
       -- Diagnostic write of the SFAR (0x1400, sun4m B.I.4.5)
@@ -2185,44 +2341,47 @@ BEGIN
       -- <AVOIR> Ecriture des registres MMU pour un TW depuis le process EXT
       -- ou depuis les process DATA et INSTRUCTION ?
       -- <Ecriture MMU Fault Status Reg sur faute>
+      -- Fault status (Sun-4M 4.4, microSPARC-II table 28): a data fault
+      -- overwrites any pending status and sets OW over an unread data
+      -- fault; an instruction fault does not overwrite an unread data
+      -- fault and sets OW over an unread instruction fault. Walk faults
+      -- (invalid, reserved entries) are faults of their side.
       IF mmu_tw_fault='1' AND NOT MMU_DIS THEN
-        -- Faute pendant un tablewalk : INVALIDE ou TRANSLATION
-        IF mmu_tw_ft/=FT_INVALID OR mmu_tw_di='0' OR mmu_fsr_fav='0' THEN
-          mmu_fclass<=WALK;
-          mmu_fsr_l<=mmu_tw_st;           -- Level / Short Translation
-          IF mmu_tw_di='0' THEN
-            mmu_fsr_at<=data_at_c;
-          ELSE
-            mmu_fsr_at<=inst_at_c;
-          END IF;
-          mmu_fsr_ft<=mmu_tw_ft;             -- Fault Type
+        IF mmu_tw_di='0' OR mmu_fsr_fav='0' OR mmu_fclass/=DATA THEN
+          mmu_fsr_l<=mmu_tw_st;           -- Level
+          mmu_fsr_ft<=mmu_tw_ft;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<='0';                -- OverWrite
           mmu_far<=tw_va;
+          IF mmu_tw_di='0' THEN
+            mmu_fclass<=DATA;
+            mmu_fsr_at<=data_at_c;
+            mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=DATA);
+          ELSE
+            mmu_fclass<=INST;
+            mmu_fsr_at<=inst_at_c;
+            mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=INST);
+          END IF;
         END IF;
         
       ELSIF mmu_fault_data_acc_c='1' AND NOT MMU_DIS THEN
-        IF mmu_fclass/=WALK AND mmu_fclass/=DATA THEN
-          mmu_fclass<=DATA;
-          -- Faute sur accès normal data : PROTECTION ou PRIVILEGE
-          mmu_fsr_l<="00";                -- Level ???
-          mmu_fsr_at<=data_at_c;          -- Access Type
-          mmu_fsr_ft<=data_ft_c;          -- Fault Type
-          mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<=to_std_logic(mmu_fclass=DATA); -- OverWrite
-          mmu_far<=data2_w.a;
-        END IF;
-        -- <AVOIR> : !! Cascade de fautes data. Impossible ?
+        -- Faute sur accès normal data : PROTECTION ou PRIVILEGE
+        mmu_fsr_l<=data_st_c;           -- the level of the entry hit
+        mmu_fsr_at<=data_at_c;          -- Access Type
+        mmu_fsr_ft<=data_ft_c;          -- Fault Type
+        mmu_fsr_fav<='1';               -- Fault Address Valid
+        mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=DATA);
+        mmu_fclass<=DATA;
+        mmu_far<=data2_w.a;
         
       ELSIF mmu_fault_inst_acc_c='1' AND NOT MMU_DIS THEN
-        IF mmu_fclass/=WALK AND mmu_fclass/=DATA THEN
-          mmu_fclass<=INST;
+        IF mmu_fsr_fav='0' OR mmu_fclass/=DATA THEN
           -- Faute sur accès normal instruction : PROTECTION ou PRIVILEGE
-          mmu_fsr_l<="00";                -- Level ???
+          mmu_fsr_l<=inst_st_c;
           mmu_fsr_at<=inst_at_c;          -- Access Type
           mmu_fsr_ft<=inst_ft_c;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<=to_std_logic(mmu_fclass=INST); -- OverWrite
+          mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=INST);
+          mmu_fclass<=INST;
           -- L'écriture de FAR est facultative !!!
           mmu_far<=imux2_w.a;
         END IF;
@@ -2281,6 +2440,7 @@ BEGIN
       mmu_ctxtpr_maj => mmu_ctxtpr_maj,
       mmu_ctxr       => mmu_ctxr,
       mmu_ctxr_maj   => mmu_ctxr_maj,
+      mmu_ctxhi_maj  => mmu_ctxhi_maj,
       mmu_tw_fault   => mmu_tw_fault,
       mmu_tw_ft      => mmu_tw_ft,
       mmu_tw_st      => mmu_tw_st,
@@ -2316,6 +2476,7 @@ BEGIN
       ext_dreq_tw    => ext_dreq_tw,
       ext_dr         => ext_dr,
       hitmaj         => hitmaj,
+      flushdone      => flushdone,
       ext_w          => ext_w,
       ext_r          => ext_r,
       smp_w          => smp_w,

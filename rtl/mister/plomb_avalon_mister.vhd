@@ -201,9 +201,12 @@ BEGIN
         write_c<='1';
         dbl_c<='1';
         IF pw.req='1' OR reset_n='0' THEN
-          mem_d_c <=pw.d;
-          mem_be_c<=pw.be;
           IF burstcpt MOD 2=1 THEN
+            -- Odd beat: write the pair (mem_d & pw.d). mem_d must keep the
+            -- even beat while avl_waitrequest stalls this one; latching
+            -- pw.d here as well wrote the odd word twice (word 2k took
+            -- word 2k+1: a stalled write-back of a line holding a lock
+            -- put the lock byte over its neighbour, t_smp_atomic).
             avl_write<='1';
             IF avl_waitrequest='0' THEN
               ack_c<=reset_n;
@@ -217,6 +220,9 @@ BEGIN
               avl_burstbegin<='1';
             END IF;
           ELSE
+            -- Even beat: latch it, the Avalon write comes with the next
+            mem_d_c <=pw.d;
+            mem_be_c<=pw.be;
             ack_c<='1';
             fifo_push_c<=wrack_mem;
             burstcpt_c<=burstcpt+1;

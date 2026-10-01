@@ -94,7 +94,7 @@ ARCHITECTURE rtl OF smpmux IS
   SIGNAL io_r_ack_l : std_logic;
   SIGNAL iocpt,iocpt_c : natural RANGE 0 TO PB_BLEN_MAX;
 
-  SIGNAL xx_cpt : natural RANGE 0 TO 255;
+  SIGNAL xx_cpt : natural RANGE 0 TO 65535; -- hang breaker (audit C-5)
   SIGNAL xx_max : std_logic;
   SIGNAL mlast,mlast_c : uv5;
 
@@ -493,14 +493,17 @@ BEGIN
 
 
       IF etat/=sIDLE THEN
-        if xx_cpt<240 THEN
+        if xx_cpt<65535 THEN
           xx_cpt<=xx_cpt+1;
         END IF;
       ELSE
         xx_cpt<=0;
       END IF;
 
-      xx_max<=to_std_logic(xx_cpt>=128);
+      -- 128 cycles was short enough to fire under three CPUs contending
+      -- for one line (lost ldstub updates, t_smp_atomic); a transaction
+      -- that is still progressing must not be abandoned
+      xx_max<=to_std_logic(xx_cpt>=32768);
       IF xx_max='1' THEN
         etat<=sIDLE;
       END IF;

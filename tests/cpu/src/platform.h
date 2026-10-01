@@ -56,6 +56,17 @@
  * MSI registers, through ASI 0x2f (pa 0xf_xxxx_xxxx). */
 #define MP_MID          0x00180000      /* + 4n: CPU n's MID register read */
 #define MP_COUNT        0x00180010      /* + 4n: CPU n's loop counter */
+/* The dispatcher (runtime.S mp_park, mp_post, mp_wait): CPU 0 posts a
+ * function and two arguments to CPU n's mailbox; CPU n runs it with the
+ * MMU off, in boot mode, with traps disabled and no stack (leaf code
+ * only: a trap there is error mode), stores %o0 in RES and clears FN. */
+#define MP_CMD          0x00180100      /* + 0x10n: CPU n's mailbox */
+#define MP_CMD_FN       0x0             /* function to run; 0 = idle/done */
+#define MP_CMD_ARG0     0x4
+#define MP_CMD_ARG1     0x8
+#define MP_CMD_RES      0xc
+#define MP_SYNC         0x00180200      /* + 4n: free for a test's handshake */
+#define MP_WAIT_POLLS   100000          /* mp_wait gives up after this */
 #define IOMMU_CTRL_PA   0xe0000000
 #define MSI_ARB_PA      0xe0001008      /* arbiter enable */
 #define MSI_MID_PA      0xe0002000      /* MID of the requesting master */
@@ -81,6 +92,8 @@
 #define V_SKIP          0x44    /* set by a test that could not run */
 #define V_SKIP_COUNT    0x48
 #define V_TRAP_PSR      0x4c    /* PSR on entry of the last expected trap */
+#define V_WBMODE        0x50    /* D-cache mode seen by t_cache_wrhit:
+                                   0 unknown, 1 write-through, 2 write-back */
 #define V_SIZE          0x80
 
 /* ta SVC_SUPER: the runtime resumes after it in supervisor mode; a test
@@ -99,6 +112,8 @@
 #define TT_FP_EXC       0x08
 #define TT_DACC         0x09
 #define TT_TAG_OVF      0x0a
+#define TT_CP_DISABLED  0x24
+#define TT_DACC_ERR     0x29
 #define TT_DIV_ZERO     0x2a
 #define TT_TICC(n)      (0x80 + (n))
 
