@@ -5,9 +5,13 @@
    TBR, WIM and the 32 visible registers, and lets it run again (unless
    -s). Then it switches the UART back to the console.
 
-     pcdump [-s] [-n count] [-d ms]
+     pcdump [-s] [-n count] [-d ms] [-c cpu] [-m va,words] [-p pa,words]
        -s        leave the CPUs stopped
        -n count  take count samples (default 1), -d ms apart (default 500)
+       -c cpu    only this CPU
+       -m va,n   also dump n words of virtual memory (supervisor data,
+                 the CPU's current context) after the registers
+       -p pa,n   the same for physical memory (36-bit pa, MMU bypass)
 
    Nothing else may read /dev/ttyS1 meanwhile (scripts/console.sh, agetty).
    Uses lib.c and serie.c unchanged.
@@ -62,15 +66,26 @@ static const char *rname[32] = {
 
 int main(int argc, char *argv[])
 {
-    int keep = 0, count = 1, delay = 500, c, s, n, mask;
+    int keep = 0, count = 1, delay = 500, only = -1, c, s, n, mask;
+    unsigned long long maddr = 0;
+    int mwords = 0, mphys = 0;
+    char *comma;
 
-    while ((c = getopt(argc, argv, "sn:d:")) != -1) {
+    while ((c = getopt(argc, argv, "sn:d:c:m:p:")) != -1) {
         switch (c) {
         case 's': keep = 1; break;
         case 'n': count = atoi(optarg); break;
         case 'd': delay = atoi(optarg); break;
+        case 'c': only = atoi(optarg); break;
+        case 'm':
+        case 'p':
+            maddr = strtoull(optarg, &comma, 16);
+            mwords = *comma == ',' ? atoi(comma + 1) : 16;
+            mphys = c == 'p';
+            break;
         default:
-            fprintf(stderr, "usage: %s [-s] [-n count] [-d ms]\n", argv[0]);
+            fprintf(stderr, "usage: %s [-s] [-n count] [-d ms] [-c cpu] "
+                    "[-m va,words] [-p pa,words]\n", argv[0]);
             return 2;
         }
     }
@@ -88,7 +103,7 @@ int main(int argc, char *argv[])
         for (n = 0; n < 4; n++) {
             uint32_t r[32];
             int i;
-            if (!(mask & (1 << n)))
+            if (!(mask & (1 << n)) || (only >= 0 && n != only))
                 continue;
             dbg_selcpu(n);
             dbg_stop();
@@ -100,6 +115,15 @@ int main(int argc, char *argv[])
             for (i = 0; i < 32; i++)
                 printf("%s %s=%08x%s", i % 8 ? "" : "   ", rname[i], r[i],
                        i % 8 == 7 ? "\n" : "");
+            for (i = 0; i < mwords; i++) {
+                unsigned long long a = maddr + 4 * i;
+                if (i % 4 == 0)
+                    printf("    %s %09llx:", mphys ? "pa" : "va", a);
+                printf(" %08x", mphys ? dbg_read_pmem32(a)
+                                      : dbg_read_vmem32((uint32_t)a));
+                if (i % 4 == 3 || i == mwords - 1)
+                    printf("\n");
+            }
             if (!keep)
                 dbg_run();
         }
