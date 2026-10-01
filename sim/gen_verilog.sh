@@ -31,6 +31,9 @@
 #
 #   sim/gen_verilog.sh 5      -> sim/generated/ss_core_ss5.v
 #   sim/gen_verilog.sh 20     -> sim/generated/ss_core_ss20.v
+#
+# NVRAM_DIAG=1 starts the NVRAM with diag-switch? set (iram_rtc's DIAG
+# generic), so the Sun OBP runs its POST: -> ss_core_ss<REV>-diag.v
 
 set -euo pipefail
 
@@ -69,6 +72,13 @@ for f in "${FILES[@]}"; do
     ' "$ROOT/$f" > "$SRC/$(basename "$f")"
 done
 cp "$ROOT/sim/pll_sim.vhd" "$SRC/"
+SUFFIX=""
+if [ "${NVRAM_DIAG:-0}" = 1 ]; then
+    perl -pi -e 's/^(\s*DIAG\s*:\s*boolean\s*:=\s*)false/${1}true/' "$SRC/iram_rtc.vhd"
+    grep -q -E "DIAG *: *boolean *:= *true" "$SRC/iram_rtc.vhd" \
+        || { echo "error: NVRAM_DIAG: no DIAG generic in iram_rtc.vhd" >&2; exit 1; }
+    SUFFIX="-diag"
+fi
 
 # GHDL runs in the work directory: elaboration opens files the RTL declares
 # (iu_pipe5.vhd creates Trace_pipe5.log).
@@ -85,6 +95,6 @@ if grep -q -E "'b[01xX]*[zZ]" "$WORK/ss_core.v"; then
     echo "error: Z literals left after the rewrite" >&2; exit 1
 fi
 
-mv "$WORK/ss_core.v" "$OUT/ss_core_ss$REV.v"
+mv "$WORK/ss_core.v" "$OUT/ss_core_ss$REV$SUFFIX.v"
 rm -rf "$WORK"
-echo "generated $OUT/ss_core_ss$REV.v ($(wc -l < "$OUT/ss_core_ss$REV.v") lines)"
+echo "generated $OUT/ss_core_ss$REV$SUFFIX.v ($(wc -l < "$OUT/ss_core_ss$REV$SUFFIX.v") lines)"

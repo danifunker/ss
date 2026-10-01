@@ -1,32 +1,39 @@
 #!/usr/bin/env bash
 #
-# build.sh 5|20 [--trace] - build the Verilator model of one revision.
+# build.sh 5|20 [--trace] [--diag] - build the Verilator model of one revision.
 #
 # Regenerates sim/generated/ss_core_ss<REV>.v when any RTL file is newer,
 # then verilates sim_top.sv + ddram_arb.sv + the generated core with the
 # harness into sim/obj_ss<REV>/Vsim_top (sim/obj_ss<REV>_trace/ with
 # --trace, which adds VCD waveform support and costs build time).
+# --diag starts the NVRAM with diag-switch? set, so the Sun OBP runs its
+# POST (ss_core_ss<REV>-diag.v, sim/obj_ss<REV>_diag/).
 
 set -euo pipefail
 
 REV="${1:-5}"
 shift || true
 TRACE=0
+DIAG=0
 for a in "$@"; do
     case "$a" in
         --trace) TRACE=1 ;;
+        --diag) DIAG=1 ;;
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
 case "$REV" in
     5)  SYSFREQ=60000000 ;;
     20) SYSFREQ=55000000 ;;
-    *)  echo "usage: $0 5|20 [--trace]" >&2; exit 2 ;;
+    *)  echo "usage: $0 5|20 [--trace] [--diag]" >&2; exit 2 ;;
 esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GEN="$ROOT/sim/generated/ss_core_ss$REV.v"
+SUFFIX=""
+[ "$DIAG" = 1 ] && SUFFIX="-diag"
+GEN="$ROOT/sim/generated/ss_core_ss$REV$SUFFIX.v"
 OBJ="$ROOT/sim/obj_ss$REV"
+[ "$DIAG" = 1 ] && OBJ="${OBJ}_diag"
 [ "$TRACE" = 1 ] && OBJ="${OBJ}_trace"
 # SIM_OBJ=dir builds elsewhere, e.g. while a run still uses the usual model
 [ -n "${SIM_OBJ:-}" ] && OBJ="$ROOT/sim/$SIM_OBJ"
@@ -40,7 +47,7 @@ if [ "$stale" = 0 ]; then
                  -o -name gen_verilog.sh -newer "$GEN" | head -1)
     [ -n "$newer" ] && stale=1
 fi
-[ "$stale" = 1 ] && "$ROOT/sim/gen_verilog.sh" "$REV"
+[ "$stale" = 1 ] && NVRAM_DIAG=$DIAG "$ROOT/sim/gen_verilog.sh" "$REV"
 
 VFLAGS=(
     --cc --exe --build -j "$(nproc)"

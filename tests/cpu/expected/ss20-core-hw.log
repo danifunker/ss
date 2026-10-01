@@ -34,4 +34,7 @@ PASS chipset: system control reads 0 after power-on (RS, WD clear)
 PASS chipset: NVRAM IDPROM format 1, machine type, checksum
 PASS chipset: frame buffer slot starts with FCode (0xf1 header)
 PASS chipset: DMA2 E_BASE_ADDR resets to 0xff
-CPUTEST DONE pass=35 fail=0 skip=0
+PASS chipset: SS20 MSI: IOMMU IMPL/VER 0x13, MID 8, arbiter enable
+PASS chipset: SS20 MSI: each CPU reads its own MID; the arbiter parks CPU 1
+PASS chipset: SS20 SIMM slot 7 is 16 MB, aliased every 16 MB
+CPUTEST DONE pass=38 fail=0 skip=0

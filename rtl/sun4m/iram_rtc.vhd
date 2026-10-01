@@ -22,7 +22,10 @@ USE work.plomb_pack.ALL;
 
 ENTITY iram_rtc IS
   GENERIC (
-    MACHINE_TYPE : natural := 16#80#);  -- IDPROM type: 0x80 SS5, 0x72 SS20
+    MACHINE_TYPE : natural := 16#80#;   -- IDPROM type: 0x80 SS5, 0x72 SS20
+    -- NVRAM byte 1 (diag-switch?) starts at 0xFF, so the Sun OBP runs its
+    -- POST. Only `sim/build.sh --diag` sets it (sim/gen_verilog.sh).
+    DIAG         : boolean := false);
   PORT (
     mem_w : IN  type_pvc_w;
     mem_r : OUT type_pvc_r;
@@ -68,6 +71,9 @@ ARCHITECTURE rtc OF iram_rtc IS
         m(n / 4) := id(i);
       END IF;
     END LOOP;
+    IF DIAG AND lane = 1 THEN
+      m(0) := x"FF";
+    END IF;
     RETURN m;
   END FUNCTION nvram_init;
   
