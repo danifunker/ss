@@ -254,8 +254,17 @@ trap_common:
         st %l0, [%g7 + V_TRAP_PSR]
         mov -1, %l4
         st %l4, [%g7 + V_TRAP_EXPECT]
-        ba trap_skip
+        ld [%g7 + V_TRAP_RESUME], %l4
+        tst %l4
+        be trap_skip
         nop
+        /* an instruction fault: the next instruction is on the same
+         * page, so resume where the test asked (V_TRAP_RESUME) */
+        st %g0, [%g7 + V_TRAP_RESUME]
+        wr %l0, %psr
+        nop ; nop ; nop
+        jmp %l4
+        rett %l4 + 4
 trap_svc_super:
         /* ta SVC_SUPER: resume after it in supervisor mode. The rett below
          * restores S from PS, so set PS. */

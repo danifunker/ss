@@ -15,7 +15,7 @@ PASS branch: annul bit and delay slots
 PASS branch: call/jmpl link register, computed jumps
 PASS trap: ta n -> tt 0x80+n, trap PC/nPC, register+imm number
 PASS trap: unimp and invalid opcodes -> illegal_instruction
-    check 00000002 exp=700025e8 obs=700025ec
+    check 00000002 exp=70002608 obs=7000260c
 FAIL trap: rett with traps enabled -> illegal_instruction
 PASS trap: rett in user mode -> privileged_instruction (0x03)
 PASS trap: udiv/sdiv by zero -> division_by_zero (0x2a)
@@ -54,6 +54,7 @@ FAIL mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserve
     check 0000000b exp=000003aa obs=000000aa
     check 0000000d exp=0000030e obs=0000000e
 FAIL mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
+PASS mmu: an instruction access fault sets the SFSR once (FAV, no OW)
 PASS cache: ldstub and swap on a cached line change only their byte / word
 PASS cache: a patched instruction runs after FLUSH
 PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
@@ -62,4 +63,4 @@ PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000004 exp=5a5a1234 obs=00000000
 FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
-CPUTEST DONE pass=43 fail=7 skip=0
+CPUTEST DONE pass=44 fail=7 skip=0

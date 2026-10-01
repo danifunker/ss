@@ -94,6 +94,9 @@
 #define V_TRAP_PSR      0x4c    /* PSR on entry of the last expected trap */
 #define V_WBMODE        0x50    /* D-cache mode seen by t_cache_wrhit:
                                    0 unknown, 1 write-through, 2 write-back */
+#define V_TRAP_RESUME   0x54    /* non-zero: the next expected trap resumes
+                                   there (once), not after the trapping
+                                   instruction: for instruction faults */
 #define V_SIZE          0x80
 
 /* ta SVC_SUPER: the runtime resumes after it in supervisor mode; a test

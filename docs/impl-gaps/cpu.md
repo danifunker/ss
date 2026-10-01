@@ -379,6 +379,18 @@ behaviour.
 - Faults detected on a TLB hit report SFSR.L = 0 ("Level ???",
   `mcu_simple.vhd:2118,2131`, `mcu_multi.vhd:2209,2222`); SRMMU wants the
   level of the PTE (the TLB entry's `st`).
+- **OW must stay clear for one instruction fault** (2026-10-01, on the
+  board). The fetch unit runs ahead: after a jump into an unmapped page
+  the next fetch, on the same page, faults as well. Upstream recorded an
+  instruction-side invalid walk fault only while FAV was clear and always
+  cleared OW on walk faults; `5568d30` (MMU-8, table 28) records the second
+  one and sets OW. Solaris 8's sun4m `get_fault_type` tests OW
+  (`andcc %l1, 1` at `unix` `0xf005bef8`), takes the status as overwritten,
+  re-probes, never calls `pagefault` and the process loops on the fault
+  (SFSR `0x347`: user instruction, invalid, level 3, FAV, OW). Patching that
+  test out in memory let Solaris reach its rc scripts. OW is for a second
+  fault the software never saw, not for the fetch unit's speculation.
+  `t_mmu_ifault`.
 
 ### MMU-9 SS5 physical address model (S1, S + chipset)
 
@@ -659,6 +671,7 @@ forces one CPU (`ts_core.vhd:179`). `BSD_MODE` (MMU-6) and `FPU_LDASTA`
 | `t_bus_error` | both | bypass load from an unmapped PA → tt 0x29, SFSR FT=5 + EBE, SFAR = address (needs the chipset part) | MMU-4 |
 | `t_mmu_probe` | both | probe types 0-4 on valid, invalid and PTD entries: result, 0 on error | MMU-5 |
 | `t_mmu_fault_regs` | both | SFSR L/AT/FT/FAV/OW for invalid, protection, privilege faults; read-to-clear; OW on a second fault; NF bit | MMU-8 |
+| `t_mmu_ifault` | both | a jump mid-page into an invalid page: tt 1, SFSR 0x366 (no OW), read clears | MMU-8 |
 | `t_fpu_trap_prio` | both | `fdivs` by 0 with TEM.DZ, then misaligned `st %f` → tt 7 and memory untouched, then aligned `st %f` → tt 8, cexc DZ | FPU-1 |
 | `t_fpu_fq` | both | FQ contents after a trap (PC, instruction), FSR.qne, `STDFQ` with empty FQ → ftt 4, `STDFQ` in user mode → tt 3 | FPU-2 |
 | `t_cp_ldst` | both | op3 0x30-0x37 → tt 0x24; in user mode no memory access | IU-3 |

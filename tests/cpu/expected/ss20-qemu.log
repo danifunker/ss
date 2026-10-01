@@ -15,7 +15,7 @@ PASS branch: annul bit and delay slots
 PASS branch: call/jmpl link register, computed jumps
 PASS trap: ta n -> tt 0x80+n, trap PC/nPC, register+imm number
 PASS trap: unimp and invalid opcodes -> illegal_instruction
-    check 00000002 exp=00002748 obs=0000274c
+    check 00000002 exp=00002768 obs=0000276c
 FAIL trap: rett with traps enabled -> illegal_instruction
 PASS trap: rett in user mode -> privileged_instruction (0x03)
 PASS trap: udiv/sdiv by zero -> division_by_zero (0x2a)
@@ -55,6 +55,7 @@ FAIL mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserve
     check 0000000b exp=000003aa obs=000000aa
     check 0000000d exp=0000030e obs=0000000e
 FAIL mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
+PASS mmu: an instruction access fault sets the SFSR once (FAV, no OW)
 PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
     dcache mode: write-through
 PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
@@ -72,4 +73,4 @@ PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000004 exp=5a5a1234 obs=00000000
 FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=47 fail=7 skip=5
+CPUTEST DONE pass=48 fail=7 skip=5

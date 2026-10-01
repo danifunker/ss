@@ -297,3 +297,36 @@ BEGIN(t_mmu_fault_regs, "mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved,
         call mmu_off
         nop
 END
+
+/* One instruction access fault sets the SFSR once: FT 1 (invalid), L 3,
+ * AT 3 (supervisor instruction), FAV, and no OW. The jump lands mid-page
+ * in the invalid page, so the fetch unit's next fetch (the same page)
+ * faults too; a core that records that second fault sets OW, and Solaris
+ * 8 (sun4m get_fault_type) then takes the status as overwritten, never
+ * pages the text in and loops on the fault (seen on the board,
+ * 2026-10-01: SFSR 0x347 for a user text fault). The trap returns to 1:
+ * through V_TRAP_RESUME. */
+BEGIN(t_mmu_ifault, "mmu: an instruction access fault sets the SFSR once (FAV, no OW)")
+        call mmu_tables_init
+        nop
+        call mmu_on
+        nop
+        mov 0x300, %l6
+        lda [%l6] 4, %g0                /* clear */
+        set MT_PAGE(MT_P_INVALID) + 0x8b8, %l0
+        set 1f, %o0
+        st %o0, [%g7 + V_TRAP_RESUME]
+        EXPECT_TRAP(TT_IACC)
+        jmpl %l0, %g0
+        nop
+1:      CHECK_TRAPPED(TT_IACC, 1)
+        ld [%g7 + V_TRAP_PC], %l1
+        EXPECT_R(%l1, %l0, 2)
+        lda [%l6] 4, %l1
+        EXPECT(%l1, 0x366, 3)
+        lda [%l6] 4, %l1
+        EXPECT(%l1, 0, 4)               /* read clears */
+        st %g0, [%g7 + V_TRAP_RESUME]
+        call mmu_off
+        nop
+END
