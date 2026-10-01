@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Read files out of a Solaris (SPARC) UFS slice in a raw disk image.
+"""Read files out of a Solaris (SPARC) UFS or NetBSD/sparc FFSv1 slice in a
+raw disk image.
 
     tools/ufsread.py IMAGE ls PATH [--slice N]
     tools/ufsread.py IMAGE get PATH OUT [--slice N]
@@ -114,6 +115,8 @@ class UFS:
         off = 0
         while off < len(data):
             ino, reclen, namlen = struct.unpack(">IHH", data[off:off + 8])
+            # 4.4BSD FFS (NetBSD): a type byte, then an 8-bit name length
+            namlen &= 0xFF
             if reclen == 0:
                 break
             if ino:

@@ -4,8 +4,9 @@
  * privileged; with an empty queue it is fp_exception, ftt 4
  * sequence_error), the coprocessor load/store family (IU-3: cp_disabled,
  * tt 0x24, with no coprocessor), WRPSR with CWP >= NWINDOWS (IU-5:
- * illegal_instruction), reserved ASRs and CASA (IU-6), and on the SS20
- * the ASI width (MMU-12) and the ASI 0x38 registers (SMP-1). */
+ * illegal_instruction), reserved ASRs (read %y, write nothing) and CASA
+ * (IU-6), and on the SS20 the ASI width (MMU-12) and the ASI 0x38
+ * registers (SMP-1). */
 #include "macros.h"
 
 #define FTMP2   (SCRATCH + 0x40)
@@ -195,28 +196,40 @@ BEGIN(t_wrpsr_cwp, "trap: wr %psr with CWP = NWINDOWS -> illegal_instruction")
         EXPECT_R(%l0, %l1, 2)
 END
 
-/* rd %asr1 (reserved), wr %asr1, rd %asr15 with rd != 0 (reserved; rd =
- * 0 is STBAR), and CASA (op3 0x3c, V9) are illegal_instruction on V8. */
-BEGIN(t_rdasr, "trap: reserved ASRs and CASA -> illegal_instruction")
+/* Reserved ASRs: V8 B.28/B.29 leave them to the implementation. The
+ * microSPARC-I and -II manuals say every ASR read acts as RDY and every
+ * ASR write as a NOP (QEMU does the same), and OpenSSL's libcrypto relies
+ * on it: it tells V8 from V9 with "wr %g0, %y; rd %asr2" (%y on V8, %ccr
+ * on V9), so NetBSD's syslogd and login died of SIGILL when the core
+ * trapped reserved ASRs. rd %asr15 with rd = 0 is STBAR. CASA (op3 0x3c,
+ * V9/LEON) is illegal_instruction on both modules. */
+BEGIN(t_rdasr, "iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction")
+        set 0x5a5a1234, %o0
+        wr %o0, %y
+        nop ; nop ; nop
+        clr %l0 ; clr %l1 ; clr %l2
+        set 0x0bad0bad, %l4
+        EXPECT_TRAP(TT_ILLEGAL)
+        .word 0xa1404000                /* rd %asr1, %l0 */
+        .word 0xa3408000                /* rd %asr2, %l1 */
+        .word 0xa543c000                /* rd %asr15, %l2 */
+        .word 0x83850000                /* wr %l4, %g0, %asr1 */
+        nop ; nop ; nop                 /* (the WRY delay, were it one) */
+        rd %y, %l3
+        CHECK_NOT_TRAPPED(1)
+        EXPECT(%l0, 0x5a5a1234, 2)
+        EXPECT(%l1, 0x5a5a1234, 3)
+        EXPECT(%l2, 0x5a5a1234, 4)
+        EXPECT(%l3, 0x5a5a1234, 5)
         set SCRATCH, %l0
         set 0x3a3a3a3a, %l1
         st %l1, [%l0]
         set 0x11111111, %l1             /* != memory: CASA would not store */
         EXPECT_TRAP(TT_ILLEGAL)
-        .word 0xa1404000                /* rd %asr1, %l0 */
-        CHECK_TRAPPED(TT_ILLEGAL, 1)
-        EXPECT_TRAP(TT_ILLEGAL)
-        .word 0x83800000                /* wr %g0, %g0, %asr1 */
-        CHECK_TRAPPED(TT_ILLEGAL, 2)
-        EXPECT_TRAP(TT_ILLEGAL)
-        .word 0xa143c000                /* rd %asr15, %l0 */
-        CHECK_TRAPPED(TT_ILLEGAL, 3)
-        set SCRATCH, %l0
-        EXPECT_TRAP(TT_ILLEGAL)
         .word 0xe5e40171                /* casa [%l0] 0xb, %l1, %l2 */
-        CHECK_TRAPPED(TT_ILLEGAL, 4)
+        CHECK_TRAPPED(TT_ILLEGAL, 6)
         ld [%l0], %l2
-        EXPECT(%l2, 0x3a3a3a3a, 5)
+        EXPECT(%l2, 0x3a3a3a3a, 7)
 END
 
 #if defined(TARGET_SS20)

@@ -62,7 +62,7 @@ Effort: **S** up to a day, **M** a few days, **L** a redesign.
 | FPU-2 | FPU | No FPU exception mode / `sequence_error`; `STDFQ` not privileged | S3 | S |
 | IU-2 | IU | An interrupt overrides a synchronous trap of the same instruction | S3 | S |
 | IU-5 | IU | `WRPSR` with CWP ≥ NWINDOWS wraps instead of `illegal_instruction` | S3 | S |
-| IU-6 | IU | `RDASR`/`WRASR` with any rs1/rd access Y; `CASA` (op3 0x3c) executes instead of trapping | S3 | S |
+| IU-6 | IU | `CASA` (op3 0x3c) executes instead of trapping; `WRASR` with rd != 0 writes Y (a NOP on the microSPARC) | S3 | S |
 | C-6 | Cache | Cache geometry differs from both modules (VIVT 4-way on the SS5) | S3 | – |
 | CFG-2 | Config | Reset: only `reset_n` exists (processor reset = delayed global reset); a software reset also clears DRAM | S2 | M (glue) |
 | CFG-3 | Config | "IOMMU rev" (mask rev) never reaches the CPU; only the IOMMU's `0x3018` and a private copy | S3 | – |
@@ -213,7 +213,13 @@ Test: `t_irq_prio` (needs the timer).
 - `WRPSR` with CWP ≥ NWINDOWS: V8 requires `illegal_instruction`; the core
   wraps with `cwpfix` (`iu_pack.vhd:502`, `:1464-1479`).
 - `RDASR`/`WRASR` ignore rs1/rd and access Y (`iu_pack.vhd:1770-1772`,
-  `:1793-1796`). V8 reserves ASR 1-14 (illegal); `STBAR` (rs1=15, rd=0) is fine.
+  `:1793-1796`). V8 B.28/B.29 leave reserved ASRs to the implementation,
+  and the microSPARC-I/II manuals say every ASR read acts as RDY and every
+  ASR write as a NOP. **Reads must not trap**: OpenSSL's libcrypto tells
+  V8 from V9 with `wr %g0, %y; rd %asr2` (2026-10-01: a core that trapped
+  it killed NetBSD's `syslogd` and `login` with SIGILL). So reads stay RDY;
+  the only gap is that a write to ASR 1-31 changes Y instead of nothing.
+  (This entry first said reserved ASRs were illegal_instruction: wrong.)
 - `CASA` (op3 0x3c, V9/LEON) is enabled in every configuration
   (`cpu_conf_pack.vhd:71,99,127`; `iu_pack.vhd:1327-1333`, `:2291-2305`), so an
   op3 that is `illegal_instruction` on both modules executes.
@@ -653,7 +659,7 @@ forces one CPU (`ts_core.vhd:179`). `BSD_MODE` (MMU-6) and `FPU_LDASTA`
 | `t_fpu_trap_prio` | both | `fdivs` by 0 with TEM.DZ, then misaligned `st %f` → tt 7 and memory untouched, then aligned `st %f` → tt 8, cexc DZ | FPU-1 |
 | `t_fpu_fq` | both | FQ contents after a trap (PC, instruction), FSR.qne, `STDFQ` with empty FQ → ftt 4, `STDFQ` in user mode → tt 3 | FPU-2 |
 | `t_cp_ldst` | both | op3 0x30-0x37 → tt 0x24; in user mode no memory access | IU-3 |
-| `t_wrpsr_cwp`, `t_rdasr` | both | `wr %psr` with CWP = 8 → tt 2; `rd %asr1` → tt 2 | IU-5, IU-6 |
+| `t_wrpsr_cwp`, `t_rdasr` | both | `wr %psr` with CWP = 8 → tt 2; `rd %asr1`/`%asr2`/`%asr15, %l2` read Y, `wr %asr1` leaves Y, CASA → tt 2 | IU-5, IU-6 |
 | `t_asi_width` | SS20 | a store to ASI 0x4c does not change the ASI 0x0c tag at 0; ASI 0x38 va 0 holds a 64-bit value | MMU-12, SMP-1 |
 | `t_cache_flush_miss` | SS20 | WB on: store to a line, touch 5 other pages, `flush` it, read back through ASI 0x20 | C-3 |
 | `t_flash_clear` | SS20 | line cached, DE off, store, flash clear, DE on, load sees the new value | C-2 |
