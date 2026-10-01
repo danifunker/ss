@@ -71,5 +71,5 @@ PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000004 exp=5a5a1234 obs=00000000
 FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
-PASS mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit values
+PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
 CPUTEST DONE pass=47 fail=7 skip=5

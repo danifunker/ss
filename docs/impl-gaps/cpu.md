@@ -415,8 +415,11 @@ ASI 0x44 reaches the MMU registers, 0x48-0x4b normal memory, and 0x4c (Viking
 ACTION register: OBP 2.25 `obp_cache_init` writes 0, Linux `poke_viking` does
 read-modify-write on secondaries) writes the I-cache tag at index 0 of every
 way. Today that happens while the tags are clear, so it is harmless
-(*inference*). Fix: decode all 8 bits; ACTION becomes a register or a
-write-ignored ASI.
+(*inference*). Fix: decode all 8 bits; ACTION becomes a register (not a
+write-ignored ASI: Solaris 8's SuperSPARC setup writes 0x1000, MIX, and
+loops until it reads it back; seen on the board 2026-10-01, the kernel
+spinning at `sta %o0,[%g0] 0x4c; lda [%g0] 0x4c,%o3; cmp; bne`). QEMU keeps
+13 bits (`val & 0x1fff`) at any address.
 
 ### MMU-13 ASI 0x38 (part of SMP-1)
 
@@ -660,7 +663,7 @@ forces one CPU (`ts_core.vhd:179`). `BSD_MODE` (MMU-6) and `FPU_LDASTA`
 | `t_fpu_fq` | both | FQ contents after a trap (PC, instruction), FSR.qne, `STDFQ` with empty FQ → ftt 4, `STDFQ` in user mode → tt 3 | FPU-2 |
 | `t_cp_ldst` | both | op3 0x30-0x37 → tt 0x24; in user mode no memory access | IU-3 |
 | `t_wrpsr_cwp`, `t_rdasr` | both | `wr %psr` with CWP = 8 → tt 2; `rd %asr1`/`%asr2`/`%asr15, %l2` read Y, `wr %asr1` leaves Y, CASA → tt 2 | IU-5, IU-6 |
-| `t_asi_width` | SS20 | a store to ASI 0x4c does not change the ASI 0x0c tag at 0; ASI 0x38 va 0 holds a 64-bit value | MMU-12, SMP-1 |
+| `t_asi_width` | SS20 | a store to ASI 0x4c does not change the ASI 0x0c tag at 0 and reads back; ASI 0x38 va 0 holds a 64-bit value | MMU-12, SMP-1 |
 | `t_cache_flush_miss` | SS20 | WB on: store to a line, touch 5 other pages, `flush` it, read back through ASI 0x20 | C-3 |
 | `t_flash_clear` | SS20 | line cached, DE off, store, flash clear, DE on, load sees the new value | C-2 |
 | `t_selfmod` | both | write an instruction, `flush`, execute it | C-3 |

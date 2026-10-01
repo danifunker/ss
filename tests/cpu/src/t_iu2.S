@@ -234,12 +234,12 @@ END
 
 #if defined(TARGET_SS20)
 /* ASI 0x4c (the SuperSPARC ACTION register, written 0 by OBP 2.25) must
- * not reach the ASI 0x0c I-cache tag at index 0 (the core keeps 6 ASI
+ * not reach the ASI 0x0c I-cache tag at index 0 (the core kept 6 ASI
  * bits, MMU-12); the tag is compared before and after, since QEMU reads
- * the tag ASIs as 0. ASI 0x38 va 0 and 0x100 (MMU breakpoint value and
- * mask, 36 bits) must hold 64-bit values: OBP 2.25 keeps the MID there
- * (SMP-1). */
-BEGIN(t_asi_width, "mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit values")
+ * the tag ASIs as 0. ACTION itself must read back (Solaris 8). ASI 0x38
+ * va 0 and 0x100 (MMU breakpoint value and mask, 36 bits) must hold
+ * 64-bit values: OBP 2.25 keeps the MID there (SMP-1). */
+BEGIN(t_asi_width, "mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values")
         set 0x100, %o0
         sta %o0, [%g0] 0x0c             /* an invalid, non-zero tag */
         lda [%g0] 0x0c, %l0
@@ -264,5 +264,19 @@ BEGIN(t_asi_width, "mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit va
         clr %l3
         stda %l2, [%g0] 0x38
         stda %l2, [%l4] 0x38
+        /* ACTION (ASI 0x4c, 13 bits in QEMU) reads back what was written:
+         * Solaris 8's SuperSPARC setup writes 0x1000 (MIX) and loops
+         * until it reads it back */
+        set 0x1000, %o0
+        sta %o0, [%g0] 0x4c
+        lda [%g0] 0x4c, %l5
+        EXPECT(%l5, 0x1000, 6)
+        set 0x0aaa, %o0
+        sta %o0, [%g0] 0x4c
+        lda [%g0] 0x4c, %l5
+        EXPECT(%l5, 0x0aaa, 7)
+        sta %g0, [%g0] 0x4c
+        lda [%g0] 0x4c, %l5
+        EXPECT(%l5, 0, 8)
 END
 #endif
