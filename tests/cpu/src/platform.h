@@ -52,6 +52,14 @@
 #define SCRATCH         0x00200000      /* free for tests: 1 MiB */
 #define SCRATCH_SIZE    0x00100000
 
+/* SS20: the parked CPUs' mailboxes (runtime.S mp_park, t_msi.S), and the
+ * MSI registers, through ASI 0x2f (pa 0xf_xxxx_xxxx). */
+#define MP_MID          0x00180000      /* + 4n: CPU n's MID register read */
+#define MP_COUNT        0x00180010      /* + 4n: CPU n's loop counter */
+#define IOMMU_CTRL_PA   0xe0000000
+#define MSI_ARB_PA      0xe0001008      /* arbiter enable */
+#define MSI_MID_PA      0xe0002000      /* MID of the requesting master */
+
 /* Runtime variables, offsets from VARS (kept in %g7 by convention). */
 #define V_TRAP_EXPECT   0x00    /* tt the current test expects, or -1 */
 #define V_TRAP_SEEN     0x04    /* tt of the last expected trap taken */

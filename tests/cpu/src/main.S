@@ -13,6 +13,7 @@
 #include "t_cache.S"
 #include "t_fpu.S"
 #include "t_chipset.S"
+#include "t_msi.S"
 
         .section .testtab, "a", @progbits
         .word 0, 0                      /* end of the test table */

@@ -219,7 +219,9 @@ ARCHITECTURE rtl OF ts_core IS
   END FUNCTION;
 
   CONSTANT CPUTYPE : natural :=smptype(SS20);
-  CONSTANT IOMMU_VER : uv8 := CPUCONF(CPUTYPE).IOMMU_VER;
+  -- SS20: IMPL 1, VER 3 (an MSI with a working MID register; QEMU's SS-20
+  -- value). With IMPL 0 the SS20 OBP takes the MID from the CPU (IOM-2).
+  CONSTANT IOMMU_VER : uv8 := mux(SS20,x"13",CPUCONF(CPUTYPE).IOMMU_VER);
   
   CONSTANT NCPU : natural :=calc_ncpu(CPU0,CPU1,CPU2,CPU3); -- <AVOIR : Saute ordre>
   
@@ -438,6 +440,8 @@ ARCHITECTURE rtl OF ts_core IS
       iic3_sda_o  : OUT std_logic;
       iic3_sda_i  : IN  std_logic;
       reset_mask_rev : IN uv8;
+      arb_cpu     : OUT uv4;
+      bus_cpu     : IN  uv2 := "00";
       kbm_layout  : IN  uv8;
       swconf      : IN  uv8;
       stopa       : IN  std_logic;
@@ -469,6 +473,10 @@ ARCHITECTURE rtl OF ts_core IS
   SIGNAL fpu0_o,fpu1_o,fpu2_o,fpu3_o : type_fpu_o;
   
   SIGNAL smp0_w,smp1_w,smp2_w,smp3_w,smp_r : type_smp;
+  SIGNAL smp0_aw,smp1_aw,smp2_aw,smp3_aw : type_smp; -- after the arbiter
+  SIGNAL arb_cpu : uv4;                 -- MSI arbiter enables, bit n = CPU n
+  SIGNAL sel_q   : uv4 :="0000";        -- CPU n owned the MBus last cycle
+  SIGNAL bus_cpu : uv2 :="00";          -- the CPU that owns the MBus
   SIGNAL hitx0,hitx1,hitx2,hitx3,hit0,hit1,hit2,hit3 : std_logic :='0';
   SIGNAL cwb0,cwb1,cwb2,cwb3 : std_logic :='0';
   SIGNAL sel0,sel1,sel2,sel3 : std_logic :='0';
@@ -974,12 +982,35 @@ BEGIN
     END GENERATE GEN_FPU_UNI;
     
     -----------------------------------
+    -- MSI MBus arbiter [S4M 5.1.2]: a CPU whose arbiter enable bit is
+    -- clear gets no new grant; its request stays pending (the MCU holds
+    -- it until done) and it stalls. MBus arbitration parks: the master
+    -- that owns the bus keeps it until another master needs it, so the
+    -- request of the current owner always passes. sel_q is registered
+    -- because smpmux's sel outputs depend on the requests.
+    sel_q<=sel3 & sel2 & sel1 & sel0 WHEN rising_edge(clk);
+    bus_cpu<="01" WHEN sel_q(1)='1' ELSE
+             "10" WHEN sel_q(2)='1' ELSE
+             "11" WHEN sel_q(3)='1' ELSE
+             "00";
+
+    Arb:PROCESS(smp0_w,smp1_w,smp2_w,smp3_w,arb_cpu,sel_q) IS
+    BEGIN
+      smp0_aw<=smp0_w;
+      smp1_aw<=smp1_w;
+      smp1_aw.req<=smp1_w.req AND (arb_cpu(1) OR sel_q(1));
+      smp2_aw<=smp2_w;
+      smp2_aw.req<=smp2_w.req AND (arb_cpu(2) OR sel_q(2));
+      smp3_aw<=smp3_w;
+      smp3_aw.req<=smp3_w.req AND (arb_cpu(3) OR sel_q(3));
+    END PROCESS Arb;
+
     i_smpmux: ENTITY work.smpmux
       GENERIC MAP (
         NCPU => NCPU,
         PROF => 20)
       PORT MAP (
-        smp0_w   => smp0_w,
+        smp0_w   => smp0_aw,
         cpu0_w   => ext0_pw,
         cpu0_r   => ext0_pr,
         hit0     => hit0,
@@ -987,7 +1018,7 @@ BEGIN
         cwb0     => cwb0,
         last0    => last0,
         sel0     => sel0,
-        smp1_w   => smp1_w,
+        smp1_w   => smp1_aw,
         cpu1_w   => ext1_pw,
         cpu1_r   => ext1_pr,
         hit1     => hit1,
@@ -995,7 +1026,7 @@ BEGIN
         cwb1     => cwb1,
         last1    => last1,
         sel1     => sel1,
-        smp2_w   => smp2_w,
+        smp2_w   => smp2_aw,
         cpu2_w   => ext2_pw,
         cpu2_r   => ext2_pr,
         hit2     => hit2,
@@ -1003,7 +1034,7 @@ BEGIN
         cwb2     => cwb2,
         last2    => last2,
         sel2     => sel2,
-        smp3_w   => smp3_w,
+        smp3_w   => smp3_aw,
         cpu3_w   => ext3_pw,
         cpu3_r   => ext3_pr,
         hit3     => hit3,
@@ -1294,6 +1325,14 @@ BEGIN
       ELSIF mem_pw.ah=x"E" AND mem_pw.a(31)='0' AND mem_pw.a(23)='1' THEN
         memm_pw.a(31 DOWNTO 21)<=TCX_ADR(31 DOWNTO 21);
         memm_pw.ah<=TCX_ADR_H;
+      ELSIF mem_pw.ah=x"0" AND mem_pw.a(31 DOWNTO 29)="000" AND
+            mem_pw.a(28 DOWNTO 24)>="11101" THEN
+        -- pa 0x1D00_0000-0x1FFF_FFFF: the top 48 MB of the DDR hold the
+        -- PROM image (OBRAM), the TCX VRAM and the scaler buffers. For the
+        -- CPUs and DVMA, SIMM slot 7 is a 16 MB SIMM that repeats every
+        -- 16 MB, so the Sun OBP's memory probe sizes it (7 x 64 + 16 =
+        -- RAMSIZE) instead of writing over the PROM image (glue G6).
+        memm_pw.a(28 DOWNTO 24)<="11100";
       END IF;
     ELSE
       IF OBRAM AND (mem_pw.a(31 DOWNTO 28)=x"F" OR
@@ -1433,6 +1472,8 @@ BEGIN
       iic3_sda_o  => iic3_sda_o,
       iic3_sda_i  => iic3_sda_i,
       reset_mask_rev => reset_mask_rev,
+      arb_cpu     => arb_cpu,
+      bus_cpu     => bus_cpu,
       kbm_layout  => kbm_layout,
       swconf      => swconfs,
       stopa       => debug_stopa,

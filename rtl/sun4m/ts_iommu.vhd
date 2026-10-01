@@ -75,6 +75,10 @@ ENTITY ts_iommu IS
     por  : IN  type_plomb_r; -- Plomb, Côte Mémoire, lectures
 
     mask_rev : IN uv8;
+    -- MBus (SS20): the MSI arbiter enable for CPUs 3:1 (bit 0 reads 1),
+    -- and the index of the CPU that owns the bus (the MID register)
+    arb_cpu  : OUT uv4;
+    bus_cpu  : IN  uv2 := "00";
     -- Global
     clk      : IN std_logic;
     reset_n  : IN std_logic
@@ -89,6 +93,10 @@ ARCHITECTURE rtl OF ts_iommu IS
   SIGNAL de : std_logic;                -- IOMMU Diagnostic Enable
   SIGNAL rag : unsigned(2 DOWNTO 0);    -- IOMMU Range
   SIGNAL iba : unsigned(35 DOWNTO 14);  -- IOMMU Base address
+  SIGNAL arb_en  : unsigned(3 DOWNTO 1); -- SS20 arbiter: MBus masters 9-B
+  SIGNAL arb_sbus : unsigned(4 DOWNTO 0); -- SS20 arbiter: SBus slots 0-3, F
+  SIGNAL arb_sbw : std_logic;            -- SS20 arbiter: S-to-M async writes
+  SIGNAL sbae    : unsigned(5 DOWNTO 0); -- SS5 MID register: SBus arb enables
   SIGNAL dr : uv32;
   SIGNAL rsel : std_logic;
   
@@ -237,14 +245,49 @@ BEGIN
       IF rsel='1' AND w.a(13 DOWNTO 2)="110000000110" THEN
         dr<=mask_rev & ZERO(23 DOWNTO 0);
       END IF;
-      
+
+      -- 1008 : SS20 MSI Arbiter Enable Register [S4M 5.1.2]. Bit 0 (MBus
+      -- master 8) reads 1; bits 3:1 enable masters 9-B, 20:16 the SBus
+      -- slots and on-board devices, 31 SBW. The OBP parks and releases
+      -- CPUs with bits 3:1 (ts_core withholds a disabled CPU's requests).
+      IF SS20 AND rsel='1' AND w.a(13 DOWNTO 2)="010000000010" THEN
+        IF w.be="1111" AND w.wr='1' THEN
+          arb_en<=w.dw(3 DOWNTO 1);
+          arb_sbus<=w.dw(20 DOWNTO 16);
+          arb_sbw<=w.dw(31);
+        END IF;
+        dr<=arb_sbw & ZERO(30 DOWNTO 21) & arb_sbus & ZERO(15 DOWNTO 4) &
+             arb_en & '1';
+      END IF;
+
+      -- 2000 : MID Register. SS20 MSI [S4M 5.4.3]: the MBus ID of the
+      -- master doing the access, 8 + the CPU index. SS5 [MS2 5.7.10]:
+      -- the constant 8, and SBAE[5:0] in bits 21:16.
+      IF rsel='1' AND w.a(13 DOWNTO 2)="100000000000" THEN
+        IF SS20 THEN
+          dr<=ZERO(31 DOWNTO 4) & "10" & bus_cpu;
+        ELSE
+          IF w.be="1111" AND w.wr='1' THEN
+            sbae<=w.dw(21 DOWNTO 16);
+          END IF;
+          dr<=ZERO(31 DOWNTO 22) & sbae & ZERO(15 DOWNTO 4) & x"8";
+        END IF;
+      END IF;
+
       IF reset_n='0' THEN
         me<='0';
         de<='0';
         rag<="000";
         flush<='0';
         iba<=(OTHERS => '0');
-      END IF;      
+        -- The MSI enables only CPUs 8 and 9 at power-on; all of them here,
+        -- because OpenBIOS starts every CPU from reset and never writes
+        -- the arbiter (the Sun OBP enables 9-B in its first instructions).
+        arb_en<="111";
+        arb_sbus<="00000";
+        arb_sbw<='0';
+        sbae<="000000";
+      END IF;
 
     END IF;
   END PROCESS Sync_Regs;
@@ -255,6 +298,8 @@ BEGIN
     r.ack<=sel;
     r.dr<=dr;
   END PROCESS R_Gen;
+
+  arb_cpu<=arb_en & '1' WHEN SS20 ELSE "1111";
   
   ------------------------------------------------------------------------------
   -- Manipulations Pipe

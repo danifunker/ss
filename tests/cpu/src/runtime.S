@@ -42,8 +42,8 @@ reset:
          * QEMU starts the secondary CPUs halted, and CPU 0 reads 0 there. */
         lda [%g0] 4, %l0
         srl %l0, 2, %l0
-        andcc %l0, 3, %g0
-        bne halt
+        andcc %l0, 3, %l0
+        bne mp_park
         nop
 #endif
         wr %g0, (PSR_S | PSR_PS | PSR_PIL_MASK), %psr   /* ET=0 CWP=0 */
@@ -125,6 +125,26 @@ reset:
         nop
 halt:   ba halt
         nop
+
+#if defined(TARGET_SS20)
+/* CPU n (1-3, in %l0) parks here: forever, it copies the MSI MID register
+ * into MP_MID + 4n and increments MP_COUNT + 4n, uncached (MMU off, caches
+ * off), so every iteration is MBus traffic. t_msi.S watches it. */
+mp_park:
+        sll %l0, 2, %l0
+        set MP_MID, %l1
+        add %l1, %l0, %l1
+        set MP_COUNT, %l2
+        add %l2, %l0, %l2
+        set MSI_MID_PA, %l3
+1:      lda [%l3] 0x2f, %l4
+        sta %l4, [%l1] 0x20
+        lda [%l2] 0x20, %l4
+        add %l4, 1, %l4
+        sta %l4, [%l2] 0x20
+        ba 1b
+        nop
+#endif
 
 /* ------------------------------------------------------------------ */
 /* Trap entry: %l0 = PSR, %l1 = PC, %l2 = nPC, ET = 0, in the trap

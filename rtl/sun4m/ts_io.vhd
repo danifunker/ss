@@ -149,6 +149,8 @@ ENTITY ts_io IS
 
     -- Direct
     reset_mask_rev : IN uv8;
+    arb_cpu     : OUT uv4;              -- SS20 MBus arbiter enables (CPU n)
+    bus_cpu     : IN  uv2 := "00";      -- CPU that owns the MBus
     kbm_layout  : IN  uv8;
     swconf      : IN  uv8;
     
@@ -339,6 +341,8 @@ BEGIN
       pow      => iommu_pw,
       por      => iommu_pr,
       mask_rev => mask_rev,
+      arb_cpu  => arb_cpu,
+      bus_cpu  => bus_cpu,
       clk      => clk,
       reset_n  => reset_n);
   
