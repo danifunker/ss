@@ -278,6 +278,86 @@ BEGIN(t_cache_atomic, "cache: ldstub and swap on a cached line change only their
         EXPECT(%i3, 0x55555555, 9)
 END
 
+#if defined(TARGET_SS20)
+/* 32 lines of 8 distinct words each; an ldstub on every line brings it
+ * into the cache modified (FILLMOD) and a line flush writes it back. The
+ * memory image must match word for word: every write-back burst has to
+ * reach the DDR intact. The DDR arbiter stalls write beats at will (video
+ * has priority), and a stalled odd beat once overwrote the even word of
+ * its 64-bit pair in the plomb-to-Avalon bridge: the lock byte of a line
+ * landed on its neighbour (t_smp_atomic's 0xff000000 counter). Code of a
+ * failing check = the word's byte offset in the page. */
+#define WB_LINES        32
+#define WB_PAGE         MT_PAGE(12)
+BEGIN(t_cache_wback_burst, "cache: SS20 write-backs of 32 modified lines reach memory intact")
+        call mmu_tables_init
+        nop
+        /* word j of line i = (i+1) << 24 | (i+1) << 16 | j << 8 | j */
+        set WB_PAGE, %l0
+        clr %l1                         /* i */
+1:      clr %l2                         /* j */
+        add %l1, 1, %l3
+        sll %l3, 8, %l4
+        or %l4, %l3, %l3
+        sll %l3, 16, %l3
+2:      sll %l2, 8, %l4
+        or %l4, %l2, %l4
+        or %l3, %l4, %l4
+        sta %l4, [%l0] 0x20
+        add %l0, 4, %l0
+        add %l2, 1, %l2
+        cmp %l2, 8
+        bl 2b
+        nop
+        add %l1, 1, %l1
+        cmp %l1, WB_LINES
+        bl 1b
+        nop
+        call mmu_on
+        nop
+        set WB_PAGE + 4, %l0
+        mov WB_LINES, %l1
+3:      ldstub [%l0], %l2               /* the line: cached, modified */
+        sta %g0, [%l0] 0x10             /* flushed: a write-back burst */
+        add %l0, 32, %l0
+        subcc %l1, 1, %l1
+        bne 3b
+        nop
+        call mmu_off
+        nop
+        set WB_PAGE, %l0
+        clr %l1
+4:      clr %l2
+        add %l1, 1, %l3
+        sll %l3, 8, %l4
+        or %l4, %l3, %l3
+        sll %l3, 16, %l3
+5:      sll %l2, 8, %l4
+        or %l4, %l2, %l4
+        or %l3, %l4, %o2                /* expected */
+        cmp %l2, 1
+        bne 6f
+        nop
+        set 0x00ffffff, %l6
+        and %o2, %l6, %o2
+        set 0xff000000, %l6
+        or %o2, %l6, %o2                /* word 1: ldstub set its top byte */
+6:      lda [%l0] 0x20, %o1
+        set WB_PAGE, %o0
+        call check_eq
+        sub %l0, %o0, %o0
+        add %l0, 4, %l0
+        add %l2, 1, %l2
+        cmp %l2, 8
+        bl 5b
+        nop
+        add %l1, 1, %l1
+        cmp %l1, WB_LINES
+        bl 4b
+        nop
+END
+#endif
+
 /* A routine in cacheable RAM is run, patched with a normal store, FLUSHed
  * and run again (V8 FLUSH: instruction memory consistency). */
 BEGIN(t_selfmod, "cache: a patched instruction runs after FLUSH")

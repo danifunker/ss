@@ -125,6 +125,10 @@ BEGIN(t_mmu_tlb_flush, "mmu: a changed PTE is seen after the matching ASI 3 flus
         ld [%l0], %l1                   /* 22: the TLB now holds it */
         SET_PTE(PTE_C3(MT_PAGE(23)), MT_L3 + MT_P_REMAP * 4)
         ld [%l0], %l2                   /* still 22 */
+        sta %g0, [%l0] 0x10             /* that load refilled the line: the
+                                           SS5's D-cache is virtually
+                                           tagged, so it would serve page
+                                           22 after the remap */
         sta %g0, [%l0] 3                /* page flush (type 0) */
         ld [%l0], %l4                   /* 23 */
         SET_PTE(PTE_C3(MT_PAGE(24)), MT_L3 + MT_P_REMAP * 4)
