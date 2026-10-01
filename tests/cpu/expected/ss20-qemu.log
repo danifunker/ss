@@ -38,7 +38,13 @@ PASS chipset: NVRAM IDPROM format 1, machine type, checksum
 PASS chipset: frame buffer slot starts with FCode (0xf1 header)
     check 00000001 exp=000000ff obs=00000000
 FAIL chipset: DMA2 E_BASE_ADDR resets to 0xff
+    check 00000001 exp=000000c0 obs=00000080
+    check 00000001 exp=000000c1 obs=00000080
+    check 00000001 exp=000000c2 obs=00000080
+    check 00000001 exp=000000c3 obs=00000080
+    check 00000006 exp=00000071 obs=00000021
+FAIL chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
 PASS chipset: SS20 MSI: IOMMU IMPL/VER 0x13, MID 8, arbiter enable
 SKIP chipset: SS20 MSI: each CPU reads its own MID; the arbiter parks CPU 1
 SKIP chipset: SS20 SIMM slot 7 is 16 MB, aliased every 16 MB
-CPUTEST DONE pass=33 fail=3 skip=2
+CPUTEST DONE pass=33 fail=4 skip=2

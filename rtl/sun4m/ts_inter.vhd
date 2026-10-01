@@ -73,6 +73,7 @@ ENTITY ts_inter IS
     int_ether    : IN std_logic; -- Ethernet
     int_sport    : IN std_logic; -- Serial port
     int_kbm      : IN std_logic; -- Keyboard / Mouse
+    int_floppy   : IN std_logic := '0'; -- Floppy (82077)
     int_video    : IN std_logic; -- Video (CG3)
     int_audio    : IN std_logic; -- Audio (CS4231)
     
@@ -133,7 +134,7 @@ BEGIN
     "00" &                 -- [30] Module error (L15)  [29] M-to-S (L15)
     "00" &                 -- [28] ECC Mem (L15)       [27] VME Async (L15)
     "0000" &               -- [26:23] Réservé
-    '0' & '0' & '0' &      -- [22] Floppy     [21] Module    [20] Video
+    int_floppy & '0' & '0' & -- [22] Floppy   [21] Module    [20] Video
     int_timer_s &          -- [19] System Timer
     int_esp &              -- [18] SCSI
     '0' &                  -- [17] Audio

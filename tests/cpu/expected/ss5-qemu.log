@@ -42,4 +42,10 @@ PASS chipset: frame buffer slot starts with FCode (0xf1 header)
     check 00000001 exp=000000ff obs=00000000
 FAIL chipset: DMA2 E_BASE_ADDR resets to 0xff
 PASS chipset: the PROM answers at pa 0x7000_0000
-CPUTEST DONE pass=36 fail=3 skip=0
+    check 00000001 exp=000000c0 obs=00000080
+    check 00000001 exp=000000c1 obs=00000080
+    check 00000001 exp=000000c2 obs=00000080
+    check 00000001 exp=000000c3 obs=00000080
+    check 00000006 exp=00000071 obs=00000021
+FAIL chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
+CPUTEST DONE pass=36 fail=4 skip=0

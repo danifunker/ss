@@ -42,6 +42,7 @@ set_global_assignment -name VHDL_FILE rtl/sun4m/ts_pack.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_ps2.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_ps2sun.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_rtc.vhd
+set_global_assignment -name VHDL_FILE rtl/sun4m/ts_fdc.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_sport.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_sunkb.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_fcode_pack.vhd

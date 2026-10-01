@@ -59,3 +59,8 @@ build*.out
 
 # OpenBIOS out-of-tree build (scripts/build-bios.sh)
 bios/build/
+
+# tools/debugarm build outputs (ARM binaries, built with make)
+tools/debugarm/*.o
+tools/debugarm/debug
+tools/debugarm/pcdump

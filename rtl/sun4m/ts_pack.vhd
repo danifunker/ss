@@ -38,6 +38,7 @@ PACKAGE ts_pack IS
     auxio0  : std_logic;
     auxio1  : std_logic;
     syscon  : std_logic;
+    fdc     : std_logic;
     
     vide    : std_logic;
   END RECORD;

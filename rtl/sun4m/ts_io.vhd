@@ -170,6 +170,8 @@ ARCHITECTURE rtl OF ts_io IS
   SIGNAL sel,sel2 : type_sel;
   SIGNAL int_ether,int_sport : std_logic;
   SIGNAL int_kbm,int_timer_s : std_logic;
+  SIGNAL int_floppy : std_logic;
+  SIGNAL fdc_r : type_pvc_r;
   SIGNAL int_timer_p0,int_timer_p1,int_timer_p2,int_timer_p3 : std_logic;
   SIGNAL dmaux_r,inter_r,iommu_r,lance_r : type_pvc_r;
   SIGNAL rtc_r,sport1_r,sport2_r,timer_r,vid_r : type_pvc_r;
@@ -321,6 +323,7 @@ BEGIN
       int_ether    => eth_int,
       int_sport    => int_sport,
       int_kbm      => int_kbm,
+      int_floppy   => int_floppy,
       int_video    => int_video,
       int_audio    => int_audio,
       clk          => clk,
@@ -481,6 +484,17 @@ BEGIN
       r        => rtc_r,
       rtcinit  => rtcinit,
       rtcset   => rtcset,
+      clk      => clk,
+      reset_n  => reset_n);
+
+  -----------------------------------
+  -- Floppy controller (no drive)
+  i_ts_fdc: ENTITY work.ts_fdc
+    PORT MAP (
+      sel      => sel.fdc,
+      w        => io_w,
+      r        => fdc_r,
+      int      => int_floppy,
       clk      => clk,
       reset_n  => reset_n);
 
@@ -740,7 +754,7 @@ BEGIN
   
   ReadMux:PROCESS (sel2,sel,dmaux_r,inter_r,iommu_r,esp_r,lance_r,rtc_r,
                    vid_r,sport1_r,sport2_r,timer_r,flash_r,ibram_r,audio_r_pvc,
-                   sysstat)
+                   fdc_r,sysstat)
   BEGIN
     IF sel2.dma2='1' OR sel2.auxio0='1' THEN
       io_r<=dmaux_r;
@@ -768,6 +782,8 @@ BEGIN
       io_r<=ibram_r;
     ELSIF sel2.audio='1' THEN
       io_r<= audio_r_pvc;
+    ELSIF sel2.fdc='1' THEN
+      io_r<=fdc_r;
     ELSIF sel2.syscon='1' THEN
       -- System control/status: bit 1 RS (a software reset happened),
       -- bit 4 WD (watchdog reset); SR (bit 0) reads 0. Word access, as
@@ -801,6 +817,8 @@ BEGIN
       io_r.ack<=ibram_r.ack;
     ELSIF sel.audio='1' THEN
       io_r.ack<= audio_r_pvc.ack;
+    ELSIF sel.fdc='1' THEN
+      io_r.ack<=fdc_r.ack;
     ELSE
       io_r.ack<='1';                    -- Zone inconnue ...
     END IF;

@@ -85,7 +85,7 @@ BEGIN
     sel.sport  <=to_std_logic(aa(31 DOWNTO 20)=x"711"); -- Serial ports
     sel.rtc    <=to_std_logic(aa(31 DOWNTO 20)=x"712"); -- NVRAM / TOD
     -- 713     : GPIO
-    -- 714     : Floppy
+    sel.fdc    <=to_std_logic(aa(31 DOWNTO 20)=x"714"); -- Floppy (82077)
     -- 715-716 : Reserved
     -- 718     : Configuration register
     sel.auxio0 <=to_std_logic(aa(31 DOWNTO 20)=x"719"); -- Auxiliary IO regs
@@ -152,7 +152,7 @@ BEGIN
     sel.inter  <=to_std_logic(aa(35 DOWNTO 20)=x"FF14"); -- Interrupt controller
     -- Audio / ISDN  FF15
     sel.led    <=to_std_logic(aa(35 DOWNTO 20)=x"FF16"); -- Diagnostic LEDs
-    -- Floppy        FF17
+    sel.fdc    <=to_std_logic(aa(35 DOWNTO 20)=x"FF17"); -- Floppy (82077)
     sel.auxio0 <=to_std_logic(aa(35 DOWNTO 20)=x"FF18"); -- Auxiliary IO1
     -- Reserved      FF19
     sel.auxio1 <=to_std_logic(aa(35 DOWNTO 20)=x"FF1A"); -- Auxiliary IO2
@@ -165,7 +165,7 @@ BEGIN
                sel.lance OR sel.iommu OR
                sel.rom OR sel.ibram OR sel.kbm OR sel.sport OR
                sel.rtc OR sel.timer OR sel.inter OR sel.led OR
-               sel.auxio0 OR sel.auxio1 OR sel.syscon);
+               sel.auxio0 OR sel.auxio1 OR sel.syscon OR sel.fdc);
   
   s<=sel;
   
