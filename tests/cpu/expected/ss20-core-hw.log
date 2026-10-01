@@ -38,4 +38,25 @@ PASS chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
 PASS chipset: SS20 MSI: IOMMU IMPL/VER 0x13, MID 8, arbiter enable
 PASS chipset: SS20 MSI: each CPU reads its own MID; the arbiter parks CPU 1
 PASS chipset: SS20 SIMM slot 7 is 16 MB, aliased every 16 MB
-CPUTEST DONE pass=39 fail=0 skip=0
+PASS mmu: SS20 context register has 16 bits, CTPR bits 31:6 stick
+PASS mmu: SS20 contexts 1, 0x101, 0x8001 translate the same VA differently
+PASS mmu: a changed PTE is seen after the matching ASI 3 flush, not before
+PASS mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserved
+PASS mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
+PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
+    dcache mode: write-through
+PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
+PASS cache: SS20 line flush after a DTLB miss reaches the line
+PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: SS20 write-backs of 32 modified lines reach memory intact
+PASS cache: a patched instruction runs after FLUSH
+PASS smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
+PASS smp: SS20 3 CPUs increment a shared counter under ldstub and swap locks
+PASS smp: SS20 with SE off CPU 0 keeps its stale copy of CPU 1's line (C-4)
+PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
+PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
+PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
+PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
+PASS trap: reserved ASRs and CASA -> illegal_instruction
+PASS mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit values
+CPUTEST DONE pass=59 fail=0 skip=0
