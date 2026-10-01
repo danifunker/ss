@@ -199,8 +199,17 @@ static void mb86904_init(void)
     fword("property");
 }
 
+/* MBus ID of the CPU node being built (setup_cpu), for the module
+ * addresses in its "reg": MBus module n (MID 8 + n) answers at
+ * 0xf_f8000000 + (n << 24), so each CPU node gets its own unit address
+ * (TI,TMS390Z55@f,f8fffffc, @f,f9fffffc, ...), as on a real SS10/SS20.
+ * Solaris builds a devinfo node per CPU node from these. */
+static int cpu_mid;
+
 static void tms390z55_init(void)
 {
+    uint32_t mbase = 0xf8000000 + (((cpu_mid - 8) & 3) << 24);
+
 
 #ifndef CONFIG_TACUS
     push_str("");
@@ -226,7 +235,7 @@ static void tms390z55_init(void)
 
     PUSH(0xf);
     fword("encode-int");
-    PUSH(0xf8fffffc);
+    PUSH(mbase + 0x00fffffc);
     fword("encode-int");
     fword("encode+");
     PUSH(4);
@@ -236,7 +245,7 @@ static void tms390z55_init(void)
     PUSH(0xf);
     fword("encode-int");
     fword("encode+");
-    PUSH(0xf8c00000);
+    PUSH(mbase + 0x00c00000);
     fword("encode-int");
     fword("encode+");
     PUSH(0x1000);
@@ -246,7 +255,7 @@ static void tms390z55_init(void)
     PUSH(0xf);
     fword("encode-int");
     fword("encode+");
-    PUSH(0xf8000000);
+    PUSH(mbase);
     fword("encode-int");
     fword("encode+");
     PUSH(0x1000);
@@ -256,7 +265,7 @@ static void tms390z55_init(void)
     PUSH(0xf);
     fword("encode-int");
     fword("encode+");
-    PUSH(0xf8800000);
+    PUSH(mbase + 0x00800000);
     fword("encode-int");
     fword("encode+");
     PUSH(0x1000);
@@ -709,6 +718,7 @@ static void setup_cpu(int mid_offset)
         push_str("mid");
         fword("property");
 
+        cpu_mid = i + mid_offset;
         cpu->initfn();
 
         fword("finish-device");
