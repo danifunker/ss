@@ -78,7 +78,7 @@ only the last word through `ioctl`, mounts the images, and runs.
 completes. It relies on `hps_io`'s slow pace, so faster spacing loses words
 whenever video reads keep the DDR busy. One
 cycle is one `clk_sys` period. The UART bit time comes from the revision's
-SYSFREQ (60 MHz on the SS5, 50 MHz on the SS20).
+SYSFREQ (60 MHz on the SS5, 55 MHz on the SS20).
 
 ## Speed
 
