@@ -116,7 +116,13 @@ BEGIN(t_fpu_fq, "fpu: FQ holds the trapping FPop; STDFQ empties it, is privilege
         EXPECT_TRAP(TT_FP_EXC)
         std %fq, [%l0]                  /* empty: sequence_error */
         nop                             /* QEMU reports this trap one instruction late */
-        CHECK_TRAPPED(TT_FP_EXC, 7)
+        ld [%g7 + V_TRAP_SEEN], %l5
+        cmp %l5, -1
+        bne 2f                          /* precise FPU: taken already */
+        nop
+        fmovs %f0, %f0                  /* deferred FPU: taken here */
+        nop
+2:      CHECK_TRAPPED(TT_FP_EXC, 7)
         RD_FSR(%l1)
         srl %l1, 14, %l2
         and %l2, 7, %l2

@@ -184,26 +184,32 @@ s_wbm2: .asciz "write-back"
         .section .text
         .align 4
 
-/* Write-back mode only (SKIP otherwise). A line is dirtied through the
- * alias VA (PA != VA), its DTLB entry is evicted by six other segments,
- * then the line is flushed by VA (ASI 0x10): memory must hold the new
- * value. The core flushes PA = VA on a DTLB miss (C-3). */
-BEGIN(t_cache_flush_miss, "cache: SS20 line flush after a DTLB miss reaches the line (write-back)")
-        ld [%g7 + V_WBMODE], %l0
-        cmp %l0, 2
-        be 1f
-        nop
-        SKIP_TEST
-1:      call mmu_tables_init
+/* A line is cached through the alias VA (PA != VA): in write-back mode
+ * it is dirtied, in write-through mode memory is changed behind it; its
+ * DTLB entry is evicted by six other segments, then the line is flushed
+ * by VA (ASI 0x10): memory must hold the new value (write-back) and a
+ * cached load must see it (both). A flush that took PA = VA on the DTLB
+ * miss (C-3) would miss the line. */
+BEGIN(t_cache_flush_miss, "cache: SS20 line flush after a DTLB miss reaches the line")
+        call mmu_tables_init
         nop
         STPAV(0x51510000, MT_PAGE(5) + 0x80)
         call mmu_on
         nop
         set MT_ALIAS + MT_PAGE(5) + 0x80, %l1
         ld [%l1], %l2
+        ld [%g7 + V_WBMODE], %l0
+        cmp %l0, 2
+        bne 2f
+        nop
         set 0x52520000, %o0
-        st %o0, [%l1]                   /* dirty */
-        set 0x000000, %o0
+        st %o0, [%l1]                   /* write-back: dirty */
+        ba 3f
+        nop
+2:      set 0x52520000, %o0             /* write-through: memory changes */
+        set MT_PAGE(5) + 0x80, %o1
+        sta %o0, [%o1] 0x20
+3:      set 0x000000, %o0
         ld [%o0], %g0
         set 0x040000, %o0
         ld [%o0], %g0
@@ -217,11 +223,13 @@ BEGIN(t_cache_flush_miss, "cache: SS20 line flush after a DTLB miss reaches the 
         ld [%o0], %g0
         sta %g0, [%l1] 0x10             /* flush the line, by VA */
         set MT_PAGE(5) + 0x80, %o0
-        lda [%o0] 0x20, %l3
+        lda [%o0] 0x20, %l3             /* memory */
+        ld [%l1], %l4                   /* cached, after the flush */
         call mmu_off
         nop
         EXPECT(%l2, 0x51510000, 1)
         EXPECT(%l3, 0x52520000, 2)
+        EXPECT(%l4, 0x52520000, 3)
 END
 #endif
 

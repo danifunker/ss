@@ -56,6 +56,9 @@ PACKAGE cpu_conf_pack IS
 
   -- On dit qu'un tag passe sur 32bits, il faut que NB_DCACHE >= NB_CONTEXT+3
   -- On dit qu'un tag passe sur 32bits, il faut que NB_ICACHE >= NB_CONTEXT+3
+  -- (virtually tagged caches only; NB_CONTEXT >= 8 everywhere: the L2TLB
+  -- tag in mcu_tw keeps the low 8 context bits and is flushed when the
+  -- upper bits change)
 
   --------------------------------------------------------------
   -- MicroSPARC-II = Fujitsu MB86904 = Sun STP1012 "Swift"
@@ -68,7 +71,7 @@ PACKAGE cpu_conf_pack IS
     NWINDOWS    => 8,
     MULDIV      => true,
     IFLUSH      => true,
-    CASA        => true,
+    CASA        => false,               -- V9/LEON only: illegal_instruction
     IU_IMP_VER  => x"04",
     
     FPU_VER     => "100",
@@ -96,7 +99,7 @@ PACKAGE cpu_conf_pack IS
     NWINDOWS    => 8,
     MULDIV      => true,
     IFLUSH      => true,
-    CASA        => true,
+    CASA        => false,               -- V9/LEON only: illegal_instruction
     IU_IMP_VER  => x"04",
     
     FPU_VER     => "100",
@@ -124,12 +127,12 @@ PACKAGE cpu_conf_pack IS
     NWINDOWS    => 8,
     MULDIV      => true,
     IFLUSH      => true,
-    CASA        => true,
+    CASA        => false,               -- V9/LEON only: illegal_instruction
     IU_IMP_VER  => x"40",
     
     FPU_VER     => "000",
     MMU_IMP_VER => x"01",
-    NB_CONTEXT  => 8,
+    NB_CONTEXT  => 16,                  -- SuperSPARC: 16-bit context register
     
     NB_ICACHE   => 12,
     WAY_ICACHE  => 4,

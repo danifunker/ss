@@ -58,7 +58,7 @@ FAIL mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privile
 PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
     dcache mode: write-through
 PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
-SKIP cache: SS20 line flush after a DTLB miss reaches the line (write-back)
+PASS cache: SS20 line flush after a DTLB miss reaches the line
 PASS cache: ldstub and swap on a cached line change only their byte / word
 PASS cache: a patched instruction runs after FLUSH
 SKIP smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
@@ -73,4 +73,4 @@ PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000003 exp=00000002 obs=ffffffff
 FAIL trap: reserved ASRs and CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=45 fail=7 skip=6
+CPUTEST DONE pass=46 fail=7 skip=5

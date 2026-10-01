@@ -69,6 +69,7 @@ ENTITY mcu_tw IS
     mmu_ctxtpr_maj : IN  std_logic;
     mmu_ctxr       : IN  unsigned(NB_CONTEXT-1 DOWNTO 0);
     mmu_ctxr_maj   : IN  std_logic;
+    mmu_ctxhi_maj  : IN  std_logic := '0'; -- context bits above 7 change
 
     -- FAULT
     mmu_tw_fault   : OUT std_logic;
@@ -87,6 +88,11 @@ ARCHITECTURE rtl OF mcu_tw IS
   
   CONSTANT NB_L2TLB    : natural := CPUCONF(CPUTYPE).NB_L2TLB;
   CONSTANT N_PTD_L2    : natural := CPUCONF(CPUTYPE).N_PTD_L2;
+  -- The L2TLB tag holds the low 8 context bits (the 32-bit tag has no room
+  -- for more beside VA[31:20] and the generation); entries of contexts
+  -- that differ above bit 7 never coexist: the generation is bumped when
+  -- those bits change (mmu_ctxhi_maj).
+  CONSTANT NB_CTXTAG   : natural := 8;
 
   TYPE enum_tw_etat IS (sOISIF,sTABLEWALK,sTABLEWALK_ADRS,sTABLEWALK_READ,
                         sTABLEWALK_FINAL,sTABLEWALK_WRITE,sTABLEWALK_L2TLB);
@@ -266,11 +272,13 @@ BEGIN
       vtag_test(l2tlb_hit_v,ig_v,l2tlb_dr,
                 tww.va(31 DOWNTO NB_L2TLB+13) &
                 l2tlb_cpt2 & tww.va(11 DOWNTO 0),
-                mmu_ctxr,ASI_CACHE_FLUSH_LINE_COMBINED_ANY,12,NB_CONTEXT,false);
+                mmu_ctxr(NB_CTXTAG-1 DOWNTO 0),
+                ASI_CACHE_FLUSH_LINE_COMBINED_ANY,12,NB_CTXTAG,false);
       
       l2tlb_tag_v:=vtag_encode(tww.va(31 DOWNTO NB_L2TLB+13) &
                                l2tlb_cpt2 & tww.va(11 DOWNTO 0),
-                               mmu_ctxr,'1','0',"00",12,NB_CONTEXT);
+                               mmu_ctxr(NB_CTXTAG-1 DOWNTO 0),
+                               '1','0',"00",12,NB_CTXTAG);
 
       -------------------------------------------------
       ptd_l2d_v := (OTHERS =>'0');
@@ -355,9 +363,11 @@ BEGIN
           tw_ext_req<='0';
           
           tw_st<="00";    -- On démarre le tablewalk de zéro par défaut
-          -- Level 0 : Context : Context_Table_Pointer(Context)
-          pa_v(35 DOWNTO NB_CONTEXT+2):=mmu_ctxtpr(35 DOWNTO NB_CONTEXT+2);
-          pa_v(NB_CONTEXT+1 DOWNTO 0) :=mmu_ctxr(NB_CONTEXT-1 DOWNTO 0) & "00";
+          -- Level 0 : Context : Context_Table_Pointer + Context * 4
+          -- (an addition, as the SRMMU specifies: the table need not be
+          -- aligned on its size)
+          pa_v:=(mmu_ctxtpr & "000000") +
+                resize(mmu_ctxr(NB_CONTEXT-1 DOWNTO 0) & "00",36);
           
           IF l2tlb_wr2='0' THEN
             l2tlb_a_mem(0)<='1';
@@ -438,6 +448,10 @@ BEGIN
               IF tww.op/=PROBE THEN
                 mmu_tw_fault<='1';
                 tw_err<=NOT mmu_cr_nf;
+              ELSE
+                -- A probe returns 0 on an invalid or reserved entry and on
+                -- a PTE above the level asked for (microSPARC-II 5.5.2)
+                tw_pte_l<=(OTHERS => '0');
               END IF;
               tw_done_data<=to_std_logic(tww.di=TDI_DATA) AND NOT l2tlb_tw;
               tw_done_inst<=to_std_logic(tww.di=TDI_INST) AND NOT l2tlb_tw;
@@ -605,7 +619,8 @@ BEGIN
       END IF;
       
       -------------------------------------------------
-      IF mmu_ctxtpr_maj='1' OR dtlb_inval='1' OR itlb_inval='1' THEN
+      IF mmu_ctxtpr_maj='1' OR dtlb_inval='1' OR itlb_inval='1' OR
+        mmu_ctxhi_maj='1' THEN
         l2tlb_cpt<=l2tlb_cpt+1;
         l2tlb_cpt2<=l2tlb_cpt2+1;
         l2tlb_inc<='1';

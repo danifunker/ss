@@ -442,6 +442,15 @@ BEGIN
       pop_fq_v:=i.do_ack AND NOT i.dstop;
     END IF;
     
+    -- STDFQ with an empty queue: fp_exception with ftt = sequence_error
+    -- (V8 B.?); the IU takes it on the next floating-point instruction
+    IF i.req='1' AND i.cat.mode.f='1' AND i.cat.mode.s='1' AND
+      i.cat.op(31 DOWNTO 30)="11" AND i.cat.op(20 DOWNTO 19)="10" AND
+      dfq_lev_i=dfq_lev_o AND i.dstop='0' THEN
+      fsr_c.ftt<=FTT_SEQUENCE_ERROR;
+      exception_c<='1';
+    END IF;
+    
     ------------------------------------------------------
     -- Dépendances. busy holds the entries that survived last cycle's pop;
     -- the entry pushed last cycle, if any, is fifo(0) now: added here from

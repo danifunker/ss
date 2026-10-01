@@ -185,6 +185,7 @@ ARCHITECTURE simple OF mcu IS
   SIGNAL data_ext2_c : type_ext;
   
   SIGNAL data_ft_c : unsigned(2 DOWNTO 0);
+  SIGNAL data_st_c : uv2;              -- level of the entry hit (SFSR.L)
   SIGNAL data_at_c : unsigned(2 DOWNTO 0);
   
   -- MMU
@@ -247,6 +248,7 @@ ARCHITECTURE simple OF mcu IS
   SIGNAL inst_cont : std_logic;
   
   SIGNAL inst_ft_c : unsigned(2 DOWNTO 0);
+  SIGNAL inst_st_c : uv2;
   SIGNAL inst_at_c : unsigned(2 DOWNTO 0);
   SIGNAL inst_dr_c,inst_dr : type_push;
   
@@ -584,6 +586,7 @@ BEGIN
     END IF;
     
     data_ft_c<=ft_v;                    -- FSR.FaultType
+    data_st_c<=tlb_sel_v.st;
     data_at_c<=ls2_v & '0' & us_v;      -- FSR.AccessType
     
     -------------------------------------------------------------------------
@@ -1469,6 +1472,7 @@ BEGIN
     END IF;
     
     inst_ft_c<=ft_v;                    -- FSR.FaultType
+    inst_st_c<=tlb_sel_v.st;
     inst_at_c<=ls_v & '1' & us_v;       -- FSR.AccessType
 
     -------------------------------------------------------------------------
@@ -2182,9 +2186,11 @@ BEGIN
 
       -- Acquittement MMU Fault Status Register
       IF mmu_fsr_maj='1' THEN
-        -- On sait que c'est lu, donc pas d'OW
+        -- Read: the whole register clears
         mmu_fsr_ow<='0';
         mmu_fsr_ft<=FT_NONE;
+        mmu_fsr_l<="00";
+        mmu_fsr_at<="000";
         mmu_fclass<=RIEN;
         mmu_fsr_fav<='0';   -- RAZ Fault Address Valid
         mmu_fsr_ebe<=(OTHERS => '0');
@@ -2223,46 +2229,49 @@ BEGIN
       -- <AVOIR> Ecriture des registres MMU pour un TW depuis le process EXT
       -- ou depuis les process DATA et INSTRUCTION ?
       -- <Ecriture MMU Fault Status Reg sur faute>
+      -- Fault status (Sun-4M 4.4, microSPARC-II table 28): a data fault
+      -- overwrites any pending status and sets OW over an unread data
+      -- fault; an instruction fault does not overwrite an unread data
+      -- fault and sets OW over an unread instruction fault. Walk faults
+      -- (invalid, reserved entries) are faults of their side.
       IF mmu_tw_fault='1' AND NOT MMU_DIS THEN
-        -- Faute pendant un tablewalk : INVALIDE ou TRANSLATION
-        IF mmu_tw_ft/=FT_INVALID OR mmu_tw_di=TDI_DATA OR mmu_fsr_fav='0' THEN
-          mmu_fclass<=WALK;
-          mmu_fsr_l<=mmu_tw_st;           -- Level / Short Translation
-          IF mmu_tw_di=TDI_DATA THEN
-            mmu_fsr_at<=data_at_c;
-          ELSE
-            mmu_fsr_at<=inst_at_c;
-          END IF;
+        IF mmu_tw_di=TDI_DATA OR mmu_fsr_fav='0' OR mmu_fclass/=DATA THEN
+          mmu_fsr_l<=mmu_tw_st;           -- Level
           mmu_fsr_ft<=mmu_tw_ft;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<='0';                -- OverWrite
           mmu_fsr_ebe<=(OTHERS => '0');
           mmu_far<=tw_va;
+          IF mmu_tw_di=TDI_DATA THEN
+            mmu_fclass<=DATA;
+            mmu_fsr_at<=data_at_c;
+            mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=DATA);
+          ELSE
+            mmu_fclass<=INST;
+            mmu_fsr_at<=inst_at_c;
+            mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=INST);
+          END IF;
         END IF;
         
       ELSIF mmu_fault_data_acc_c='1' AND NOT MMU_DIS THEN
-        IF mmu_fclass/=WALK AND mmu_fclass/=DATA THEN
-          mmu_fclass<=DATA;
-          -- Faute sur accès normal data : PROTECTION ou PRIVILEGE
-          mmu_fsr_l<="00";                -- Level ???
-          mmu_fsr_at<=data_at_c;          -- Access Type
-          mmu_fsr_ft<=data_ft_c;          -- Fault Type
-          mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<=to_std_logic(mmu_fclass=DATA); -- OverWrite
-          mmu_fsr_ebe<=(OTHERS => '0');
-          mmu_far<=data2_w.a;
-        END IF;
-        -- <AVOIR> : !! Cascade de fautes data. Impossible ?
+        -- Faute sur accès normal data : PROTECTION ou PRIVILEGE
+        mmu_fsr_l<=data_st_c;           -- the level of the entry hit
+        mmu_fsr_at<=data_at_c;          -- Access Type
+        mmu_fsr_ft<=data_ft_c;          -- Fault Type
+        mmu_fsr_fav<='1';               -- Fault Address Valid
+        mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=DATA);
+        mmu_fclass<=DATA;
+        mmu_fsr_ebe<=(OTHERS => '0');
+        mmu_far<=data2_w.a;
         
       ELSIF mmu_fault_inst_acc_c='1' AND NOT MMU_DIS THEN
-        IF mmu_fclass/=WALK AND mmu_fclass/=DATA THEN
-          mmu_fclass<=INST;
+        IF mmu_fsr_fav='0' OR mmu_fclass/=DATA THEN
           -- Faute sur accès normal instruction : PROTECTION ou PRIVILEGE
-          mmu_fsr_l<="00";                -- Level ???
+          mmu_fsr_l<=inst_st_c;
           mmu_fsr_at<=inst_at_c;          -- Access Type
           mmu_fsr_ft<=inst_ft_c;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<=to_std_logic(mmu_fclass=INST); -- OverWrite
+          mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=INST);
+          mmu_fclass<=INST;
           mmu_fsr_ebe<=(OTHERS => '0');
           -- L'écriture de FAR est facultative !!!
           mmu_far<=imux2_w.a;

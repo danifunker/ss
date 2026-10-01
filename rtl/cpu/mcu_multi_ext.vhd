@@ -55,6 +55,7 @@ ENTITY mcu_multi_ext IS
     
     ext_dr         : OUT uv32;
     hitmaj         : OUT std_logic;
+    flushdone      : OUT std_logic;  -- this CPU's FLUSH reached the tags
     
     -----------------------------------
     ext_w : OUT type_plomb_w;
@@ -629,6 +630,7 @@ BEGIN
     last_c<='0';
     done_c<='0';
     hitmaj<='0';
+    flushdone<='0';
     
     ----------------------------------------------
     CASE state IS
@@ -668,6 +670,7 @@ BEGIN
         mem_pa_c <=pa_v;
         mem_asi_c<=ext_acc.pw.asi;
         hitmaj <= sel;
+        flushdone<=sel AND to_std_logic(smp_r.op=FLUSH);
         last_c<='0';
         
         IF dwb_v THEN
