@@ -16,10 +16,11 @@ The SS20 PROM is not readable at its link address with the MMU off, so
 and strings are read at their link addresses, while instructions keep
 coming from the PROM in boot mode (`platform.h`).
 
-This is phase 1f of [docs/REWORK.md](../../docs/REWORK.md). The generic V8
-ISA tests are here now. The microSPARC-II and SuperSPARC hardware tests
-(MMU, TLB, caches, MXCC, timers, interrupt controller) come next, lifted
-from the POST catalogues in `docs/rom-disassembly/*/post-tests.md`.
+This is phase 1f of [docs/REWORK.md](../../docs/REWORK.md): the generic V8
+ISA tests, and (2026-10-01) the SRMMU, cache, SMP and remaining IU/FPU
+tests written as acceptance tests for the SS20 MMU and cache work
+(`docs/impl-gaps/cpu.md`). The POST's diagnostic-ASI tests (TLB and cache
+RAM marches, MXCC) are not lifted.
 
 ## Build and run
 
@@ -75,12 +76,18 @@ row up in `out/alu_vectors.txt`.
 | `t_fpu.S` | single and double arithmetic, conversions, fcmp/fcc/FBfcc, FSR cexc/aexc |
 | `t_chipset.S` | not CPU tests: chipset state after a power-on reset and address decode, with the suite's plumbing. The system control register reads RS = WD = 0; the NVRAM IDPROM has format 1, the machine type (0x80 SS5, 0x72 SS20) and a zero XOR checksum; the frame buffer's slot starts with FCode (`0xf1`, sane length); DMA2 E_BASE_ADDR resets to 0xff; on the SS5 the PROM answers at pa `0x7000_0000` |
 | `t_mmu_swift.S` | SS5 only: the POST's microSPARC-II MMU register walking-pattern tests (CTPR, context, TLB replacement control `0x1000`, SFSR/SFAR diagnostic aliases `0x1300`/`0x1400`), with the POST's masks; AFSR/AFAR (`0x500`/`0x600`) read 0. It probes first whether `0x1000` aliases the PCR, as it did on the core before ASI 4 was decoded from VA[12:8] (audit MMU-1), and reports that instead of walking. |
+| `mmu_setup.S` | not a test: the MMU-on setup the tests below share. Page tables in `SCRATCH` built through the bypass ASI: an identity map of the first 16 MB (code, VARS, stack; the SS20 runs from the shadow copy of the PROM at pa 0 once boot mode is off, the SS5 maps its PROM region), cacheable, with one page-mapped segment `MT_SEG` (0x280000) whose entries the tests use (invalid, reserved, read-only, supervisor-only, non-cacheable pages, a remappable page), a cacheable alias of RAM at VA 0x4000_0000, and on the SS20 contexts 1, 0x101 and 0x8001 in a 256 KB-aligned context table. `mmu_on` turns the MMU and both caches on (plus SE on the SS20); `mmu_off` flushes the lines the suite may have dirtied (write-back mode), turns everything off, flash-clears (SS20) and clears every tag so the uncached rest of the suite never meets a stale line. Leaf routines: the parked SS20 CPUs use them too. |
+| `t_mmu.S` | `t_mmu_ctx_bits` (SS20): walking one over the 16 context bits and CTPR bits 31:6 (the SS20 POST's "MMU Context Table Reg" / "MMU Context Register" tests, QEMU's masks). `t_mmu_ctx_hi` (SS20): contexts 1, 0x101 and 0x8001 map the same VA to three pages (audit MMU-3). `t_mmu_tlb_flush`: a PTE changed in memory is read through the old TLB entry until the page, segment, region, context or entire flush (ASI 3). `t_mmu_probe`: ASI 3 probe types 0-4 on valid entries at every level, 0 on invalid and reserved entries and on a PTE above the level asked for (V8 H-4, microSPARC-II 5.5.2; MMU-5). `t_mmu_fault_regs`: SFSR L/AT/FT/FAV/OW and SFAR for invalid (levels 3 and 1), reserved, protection and privilege (from user mode) faults, read-to-clear, OW on a second data fault, NF (MMU-8). |
+| `t_cache2.S` | `t_flash_clear` (SS20): a stale D-cache line (memory changed through the bypass and through a normal store with DE off) is dropped by ASI 0x37, a patched routine by ASI 0x36 (C-2). `t_cache_wrhit` (SS20, from the POST's "D-Cache Write Hit Special Test"): 16 KB filled by loads, every word stored, read back cached and through ASI 0x20; prints `dcache mode: write-through` or `write-back` (the board's WB option) and checks the matching expectation, then flushes every line and checks memory. `t_cache_flush_miss` (SS20, write-back mode only, SKIP otherwise): a dirty line whose DTLB entry was evicted is flushed by VA with ASI 0x10 (C-3). `t_selfmod`: a routine in cacheable RAM is patched with a normal store, FLUSHed and run again. |
+| `t_smp.S` | SS20, SKIP where the secondary CPUs do not run (QEMU). CPU 1 and 2 run functions through the dispatcher (`runtime.S`: `mp_post`/`mp_wait`; the parked CPUs poll a mailbox and call the function with the MMU off, no stack, traps disabled). `t_smp_coherent`: CPU 0 holds a line, CPU 1 stores to it with its cache and SE on, CPU 0's next load sees the store, memory too after CPU 1's flush. `t_smp_atomic`: three CPUs add 64 each to a shared counter under an `ldstub` lock, then under a `swap` lock; the total is exact. `t_smp_nosnoop`: with SE off CPU 0 keeps its stale copy, as the module does (C-4). |
+| `t_iu2.S` | `t_fpu_trap_prio`: a misaligned FP store with an fp_exception pending takes tt 7 first (V8 table 7-1; FPU-1), works for precise (QEMU) and deferred FPUs. `t_fpu_fq`: the FQ holds the trapping FPop, STDFQ is privileged, empties it, and traps with ftt 4 when it is empty (FPU-2). `t_cp_ldst`: the V8 LDC/STC family (op3 0x30-0x37) traps cp_disabled, in user mode too, without touching memory (IU-3). `t_wrpsr_cwp`: `wr %psr` with CWP = NWINDOWS traps illegal_instruction (IU-5). `t_rdasr`: reserved ASRs and CASA trap illegal_instruction (IU-6). `t_asi_width` (SS20): ASI 0x4c does not reach the ASI 0x0c tag (MMU-12); ASI 0x38 holds 64-bit values (SMP-1). |
 
-## Known QEMU 8.2.2 deviations
+## Known QEMU deviations
 
-The QEMU reference logs (`expected/*-qemu.log`) are not all-PASS. Each of
-the three failures in them is QEMU disagreeing with the SPARC V8 manual,
-checked against QEMU's source at tag `v8.2.2`:
+The QEMU reference logs (`expected/*-qemu.log`, from QEMU 11.1.1; the
+SS20 runs with `-cpu TI-SuperSparc-60`, the core's CPU) are not all-PASS.
+Each failure in them is QEMU disagreeing with the SPARC V8 manual or the
+SRMMU documents, checked against QEMU's source:
 
 1. **`sdiv`/`sdivcc` with a negative divisor.** `helper_sdiv` does
    `a64 /= b;` with the unsigned 32-bit `b` instead of the signed `b32`
@@ -96,9 +103,34 @@ checked against QEMU's source at tag `v8.2.2`:
    Ethernet DMA's high address byte); QEMU leaves the register at 0. Solaris
    never writes it and assumes 0xff (OpenBIOS `ob_le_init`). New in the
    11.1.1 references with `t_chipset.S`.
+5. **A probe returns a PTE found above the level asked for.** `mmu_probe`
+   returns a level-2 PTE to a page probe (type 0); the microSPARC-II manual
+   (5.5.2) and V8 table H-4 give 0. `t_mmu_probe` check 11.
+6. **SFSR.L is 0 for protection and privilege faults.** `get_physical_address`
+   returns the access-table error without the level; the SRMMU's L is the
+   level of the entry that faulted. `t_mmu_fault_regs` checks 11 and 13.
+7. **Reserved ASRs do not trap.** `rd %asr1`, `wr %asr1` and `rd %asr15, %l0`
+   execute; V8 B.28/B.29 reserve ASR 1-14 (and 15 with rd != 0:
+   illegal_instruction). `t_rdasr` checks 1-3. CASA does trap.
+8. **The sequence_error trap of an empty STDFQ is reported one instruction
+   late** (PC = the next instruction); `t_fpu_fq` has a `nop` after it.
+   Also, QEMU's FPU is precise (the fp_exception is taken on the FPop
+   itself, not deferred to the next FP instruction), which V8 allows; the
+   FPU tests accept both.
+9. **NF: the suppressed fault is recorded twice** (once by the walk, once by
+   the redirected access), so OW is set; `t_mmu_fault_regs` masks OW there.
+10. **A page flush inside a large page's range flushes the whole TLB.**
+    QEMU maps segment-level PTEs as 256 KB pages and `tlb_flush_page` then
+    degrades to a full flush; `t_mmu_tlb_flush` does not test that a page
+    flush of another page keeps the entry.
 
 The core has to follow the manual, not QEMU. On the core, these tests are
 expected to pass.
+
+Assembler note: LLVM encodes an out-of-range 13-bit immediate silently
+(`add %o1, 0x1000` became `add %o1, -0x1000`; `cmp %l1, 0x4000` compares
+with 0). Use `set` and a register for anything outside -4096..4095, and
+never put a two-instruction `set` in a delay slot.
 
 ## Writing a test
 

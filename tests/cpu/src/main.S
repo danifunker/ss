@@ -14,6 +14,11 @@
 #include "t_fpu.S"
 #include "t_chipset.S"
 #include "t_msi.S"
+#include "mmu_setup.S"
+#include "t_mmu.S"
+#include "t_cache2.S"
+#include "t_smp.S"
+#include "t_iu2.S"
 
         .section .testtab, "a", @progbits
         .word 0, 0                      /* end of the test table */

@@ -2,20 +2,23 @@
 # Run the CPU test suite under qemu-system-sparc as the boot PROM.
 #   tests/cpu/run-qemu.sh [ss5|ss20] [--no-build]
 # Prints the serial log and compares it with expected/<target>-qemu.log:
-# QEMU 8.2 has three known deviations from the V8 manual (README.md), so
-# the reference is not all-PASS. Exit 0 when the log matches.
+# QEMU has known deviations from the V8 manual and the SRMMU documents
+# (README.md), so the reference is not all-PASS. Exit 0 when the log
+# matches. QEMU=... selects the binary (the references come from 11.1.1).
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 m=${1:-ss5}
 case "$m" in
-  ss5)  target=ss5-qemu; machine=SS-5;  mem=64 ;;
-  ss20) target=ss20;     machine=SS-20; mem=128 ;;
+  ss5)  target=ss5-qemu; machine=SS-5;  mem=64;  cpu= ;;
+  # the core's SS20 CPU: SuperSPARC without an MXCC (PSR 0x40, MCNTL
+  # 0x01000800); QEMU's default SS-20 CPU is a SuperSPARC-II with one
+  ss20) target=ss20;     machine=SS-20; mem=128; cpu="-cpu TI-SuperSparc-60" ;;
   *) echo "usage: $0 [ss5|ss20] [--no-build]" >&2; exit 2 ;;
 esac
 [ "$2" = "--no-build" ] || python3 "$here/build.py" "$target" >/dev/null
 mkdir -p "$here/out/$target"
 log="$here/out/$target/qemu.log"
-timeout 60 ${QEMU:-qemu-system-sparc} -M "$machine" -m "$mem" \
+timeout 60 ${QEMU:-qemu-system-sparc} -M "$machine" $cpu -m "$mem" \
     -bios "$here/out/$target/cputest.rom" -nographic -serial mon:stdio \
     -monitor none -display none </dev/null 2>/dev/null \
   | tr -d '\r' | sed -u '/CPUTEST DONE/q' > "$log" || true

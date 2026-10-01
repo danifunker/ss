@@ -15,7 +15,7 @@ PASS branch: annul bit and delay slots
 PASS branch: call/jmpl link register, computed jumps
 PASS trap: ta n -> tt 0x80+n, trap PC/nPC, register+imm number
 PASS trap: unimp and invalid opcodes -> illegal_instruction
-    check 00000002 exp=00002658 obs=0000265c
+    check 00000002 exp=00002748 obs=0000274c
 FAIL trap: rett with traps enabled -> illegal_instruction
 PASS trap: rett in user mode -> privileged_instruction (0x03)
 PASS trap: udiv/sdiv by zero -> division_by_zero (0x2a)
@@ -47,4 +47,30 @@ FAIL chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
 PASS chipset: SS20 MSI: IOMMU IMPL/VER 0x13, MID 8, arbiter enable
 SKIP chipset: SS20 MSI: each CPU reads its own MID; the arbiter parks CPU 1
 SKIP chipset: SS20 SIMM slot 7 is 16 MB, aliased every 16 MB
-CPUTEST DONE pass=33 fail=4 skip=2
+PASS mmu: SS20 context register has 16 bits, CTPR bits 31:6 stick
+PASS mmu: SS20 contexts 1, 0x101, 0x8001 translate the same VA differently
+PASS mmu: a changed PTE is seen after the matching ASI 3 flush, not before
+    check 0000000b exp=00000000 obs=000100ee
+FAIL mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserved
+    check 0000000b exp=000003aa obs=000000aa
+    check 0000000d exp=0000030e obs=0000000e
+FAIL mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
+PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
+    dcache mode: write-through
+PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
+SKIP cache: SS20 line flush after a DTLB miss reaches the line (write-back)
+PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: a patched instruction runs after FLUSH
+SKIP smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
+SKIP smp: SS20 3 CPUs increment a shared counter under ldstub and swap locks
+SKIP smp: SS20 with SE off CPU 0 keeps its stale copy of CPU 1's line (C-4)
+PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
+PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
+PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
+PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
+    check 00000001 exp=00000002 obs=ffffffff
+    check 00000002 exp=00000002 obs=ffffffff
+    check 00000003 exp=00000002 obs=ffffffff
+FAIL trap: reserved ASRs and CASA -> illegal_instruction
+PASS mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit values
+CPUTEST DONE pass=45 fail=7 skip=6
