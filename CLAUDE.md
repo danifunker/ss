@@ -10,7 +10,7 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 
 | path | what |
 |---|---|
-| `SunSparcStation.qpf`, `SunSparcStation5.qsf`, `SunSparcStation20.qsf` | Quartus project, two revisions (SS5: 1 CPU, 65 MHz; SS20: `SS20=true`, 3 CPUs, 50 MHz) |
+| `SunSparcStation.qpf`, `SunSparcStation5.qsf`, `SunSparcStation20.qsf` | Quartus project, two revisions (SS5: 1 CPU, 60 MHz; SS20: `SS20=true`, 3 CPUs, 50 MHz) |
 | `SunSparcStation.sv` | MiSTer `emu` top: CONF_STR/OSD, `hps_io`, `ddram_arb` |
 | `files.qip` | the RTL list (add new RTL here) |
 | `sys/` | **verbatim** Template_MiSTer framework; never edit (revision in REWORK.md) |

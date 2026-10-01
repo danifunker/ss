@@ -159,7 +159,7 @@ ARCHITECTURE rtl OF ss_core IS
   --###################################################################
   
   SIGNAL sclk : std_logic;
-  SIGNAL clk65m,clk80m,clk40m : std_logic;
+  SIGNAL clk65m,clk80m,clk40m,clk60m : std_logic;
   SIGNAL spll_locked : std_logic;
   
   -- Core
@@ -284,6 +284,7 @@ ARCHITECTURE rtl OF ss_core IS
     outclk_0 : OUT std_logic;
     outclk_1 : OUT std_logic;
     outclk_2 : OUT std_logic;
+    outclk_3 : OUT std_logic;
     locked   : OUT std_logic);
   END COMPONENT;
   
@@ -911,6 +912,7 @@ BEGIN
       outclk_0 => clk65m,
       outclk_1 => clk80m,
       outclk_2 => clk40m,
+      outclk_3 => clk60m,
       locked   => spll_locked);
   
   gen40:IF SYSFREQ=40_000_000 GENERATE
@@ -925,8 +927,16 @@ BEGIN
      sclk<=clk65m;
   END GENERATE;
 
-  ASSERT SYSFREQ=40_000_000 OR SYSFREQ=50_000_000 OR SYSFREQ=65_000_000
-    SEVERITY failure;  
+  -- 60 MHz: the SS5's clock since 2026-09-30 (65 MHz did not close timing:
+  -- about -1 ns on a typical seed). The video stays on clk65m, its pixel
+  -- clock, as on the SS20; the two are asynchronous (SunSparcStation.sdc).
+  gen60:IF SYSFREQ=60_000_000 GENERATE
+     sclk<=clk60m;
+  END GENERATE;
+
+  ASSERT SYSFREQ=40_000_000 OR SYSFREQ=50_000_000 OR SYSFREQ=60_000_000
+    OR SYSFREQ=65_000_000
+    SEVERITY failure;
   
   clk_sys<=sclk;
   

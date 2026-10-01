@@ -296,7 +296,7 @@ wire reset = RESET | status[0];
 ss_core 
 #(
 `ifndef SS20
-  .SYSFREQ(65000000),
+  .SYSFREQ(60000000),
   .SS20(0),
   .NCPUS(1),
   .TRACE(1),

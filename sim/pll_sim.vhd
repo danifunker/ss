@@ -13,6 +13,7 @@ ENTITY pll IS
     outclk_0 : OUT std_logic;
     outclk_1 : OUT std_logic;
     outclk_2 : OUT std_logic;
+    outclk_3 : OUT std_logic;
     locked   : OUT std_logic);
 END ENTITY pll;
 
@@ -21,5 +22,6 @@ BEGIN
   outclk_0 <= refclk;
   outclk_1 <= refclk;
   outclk_2 <= refclk;
+  outclk_3 <= refclk;
   locked   <= '1';
 END ARCHITECTURE sim;
