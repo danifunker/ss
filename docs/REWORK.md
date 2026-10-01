@@ -637,6 +637,7 @@ stages.
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
 | 2026-09-30 | Firmware goal restated (user): compatibility with the official Sun ROMs where possible; where they cannot work (the clock speeds may prevent it), port their missing features into OpenBIOS instead |
+| 2026-09-30 (evening) | **The SS5 runs at 60 MHz** (user: "lock in at 60 for now"): after the timing work 65 MHz still missed by about 1 ns on a typical seed (six seeds: -0.51 to -1.67). The video keeps its 65 MHz pixel clock, asynchronous to the core. The SS20 was tried at 60 MHz and misses by 1.15 ns: it stays at 50 MHz. 65 MHz can be revisited: the remaining families are in the session log. |
 | 2026-09-30 | **If the SS5 cannot close timing at 65 MHz, the core focuses on the SS20 only** (user). The test is Fable's MCU→IU restructuring (`scratch/handoff/fable-ss5-65mhz.md`) |
 | 2026-09-30 | Hardware is the main test bed; the simulation is for short CPU/chipset runs and waveforms |
 
@@ -727,6 +728,20 @@ stages.
   scripts: `scratch/handoff/ss5-timing-36f07d3/`, `scratch/handoff/sta-*.tcl`,
   `group-paths.py`. The hardware baseline `ss5-core-hw.log` still has 38
   tests: to be re-recorded from the board with t_cache.
+  **Later the same evening (commits 75f3585 to 2a11900):** the bypass select
+  on the raw register fields, the IU register file in MLABs, the FPU's
+  pending-write map independent of the push: seed 5 reached -0.508 ns
+  (TNS -3.7, 40 pairs), but six seeds at 65 MHz spread from -0.51 to -1.67,
+  so the user locked the SS5 at **60 MHz**: a fourth PLL output (the video
+  stays on the 65 MHz one, its own clock group), `gen60` in `ss_core`,
+  SYSFREQ 60000000; first fit +0.376 ns, TNS 0, no negative slack on any
+  clock. The SS20 at 60 MHz misses by 1.15 ns (86 % of the device): it stays
+  at 50 MHz. Still to do: a seed or two more of the SS5 at 60 MHz for
+  margin, the board regression at 60 MHz (`hwtest.sh 5 cpu netbsd solaris`,
+  re-record `ss5-core-hw.log` with t_cache), and the 65 MHz leftovers if
+  wanted (JMPL adder → fetch address, the FPU multiplier's operands, the
+  D-cache hit into the advance chain; SS20 at 60: `by_sel2` → `npc`, the
+  `mcu_mp` I-TLB into the decode).
 - **2026-09-30, session 2.** GHDL 6.0.0 installed; Stage 1 simulation
   (`sim/`) built and matched to the board. SS20 built and run (CPU suite
   27/30 with a park for CPUs 1-2; OpenBIOS up, disk boot fails). ESCC TX fix:
