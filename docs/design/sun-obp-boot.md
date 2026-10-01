@@ -52,6 +52,15 @@ Sources:
 The SS20 PROM also runs in boot mode from VA 0, with the PROM at
 `0xF_F000_0000`, which the core already does. Its MP start-up comes first.
 
+**Status (2026-10-01, session 3):** S1, S2, S4, S5 and S6 done on the
+board (MSI MID and arbiter, IMPL 1, slot-7 fold, NVRAM IDPROM, TCX FCode),
+plus an 82077 floppy model the PROM needed: `ok` with 3 CPUs and 464 MB,
+`probe-scsi`, and `boot disk` loads Solaris 8 (it panics early, open). S3
+works (the `boot` reset). Left: S7 (16-bit contexts, Fable prompt
+`scratch/handoff/fable-ss20-mmu.md`), S8, LAN-1 (the PROM's `le` loopback
+test, diag-mode `boot net`), M9 bus errors (empty SBus slots print
+"Invalid FCode start byte").
+
 | M | Milestone | Blocker | Change |
 |---|---|---|---|
 | **S1** | each CPU knows its MID | SMP-1, IOM-1, IOM-2. `reset_find_mid` copies the MSI MID register (pa `0xF_E000_2000`, reads 0) into ASI 0x38 va 0. With IOMMU IMPL = 0 it reads the MID back from ASI 0x38 (not stored) and ORs in 8, so every CPU is MID 8 and all three run the master path. That breaks even a uniprocessor boot of the 3-CPU build | ASI 0x38 va 0 storage per CPU (`mcu_multi.vhd:1029`); the MSI MID register answering per requester (the MBus master ID), or answered inside each MCU; IOMMU IMPL/VER = `0x13…` as on a real SS20 (QEMU's SS-20 value), so the PROM takes the MSI path |

@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | Stage 0 done except SS5 timing at 65 MHz (Fable, `ss5-timing`); Stage 1 done; Stages 2, 3 and 5 well under way (session 2): SS5 CPU suite 38/0 on the board, NetBSD and **Solaris 8** boot, the official SS5 ROM runs past its keyboard handshake in simulation. Hand-off: [RESUME-20260930.md](../RESUME-20260930.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris on the board); the CPU suite with `t_chipset.S`: SS5 38/0 on the board and in the simulation ([sim/](../sim/README.md)); SS20 baseline to re-record |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (session 3; the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. SS20 on the board: CPU suite 39/0, NetBSD 11 to a shell, **the official Sun OBP 2.25 to `ok`** (3 CPUs, 464 MB, `probe-scsi`), and it boots the Solaris 8 kernel (panics in `kmem_cache_create`, open). Hand-off: [RESUME-20261001.md](../RESUME-20261001.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris on the board); the CPU suite: SS5 40/0 in simulation (board baseline 38, to re-record), SS20 39/0 on the board = simulation; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads CPU state on the board |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -436,7 +436,7 @@ stages.
 | **3** | Real Sun OBP on the SS5 (design/sun-obp-boot.md M1-M5), then use it as the hardware regression tool | 2 | not started |
 | **4** | Main-side services on one channel: design the FPGA↔HPS channel once; SCSI replies in Main (IDs 3/1/6), then HPS Ethernet; test with OpenBIOS and the real OBP | 2, the revised SCSI design | not started (the "replies in Main" revision of design/scsi-hps.md is still to write) |
 | **5** | Device and OS fixes in batches (the IMPLEMENTATION_GAPS quick wins: ESCC, timers, TOD, CG3, CS4231, mouse, Stop-A/BREAK, UART CONF_STR, Scaler framebuffer) | 2 | **in progress** (session 2): ESCC TX fix verified (NetBSD shell on ttya); a batch of chipset fixes awaits a build |
-| **6** | SS20 and MP: MID/MSI/arbiter enable, IOMMU IMPL, 16-bit contexts, the real OBP on the SS20, SMP without debugarm | 2, 4 (area freed) | not started |
+| **6** | SS20 and MP: MID/MSI/arbiter enable, IOMMU IMPL, 16-bit contexts, the real OBP on the SS20, SMP without debugarm | 2, 4 (area freed) | **in progress** (session 3): MSI MID + arbiter, IMPL 1, slot-7 fold, 82077 floppy, OpenBIOS CPU nodes: the OBP 2.25 reaches `ok` and loads Solaris. Left: 16-bit contexts and flash clear (Fable prompt), the Solaris panic under the OBP, LANCE loopback, bus errors |
 | **7** | Diagnostic POST and polish (the S1-diag items) | 3, 6 | not started |
 | **8** | Release (phase 7) | all | not started |
 | — | In parallel: the license question with Grabulosaure (phase 0) | — | open |
@@ -534,6 +534,55 @@ stages.
   (target 3) `boot disk` works; with HD1 (target 1) mounted too, `disk` is
   HD1 and HD0 needs `boot disk1` (or a `boot-device` setting). The Sun OBP
   means target 3 by `disk`. A fix belongs in `ss_openbios`.
+
+### Session 3 results (2026-09-30 night to 2026-10-01)
+
+The user locked the SS5 at 60 MHz and the SS20 at 55 MHz, said the core may
+drop one of the two machines, and asked to focus on the SS20.
+
+- **SS20 at 55 MHz on the board** (`ab4c740`): CPU suite 35/0, then 38/0
+  and 39/0 with this session's chipset tests, every run identical to the
+  simulation. **NetBSD 11 boots to a root shell on ttya** (OpenBIOS, HD0 at
+  target 3); the old "Not a bootable ELF image" was only OpenBIOS trying ELF
+  before a.out.
+- **MSI (`c901e3f`):** the MID register answers 8 + the CPU that owns the
+  MBus (smpmux's `sel`, registered, so no `rtl/cpu` change); the arbiter
+  enable register parks a CPU by withholding its `smp_w.req` from smpmux
+  unless it still owns the parked bus (Sun-4M 5.1.2); IOMMU IMPL/VER 0x13;
+  pa `0x1D00_0000-0x1FFF_FFFF` folds onto `0x1C00_0000` (slot 7 is a 16 MB
+  SIMM, G6). Reset value of the arbiter: all CPUs on (OpenBIOS starts every
+  CPU from reset). `t_msi.S` tests all of it.
+- **82077 floppy controller with no drive (`8e21d07`, `ts_fdc`)**: the
+  official OBP's `fdc-init` polled for RQM forever. Now it resets the
+  controller, finds no drive and disables `/obio/SUNW,fdtwo`. `t_fdc`.
+- **The official Sun OBP 2.25 reaches `ok` on the board** (screen console):
+  "SPARCstation 20 MP (3 X 390Z50), Keyboard Present, ROM Rev. 2.25, 464 MB
+  memory installed", the TCX found through our FCode, `probe-scsi` shows
+  the disk at target 3, the slaves sit in `(idle-cpu-loop)` with MIDs 9 and
+  10, and the memory banks probe as 7 × 64 MB + 16 MB. Blank NVRAM makes it
+  set `diag-switch?` true, so it boots from `net` first (fails the LANCE
+  loopback test, LAN-1). `setenv diag-device disk` then `boot` loads
+  **Solaris 8 under the real OBP** to its banner; it then panics (write to
+  `0xff000020` from `taskq_dispatch` in `kmem_cache_create`, a bad task
+  queue pointer: open, see the hand-off). Typing goes through mrext's
+  virtual keyboard (`scratch/kbtype.sh`: `POST /api/controls/keyboard-raw/
+  <linux keycode>`).
+- **Sun's POST in simulation** (`sim/build.sh 20 --diag`, NVRAM with
+  `diag-switch?` set): banner, three CPUs found through the arbiter
+  mailboxes, "MMU Context Table Reg Test" passes, **"MMU Context Register
+  Test" fails** (8 context bits, MMU-3), and POST hands over to OBP, which
+  sizes 464 MB.
+- **Solaris 8 under OpenBIOS on the SS20** panicked after its banner: all
+  three CPU nodes had MBus module 8's `reg`. Fixed in `bios/` (`b7d0345`);
+  it then stops at "Cannot assemble drivers for root" (open).
+- **Debugging on the board:** `tools/debugarm/pcdump` (static ARM binary,
+  run on the MiSTer) uses upstream's debug link on ttya to stop each CPU
+  and print PC, PSR, registers and memory. It found the floppy loop and
+  Solaris's panic message and stack (with `tools/ufsread.py` to pull
+  `unix`/`genunix` out of `sol8.img` for their symbols).
+- Gotchas: never run `pkill -f PATTERN` from a command line that contains
+  PATTERN (it kills its own shell); two readers on `/dev/ttyS1` split the
+  bytes (it looked like a UART bug once more).
 
 ### Work items (the content of the stages)
 
@@ -640,6 +689,9 @@ stages.
 | 2026-09-30 (evening) | **The SS5 runs at 60 MHz** (user: "lock in at 60 for now"): after the timing work 65 MHz still missed by about 1 ns on a typical seed (six seeds: -0.51 to -1.67). The video keeps its 65 MHz pixel clock, asynchronous to the core. The SS20 misses 60 MHz by 1.15 ns but **closes at 55 MHz** (+0.90 ns), so it runs at 55 MHz. 65 MHz can be revisited: the remaining families are in the session log. |
 | 2026-09-30 | **If the SS5 cannot close timing at 65 MHz, the core focuses on the SS20 only** (user). The test is Fable's MCU→IU restructuring (`scratch/handoff/fable-ss5-65mhz.md`) |
 | 2026-09-30 | Hardware is the main test bed; the simulation is for short CPU/chipset runs and waveforms |
+| 2026-09-30 (night) | The SS20 runs at 55 MHz (closes with +0.9 ns; 60 MHz misses by 1.15 ns) |
+| 2026-10-01 | **Focus on the SS20** (user): the core may drop one machine; work goes to the SS20 first. Fable sessions are run by the user from prompts in `scratch/handoff/` |
+| 2026-10-01 | MSI arbiter: power-on value enables all CPUs (the real MSI enables 8 and 9 only), because OpenBIOS starts every CPU from reset; the Sun OBP enables 9-B in its first instructions anyway |
 
 ### What phase 3 did (session 1)
 
@@ -665,6 +717,14 @@ stages.
   had it.
 
 ## Session log
+
+- **2026-10-01, session 3 (SS20).** SS20 at 55 MHz on the board: CPU suite
+  39/0, NetBSD shell. MSI MID/arbiter/IMPL and the slot-7 fold (chipset
+  only), an 82077 floppy model, `sim --diag` (Sun POST in simulation),
+  `pcdump` (CPU state on the board), OpenBIOS CPU nodes per MID. **The
+  official SS20 OBP 2.25 runs to `ok` and loads Solaris 8.** Fable prompt
+  for the CPU side: `scratch/handoff/fable-ss20-mmu.md` (16-bit contexts,
+  flash clear). Hand-off: [RESUME-20261001.md](../RESUME-20261001.md).
 
 - **2026-09-28, session 1.** Created branch `danifunker`. Surveyed the repo,
   the framework version and the ROMs; chose `ss5.bin` and the SS20 OBP 2.25

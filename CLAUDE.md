@@ -20,11 +20,12 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 | `rtl/plomb/`, `rtl/peri/` | internal bus ("plomb"), generic peripherals |
 | `tools/romdis/` | SPARC V8 disassembler, sun4m ROM analyser, OBP Forth decoder, QEMU tracer |
 | `tools/sparc_link.py` | ELF32 SPARC linker for one object (LLVM has none) |
-| `tools/debugarm/` | upstream's ARM-side debug monitor |
+| `tools/debugarm/` | upstream's ARM-side debug monitor; `pcdump` (ours, `make pcdump`, run on the MiSTer): stops each CPU over the debug link on ttya and prints PC, registers, memory |
+| `tools/ufsread.py` | lists/extracts files from a Solaris UFS disk image (kernel modules for symbols) |
 | `tests/cpu/` | bare-metal test suite that runs as the boot PROM (QEMU and core): CPU tests plus `t_chipset.S`; `expected/ss{5,20}-core-hw.log` are the hardware baselines |
-| `sim/` | whole-machine Verilator simulation (GHDL 6 lowers `ss_core`); `run-cputest.sh 5\|20` must match the hardware baseline; see `sim/README.md` |
+| `sim/` | whole-machine Verilator simulation (GHDL 6 lowers `ss_core`); `run-cputest.sh 5\|20` must match the hardware baseline; `build.sh 20 --diag` starts with `diag-switch?` set (Sun POST); see `sim/README.md` |
 | `bios/` | OpenBIOS sources (git subtree of Grabulosaure/ss_openbios); `bios/boot.rom` is the image the MiSTer runs; `scripts/build-bios.sh` builds `bios/build/boot.rom` |
-| `scripts/` | `build.sh 5\|20 [--seed N]`, `deploy.sh 5\|20 [--rom F]`, `hwtest.sh 5\|20 cpu\|netbsd\|solaris` (board regressions), `console.sh` (ttya from the MiSTer), `setopt.sh` (OSD options via the .CFG), `mount.sh` (remembered disk slots), `machine.sh 5\|20` (per-machine boot.rom/CFG sets), `build-bios.sh`; machine settings in the gitignored `scripts/local.env` |
+| `scripts/` | `build.sh 5\|20 [--seed N]`, `deploy.sh 5\|20 [--rom F]`, `hwtest.sh 5\|20 cpu\|netbsd\|solaris` (board regressions), `console.sh` (ttya from the MiSTer), `setopt.sh` (OSD options via the .CFG), `mount.sh` (remembered disk slots), `machine.sh 5\|20` (per-machine boot.rom/CFG sets), `build-bios.sh`, `kbtype.sh` (types on the core's keyboard through mrext, e.g. at the Sun OBP's `ok`); machine settings in the gitignored `scripts/local.env` |
 | `docs/` | plan, gap analyses, `rom-disassembly/` of the Sun PROMs |
 | `scratch/` | reference PDFs (+ `text/` extractions) and Sun ROM images; gitignored, never commit |
 

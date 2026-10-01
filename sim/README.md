@@ -11,7 +11,7 @@ applied to the whole machine rather than to the CPU alone.
 | `pll_sim.vhd` | stand-in for the framework PLL: every clock is the one reference clock |
 | `sim_top.sv` | `ss_core` + `ddram_arb`, with the MiSTer side as plain ports |
 | `sim_main.cpp` | the harness: DDR3, ROM download, SD blocks, RTC, ttya, video frame |
-| `build.sh 5\|20 [--trace]` | regenerate if the RTL changed, verilate, compile → `obj_ss{5,20}/Vsim_top` (`obj_ss{5,20}_trace/` with VCD support) |
+| `build.sh 5\|20 [--trace] [--diag]` | regenerate if the RTL changed, verilate, compile → `obj_ss{5,20}/Vsim_top` (`obj_ss{5,20}_trace/` with VCD support) |
 | `run-cputest.sh 5\|20` | the CPU suite as the boot PROM, diffed against the **hardware** log `tests/cpu/expected/ss{5,20}-core-hw.log` |
 | `vcd.py` | query a trace: `vcd.py F.vcd list REGEX`, `vcd.py F.vcd show REGEX… --from C --to C` |
 
@@ -79,6 +79,20 @@ completes. It relies on `hps_io`'s slow pace, so faster spacing loses words
 whenever video reads keep the DDR busy. One
 cycle is one `clk_sys` period. The UART bit time comes from the revision's
 SYSFREQ (60 MHz on the SS5, 55 MHz on the SS20).
+
+## Sun POST (`--diag`)
+
+`sim/build.sh 20 --diag` builds `sim/obj_ss20_diag/`, whose NVRAM starts
+with byte 1 (`diag-switch?`) = 0xFF, so the official PROM runs its POST and
+prints from its first instructions:
+
+```bash
+sim/obj_ss20_diag/Vsim_top --rom SS20-OBP-2.25.rom --cycles 400M --progress --log sim/out/obp20-diag.log
+```
+
+The banner comes after about 2.1 s of machine time (two 1 s keyboard
+timeouts), so about 120M cycles. The POST catalogue is
+`docs/rom-disassembly/ss20-obp-2.25/post-tests.md`.
 
 ## Speed
 
