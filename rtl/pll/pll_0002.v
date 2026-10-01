@@ -1,5 +1,8 @@
 `timescale 1ns/10ps
-module  pll_0002(
+// The core clock, outclk_3, is a parameter: 60 MHz on the SS5, 55 MHz on
+// the SS20 (ss_core sets it from SYSFREQ). Every output must divide one
+// VCO: 65 and 60 share 780 MHz, 65 and 55 share 1430 MHz, all three do not.
+module  pll_0002 #(parameter CORE_MHZ = "60.000000 MHz") (
 
 	// interface 'refclk'
 	input wire refclk,
@@ -36,7 +39,7 @@ module  pll_0002(
 		.output_clock_frequency2("40.000000 MHz"),
 		.phase_shift2("0 ps"),
 		.duty_cycle2(50),
-		.output_clock_frequency3("60.000000 MHz"),
+		.output_clock_frequency3(CORE_MHZ),
 		.phase_shift3("0 ps"),
 		.duty_cycle3(50),
 		.output_clock_frequency4("0 MHz"),

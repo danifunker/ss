@@ -301,7 +301,7 @@ ss_core
   .NCPUS(1),
   .TRACE(1),
 `else
-  .SYSFREQ(50000000),
+  .SYSFREQ(55000000),
   .SS20(1),
   .NCPUS(3),
   .TRACE(1),

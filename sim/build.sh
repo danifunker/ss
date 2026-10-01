@@ -20,7 +20,7 @@ for a in "$@"; do
 done
 case "$REV" in
     5)  SYSFREQ=60000000 ;;
-    20) SYSFREQ=50000000 ;;
+    20) SYSFREQ=55000000 ;;
     *)  echo "usage: $0 5|20 [--trace]" >&2; exit 2 ;;
 esac
 

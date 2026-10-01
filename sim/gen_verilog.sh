@@ -37,7 +37,7 @@ set -euo pipefail
 REV="${1:-5}"
 case "$REV" in
     5)  GENERICS=(-gSYSFREQ=60000000 -gSS20=0 -gNCPUS=1) ;;
-    20) GENERICS=(-gSYSFREQ=50000000 -gSS20=1 -gNCPUS=3) ;;
+    20) GENERICS=(-gSYSFREQ=55000000 -gSS20=1 -gNCPUS=3) ;;
     *)  echo "usage: $0 5|20" >&2; exit 2 ;;
 esac
 GENERICS+=(-gTRACE=1 -gFPU_MULTI=0 -gTCX_ACCEL=1 -gSIMU=1)

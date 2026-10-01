@@ -7,6 +7,8 @@ LIBRARY ieee;
 USE ieee.std_logic_1164.ALL;
 
 ENTITY pll IS
+  GENERIC (
+    CORE_MHZ : string := "60.000000 MHz");
   PORT (
     refclk   : IN  std_logic;
     rst      : IN  std_logic;

@@ -159,7 +159,17 @@ ARCHITECTURE rtl OF ss_core IS
   --###################################################################
   
   SIGNAL sclk : std_logic;
-  SIGNAL clk65m,clk80m,clk40m,clk60m : std_logic;
+  SIGNAL clk65m,clk80m,clk40m,clkcore : std_logic;
+
+  -- outclk_3 of the PLL: the core clock when SYSFREQ is 60 or 55 MHz
+  FUNCTION core_mhz(CONSTANT f : natural) RETURN string IS
+  BEGIN
+    IF f=55_000_000 THEN
+      RETURN "55.000000 MHz";
+    ELSE
+      RETURN "60.000000 MHz";
+    END IF;
+  END FUNCTION core_mhz;
   SIGNAL spll_locked : std_logic;
   
   -- Core
@@ -278,6 +288,8 @@ ARCHITECTURE rtl OF ss_core IS
   
   ------------------------------------
   COMPONENT pll IS
+    GENERIC (
+    CORE_MHZ : string := "60.000000 MHz");  -- outclk_3, the core clock
     PORT (
     refclk   : IN std_logic;
     rst      : IN std_logic;
@@ -906,13 +918,14 @@ BEGIN
   
   ----------------------------------------------------------
   i_pll: pll
+    GENERIC MAP (CORE_MHZ => core_mhz(SYSFREQ))
     PORT MAP (
       refclk   => clk_50m,
       rst      => '0',--reset,
       outclk_0 => clk65m,
       outclk_1 => clk80m,
       outclk_2 => clk40m,
-      outclk_3 => clk60m,
+      outclk_3 => clkcore,
       locked   => spll_locked);
   
   gen40:IF SYSFREQ=40_000_000 GENERATE
@@ -928,14 +941,16 @@ BEGIN
   END GENERATE;
 
   -- 60 MHz: the SS5's clock since 2026-09-30 (65 MHz did not close timing:
-  -- about -1 ns on a typical seed). The video stays on clk65m, its pixel
-  -- clock, as on the SS20; the two are asynchronous (SunSparcStation.sdc).
-  gen60:IF SYSFREQ=60_000_000 GENERATE
-     sclk<=clk60m;
+  -- about -1 ns on a typical seed); 55 MHz: the SS20's try above 50 MHz.
+  -- Both are the PLL's outclk_3 (clkcore, its frequency from SYSFREQ). The
+  -- video stays on clk65m, its pixel clock; the two are asynchronous
+  -- (SunSparcStation.sdc).
+  gencore:IF SYSFREQ=60_000_000 OR SYSFREQ=55_000_000 GENERATE
+     sclk<=clkcore;
   END GENERATE;
 
-  ASSERT SYSFREQ=40_000_000 OR SYSFREQ=50_000_000 OR SYSFREQ=60_000_000
-    OR SYSFREQ=65_000_000
+  ASSERT SYSFREQ=40_000_000 OR SYSFREQ=50_000_000 OR SYSFREQ=55_000_000
+    OR SYSFREQ=60_000_000 OR SYSFREQ=65_000_000
     SEVERITY failure;
   
   clk_sys<=sclk;
