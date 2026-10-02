@@ -948,7 +948,11 @@ drop one of the two machines, and asked to focus on the SS20.
   (setenv, Solaris eeprom), halt returns to ok; a blank NVRAM image gets
   its own IDPROM. The SCSI test ROM (simulation = board); Direct SD
   removed, the last-block fix; the two-disk hang is gone. SCSI follows
-  the current Mac approach (no FPGA cache). Hand-off: RESUME-20261003.md.
+  the current Mac approach (no FPGA cache): the new target engine
+  (`scsi_targets.vhd`, 16 KB hps_io requests) passes in simulation. CDE on
+  the screen under OpenBIOS fixed (romvec calls serialised). OSD reworked
+  (pages, model line, V-Integer) and an SS20 memory size option: committed,
+  not yet built. Hand-off: [RESUME-20261003.md](../RESUME-20261003.md).
 
 - **2026-10-02, session 6 (Fable, SS20 corruption).** Found and fixed the
   memory corruption under disk I/O: `mcu_multi_ext.vhd` released the CPU
