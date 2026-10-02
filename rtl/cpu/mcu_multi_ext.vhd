@@ -863,6 +863,16 @@ BEGIN
     
   BEGIN
     IF rising_edge(clk) THEN
+      -- filling_end is a one-cycle pulse after the last beat of a fill
+      -- (as in mcu_simple). Without this default it stayed set from the
+      -- first fill on, so filling_d / filling_i only meant "a beat
+      -- arrived last cycle": a bubble between the beats of a burst (the
+      -- MiSTer DDR port under load) released the CPU side while the
+      -- line, whose tag was already valid, was half written, and loads,
+      -- stores and fetches hit the evicted line's words (Solaris 8 and
+      -- NetBSD corrupted memory under disk I/O; t_cache_fill_words and
+      -- t_icache_fill_words with sim --ddr-gaps).
+      filling_end<='0';
       ----------------------------------------------
       state<=state_c;
       ext_w_l<=ext_w_c;
@@ -976,6 +986,9 @@ BEGIN
       IF reset_n='0' THEN
         rd_fifo_lev<=0;
         state<=sIDLE;
+        filling_d<='0';
+        filling_i<='0';
+        filling_end<='0';
       END IF;        
 
     END IF;
