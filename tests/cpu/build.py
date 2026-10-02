@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Build the CPU test suite PROM images.
 
-    python3 tests/cpu/build.py [target ...] [-DNAME=VALUE ...]
+    python3 tests/cpu/build.py [target ...] [-DNAME=VALUE ...] [--main=NAME]
                                                 (default: all targets)
+    --main=NAME builds src/NAME.S into out/<target>/NAME.rom instead of
+    the suite (src/main.S, cputest.rom); e.g. --main=memstress
     e.g. -DDETAIL_LIMIT=1000 prints every failing check
 
 Targets: ss5-qemu (link 0x70000000), ss5-core (0xf0000000), ss20 (0).
@@ -33,21 +35,21 @@ def clang():
     sys.exit("clang with the SPARC target is needed (LLVM 18)")
 
 
-def build(name, extra=()):
+def build(name, extra=(), main="main", stem="cputest"):
     macro, base, size = TARGETS[name]
     out = os.path.join(HERE, "out", name)
     os.makedirs(out, exist_ok=True)
-    obj = os.path.join(out, "cputest.o")
-    rom = os.path.join(out, "cputest.rom")
+    obj = os.path.join(out, stem + ".o")
+    rom = os.path.join(out, stem + ".rom")
     subprocess.run([clang(), "--target=sparc-unknown-elf", "-mcpu=v8",
                     "-x", "assembler-with-cpp", f"-D{macro}", "-I",
                     os.path.join(HERE, "src"), *extra, "-c",
-                    os.path.join(HERE, "src", "main.S"), "-o", obj],
+                    os.path.join(HERE, "src", main + ".S"), "-o", obj],
                    check=True)
     subprocess.run([sys.executable, os.path.join(REPO, "tools",
                                                  "sparc_link.py"), obj,
                     "-o", rom, "--base", hex(base), "--size", hex(size),
-                    "--map", os.path.join(out, "cputest.map"),
+                    "--map", os.path.join(out, stem + ".map"),
                     "--order", ".text,.rodata,.testtab,.romend"],
                    check=True)
     print(f"{name}: {rom}")
@@ -58,8 +60,11 @@ def main():
                    check=True)
     args = sys.argv[1:]
     extra = [a for a in args if a.startswith("-D")]
-    for t in [a for a in args if not a.startswith("-D")] or TARGETS:
-        build(t, extra)
+    mains = [a[len("--main="):] for a in args if a.startswith("--main=")]
+    main = mains[-1] if mains else "main"
+    stem = "cputest" if main == "main" else main
+    for t in [a for a in args if not a.startswith("-")] or TARGETS:
+        build(t, extra, main, stem)
 
 
 if __name__ == "__main__":
