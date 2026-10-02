@@ -183,14 +183,14 @@ struct SdHost {
     bool is_write = false;
     uint32_t lba = 0;
     uint8_t buf[512];
-    Disk *disks[3] = {nullptr, nullptr, nullptr};
+    Disk *disks[4] = {nullptr, nullptr, nullptr, nullptr};
 
-    void step(Vsim_top *t, uint8_t sd_rd, uint8_t sd_wr, const uint32_t lbas[3],
-              uint16_t din[3]) {
+    void step(Vsim_top *t, uint8_t sd_rd, uint8_t sd_wr, const uint32_t lbas[4],
+              uint16_t din[4]) {
         t->sd_buff_wr = 0;
         switch (st) {
         case IDLE:
-            for (int n = 0; n < 3; n++) {
+            for (int n = 0; n < 4; n++) {
                 if (!((sd_rd | sd_wr) & (1 << n))) continue;
                 slot = n;
                 is_write = sd_wr & (1 << n);
@@ -359,6 +359,7 @@ static void usage() {
         "usage: Vsim_top --rom FILE [options]\n"
         "  --rom FILE          boot PROM image (downloaded as boot.rom, index 0)\n"
         "  --hd0 FILE, --hd1 FILE, --cd FILE   SCSI images (--hd1 selects HD0+HD1)\n"
+        "  --nvram FILE        the NVRAM image (8192 bytes; slot 3, read and written)\n"
         "  --ro                open the disk images read-only\n"
         "  --cycles N          stop after N cycles (k/M/G suffixes; default 200M)\n"
         "  --stop STR          end the run, exit 0, at the end of the line that prints STR\n"
@@ -387,7 +388,7 @@ static void usage() {
 static uint8_t bcd(int v) { return (uint8_t)(((v / 10) << 4) | (v % 10)); }
 
 int main(int argc, char **argv) {
-    std::string rom, hd[3], log_path, frame_path, trace_path;
+    std::string rom, hd[4], log_path, frame_path, trace_path;   // hd[3]: NVRAM
     std::vector<std::string> stops, fails;
     struct Send { std::string pat, text; bool done; };
     std::vector<Send> sends;
@@ -407,6 +408,7 @@ int main(int argc, char **argv) {
         else if (a == "--hd0") hd[0] = next();
         else if (a == "--hd1") hd[1] = next();
         else if (a == "--cd") hd[2] = next();
+        else if (a == "--nvram") hd[3] = next();
         else if (a == "--ro") readonly = true;
         else if (a == "--cycles") max_cycles = parse_count(next().c_str());
         else if (a == "--stop") stops.push_back(unescape(next()));
@@ -454,9 +456,9 @@ int main(int argc, char **argv) {
         }
     }
 
-    Disk disks[3];
+    Disk disks[4];
     SdHost sd;
-    for (int n = 0; n < 3; n++) {
+    for (int n = 0; n < 4; n++) {
         if (hd[n].empty()) continue;
         if (!disks[n].open(hd[n], readonly || n == 2)) return 3;
         sd.disks[n] = &disks[n];
@@ -553,8 +555,9 @@ int main(int argc, char **argv) {
         uint64_t din = t->ddr_din;
         uint8_t be = t->ddr_be;
         uint8_t sd_rd = t->sd_rd, sd_wr = t->sd_wr;
-        uint32_t lbas[3] = {t->sd_lba0, t->sd_lba1, t->sd_lba2};
-        uint16_t sdin[3] = {t->sd_buff_din0, t->sd_buff_din1, t->sd_buff_din2};
+        uint32_t lbas[4] = {t->sd_lba0, t->sd_lba1, t->sd_lba2, t->sd_lba3};
+        uint16_t sdin[4] = {t->sd_buff_din0, t->sd_buff_din1, t->sd_buff_din2,
+                            t->sd_buff_din3};
         int txd = t->uart_txd;
         bool iowait = t->ioctl_wait;
 
@@ -577,6 +580,14 @@ int main(int argc, char **argv) {
         switch (dl_phase) {
         case 0:                       // reset, then start the download
             if (cyc == 16) t->reset = 0;
+            // Main mounts the remembered images before it downloads the ROM;
+            // the NVRAM's (slot 3) loads meanwhile.
+            if (cyc == 32 && sd.disks[3]) {
+                t->img_size = disks[3].size;
+                t->img_readonly = disks[3].ro;
+                t->img_mounted = 1 << 3;
+            }
+            if (cyc == 48) t->img_mounted = 0;
             // hps_io raises ioctl_download well before the first word; the
             // loader needs a few cycles to enter its download state.
             if (cyc == 64) t->ioctl_download = 1;
@@ -671,6 +682,9 @@ int main(int argc, char **argv) {
             why, cyc, cyc / (double)SIM_SYSFREQ, el, cyc / el / 1e3,
             disks[0].reads + disks[1].reads + disks[2].reads,
             disks[0].writes + disks[1].writes, vid.frames);
+    if (disks[3].f)
+        fprintf(stderr, "[sim] NVRAM image: %" PRIu64 " sector reads, %" PRIu64 " writes\n",
+                disks[3].reads, disks[3].writes);
     if (ddr.oob) fprintf(stderr, "[sim] %" PRIu64 " DDR accesses outside the FPGA window\n", ddr.oob);
     if (!frame_path.empty() && !vid.save(frame_path.c_str()))
         fprintf(stderr, "[sim] no complete video frame to save\n");

@@ -61,6 +61,37 @@ BEGIN(t_idprom, "chipset: NVRAM IDPROM format 1, machine type, checksum")
         EXPECT(%l3, 0, 3)
 END
 
+/* NVRAM offset 0x100: byte stores reach their own lanes, a word store
+ * reads back as bytes. The word is restored, so a saved NVRAM image (the
+ * core writes the NVRAM back to the SD card, TOD-6) keeps its content. */
+BEGIN(t_nvram, "chipset: NVRAM byte and word stores read back (restored)")
+        set NVRAM_PA + 0x100, %l0
+        lda [%l0] NVRAM_ASI, %l5        /* the original word */
+        mov 0x5a, %l1
+        stba %l1, [%l0] NVRAM_ASI
+        mov 0xa5, %l1
+        add %l0, 1, %l2
+        stba %l1, [%l2] NVRAM_ASI
+        mov 0x3c, %l1
+        add %l0, 2, %l2
+        stba %l1, [%l2] NVRAM_ASI
+        mov 0xc3, %l1
+        add %l0, 3, %l2
+        stba %l1, [%l2] NVRAM_ASI
+        lda [%l0] NVRAM_ASI, %l1
+        EXPECT(%l1, 0x5aa53cc3, 1)
+        set 0x12345678, %l1
+        sta %l1, [%l0] NVRAM_ASI
+        lduba [%l0] NVRAM_ASI, %l1
+        EXPECT(%l1, 0x12, 2)
+        add %l0, 3, %l2
+        lduba [%l2] NVRAM_ASI, %l1
+        EXPECT(%l1, 0x78, 3)
+        sta %l5, [%l0] NVRAM_ASI        /* restore */
+        lda [%l0] NVRAM_ASI, %l1
+        EXPECT_R(%l1, %l5, 4)
+END
+
 BEGIN(t_fcode, "chipset: frame buffer slot starts with FCode (0xf1 header)")
         set TCX_PA, %l0
         lduba [%l0] TCX_ASI, %l1

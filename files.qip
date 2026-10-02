@@ -1,4 +1,5 @@
 set_global_assignment -name VHDL_FILE rtl/mister/plomb_avalon_mister.vhd
+set_global_assignment -name VHDL_FILE rtl/mister/nvram_sd.vhd
 set_global_assignment -name VHDL_FILE rtl/mister/ss_core.vhd
 set_global_assignment -name VHDL_FILE rtl/plomb/plomb_fifo.vhd
 set_global_assignment -name VHDL_FILE rtl/plomb/plomb_sel.vhd

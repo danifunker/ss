@@ -101,21 +101,24 @@ ENTITY ss_core IS
     autoboot             : IN    std_logic; -- 0=NoAuto 1=Auto
     viboot               : IN    std_logic; -- 0=Serial 1=Video
     
-    img_mounted          : IN  std_logic_vector(2 DOWNTO 0);
+    -- Slots 0-2: SCSI images (HD0, HD1, CD); 3: the NVRAM image
+    img_mounted          : IN  std_logic_vector(3 DOWNTO 0);
     img_readonly         : IN  std_logic;
     img_size             : IN  std_logic_vector(63 DOWNTO 0);   
     sd_lba0              : OUT std_logic_vector(31 DOWNTO 0);
     sd_lba1              : OUT std_logic_vector(31 DOWNTO 0);
     sd_lba2              : OUT std_logic_vector(31 DOWNTO 0);
-    sd_rd                : OUT std_logic_vector(2 DOWNTO 0);
-    sd_wr                : OUT std_logic_vector(2 DOWNTO 0);
-    sd_ack               : IN  std_logic_vector(2 DOWNTO 0);
+    sd_lba3              : OUT std_logic_vector(31 DOWNTO 0);
+    sd_rd                : OUT std_logic_vector(3 DOWNTO 0);
+    sd_wr                : OUT std_logic_vector(3 DOWNTO 0);
+    sd_ack               : IN  std_logic_vector(3 DOWNTO 0);
     
     sd_buff_addr         : IN std_logic_vector(7 DOWNTO 0);
     sd_buff_dout         : IN std_logic_vector(15 DOWNTO 0);
     sd_buff_din0         : OUT std_logic_vector(15 DOWNTO 0);
     sd_buff_din1         : OUT std_logic_vector(15 DOWNTO 0);
     sd_buff_din2         : OUT std_logic_vector(15 DOWNTO 0);
+    sd_buff_din3         : OUT std_logic_vector(15 DOWNTO 0);
     sd_buff_wr           : IN std_logic;
     
     ioctl_download       : IN std_logic;
@@ -245,7 +248,7 @@ ARCHITECTURE rtl OF ss_core IS
   SIGNAL sd0_lba,sd1_lba,sd6_lba : std_logic_vector(31 DOWNTO 0);
   SIGNAL sd0_rd,sd1_rd,sd6_rd,sd0_wr,sd1_wr,sd6_wr : std_logic;
   SIGNAL sd0_ack,sd1_ack,sd6_ack : std_logic;
-  SIGNAL sd_ack_delay : std_logic_vector(2 DOWNTO 0);
+  SIGNAL sd_ack_delay : std_logic_vector(3 DOWNTO 0);
   SIGNAL sd0_buff_din,sd1_buff_din,sd6_buff_din : std_logic_vector(15 DOWNTO 0);
   SIGNAL sd0_buff_wr,sd1_buff_wr,sd6_buff_wr : std_logic;
   TYPE enum_scsimux IS (sIDLE,sREAD0,sREAD1,sREAD6,
@@ -265,6 +268,9 @@ ARCHITECTURE rtl OF ss_core IS
   SIGNAL kbd_leds : unsigned(2 DOWNTO 0);
   SIGNAL swr_hold : unsigned(4 DOWNTO 0);
   SIGNAL reboot_pending : std_logic := '0';
+  SIGNAL nv_w : type_nvram_w;
+  SIGNAL nv_r : type_nvram_r;
+  SIGNAL nv_ready : std_logic;
 
   SIGNAL down : std_logic;
   
@@ -351,6 +357,8 @@ BEGIN
       sd_reg_r    => sd_reg_r,
       rtcinit     => rtcinit,
       rtcset      => rtcset,
+      nv_w        => nv_w,
+      nv_r        => nv_r,
       phy_txd     => phy_txd,
       phy_tx_clk  => phy_tx_clk,
       phy_tx_en   => phy_tx_en,
@@ -624,9 +632,14 @@ BEGIN
             OR to_std_logic(scsimux=sSKIP1);
   sd6_ack<=(sd_ack(2) AND to_std_logic(scsimux=sREAD6 OR scsimux=sWRITE6))
             OR to_std_logic(scsimux=sSKIP6);
-  sd0_buff_wr<=sd_buff_wr AND to_std_logic(scsimux=sREAD0 OR scsimux=sWRITE0);
-  sd1_buff_wr<=sd_buff_wr AND to_std_logic(scsimux=sREAD1 OR scsimux=sWRITE1);
-  sd6_buff_wr<=sd_buff_wr AND to_std_logic(scsimux=sREAD6 OR scsimux=sWRITE6);
+  -- sd_buff_wr is shared by the slots: the NVRAM image's (slot 3) can be
+  -- served while a SCSI request waits.
+  sd0_buff_wr<=sd_buff_wr AND sd_ack(0) AND
+                to_std_logic(scsimux=sREAD0 OR scsimux=sWRITE0);
+  sd1_buff_wr<=sd_buff_wr AND sd_ack(1) AND
+                to_std_logic(scsimux=sREAD1 OR scsimux=sWRITE1);
+  sd6_buff_wr<=sd_buff_wr AND sd_ack(2) AND
+                to_std_logic(scsimux=sREAD6 OR scsimux=sWRITE6);
   
   sd_buff_din0<=sd0_buff_din;
   sd_buff_din1<=sd1_buff_din;
@@ -635,6 +648,29 @@ BEGIN
   sd_lba0<=sd0_lba;
   sd_lba1<=sd1_lba;
   sd_lba2<=sd6_lba;
+
+  ----------------------------------------------------------
+  -- The NVRAM image (slot 3, TOD-6)
+  i_nvram_sd: ENTITY work.nvram_sd
+    GENERIC MAP (
+      SYSFREQ => SYSFREQ,
+      SIMU    => SIMU)
+    PORT MAP (
+      img_mounted  => img_mounted(3),
+      img_readonly => img_readonly,
+      img_size     => img_size,
+      sd_lba       => sd_lba3,
+      sd_rd        => sd_rd(3),
+      sd_wr        => sd_wr(3),
+      sd_ack       => sd_ack(3),
+      sd_buff_addr => sd_buff_addr,
+      sd_buff_dout => sd_buff_dout,
+      sd_buff_din  => sd_buff_din3,
+      sd_buff_wr   => sd_buff_wr,
+      nv_w         => nv_w,
+      nv_r         => nv_r,
+      ready        => nv_ready,
+      clk          => sclk);
   
   ----------------------------------------------------------
   MUX_SCSI:PROCESS(scsi0_mist_r,scsi1_mist_r,scsi6_mist_r,scsi_sd_r,
@@ -1007,7 +1043,9 @@ BEGIN
             IF SIMU=1 THEN
               -- Clearing 512 MB one word at a time takes hours in a
               -- simulator; the simulated DDR starts out zeroed instead.
-              state<=sRUN;
+              -- sGAP at the end of the clear waits for the NVRAM.
+              state<=sGAP;
+              ddram2b_address<=std_logic_vector(to_unsigned(16#0400_0000#,29));
             END IF;
           END IF;
           
@@ -1032,7 +1070,10 @@ BEGIN
             state<=sCLR;
             ddram2b_address <= std_logic_vector(resize(shift_right(unsigned(OBRAM_ADRS) + unsigned(ioctl_addr(19 DOWNTO 0)) + 8,3),29));
           ELSIF (unsigned(ddram2b_address & "000") = x"2000_0000") THEN
-            state<=sRUN;
+            -- Run once the NVRAM image is in (nvram_sd).
+            IF nv_ready='1' THEN
+              state<=sRUN;
+            END IF;
           ELSE
             state<=sCLR;
           END IF;

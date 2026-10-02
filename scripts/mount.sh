@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# mount.sh [--hd0 FILE] [--hd1 FILE] [--cd FILE] [--mgl REV]
+# mount.sh [--hd0 FILE] [--hd1 FILE] [--cd FILE] [--nvram FILE] [--mgl REV]
 #
 # Attach images without the OSD. FILE is a name in games/SunSparcStation/ or
 # an absolute path on the MiSTer; "" detaches.
 #
-# With the remembered slots (CONF_STR "SC0/SC1/SC2"), MiSTer keeps each
+# --nvram is slot 3, the NVRAM image (an 8192-byte file, read at every core
+# start and written back when the machine changes the NVRAM).
+#
+# With the remembered slots (CONF_STR "SC0" to "SC3"), MiSTer keeps each
 # slot's image in /media/fat/config/<core>.s<n>: a fixed 1024-byte record,
 # the absolute path NUL-padded (Main menu.cpp FileSaveConfig). The core
 # remounts them at every start, so this writes the records and nothing else.
@@ -21,6 +24,7 @@ while [ $# -gt 0 ]; do
         --hd0) SLOT[0]="$2"; shift ;;
         --hd1) SLOT[1]="$2"; shift ;;
         --cd)  SLOT[2]="$2"; shift ;;
+        --nvram) SLOT[3]="$2"; shift ;;
         --mgl) MGL=$(rev_of "$2") || exit 2; shift ;;
         *) echo "unknown argument $1" >&2; exit 2 ;;
     esac; shift

@@ -177,7 +177,22 @@ PACKAGE ts_pack IS
     d0 : uv32;
     d1 : uv32;
   END RECORD;
-  
+
+  -- The NVRAM's second port, for its image on the SD card (TOD-6,
+  -- rtl/mister/nvram_sd.vhd). Halfword a holds NVRAM bytes 2a (low half)
+  -- and 2a+1, the byte order of the image file and of hps_io's buffer.
+  TYPE type_nvram_w IS RECORD
+    a  : unsigned(11 DOWNTO 0);
+    we : std_logic;
+    dw : uv16;
+  END RECORD;
+
+  TYPE type_nvram_r IS RECORD
+    dr  : uv16;                  -- halfword a, one clock after a
+    chg : std_logic;             -- the CPU wrote the RAM (not 0x1FF8-0x1FFF)
+    sec : unsigned(3 DOWNTO 0);  -- in this 512-byte sector
+  END RECORD;
+
   CONSTANT HWCONF_SP605    : uv8 :=x"01"; -- Xilinx SP605
   
   CONSTANT HWCONF_C5G      : uv8 :=x"11"; -- Terasic CycloneV GX

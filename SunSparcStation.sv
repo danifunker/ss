@@ -80,6 +80,7 @@ localparam CONF_STR = {
     "SC1,VHDIMGHDARAW,HD2;" ,
     "O45,CDROM,OFF,2048,512;" ,
     "SC2,ISO,CDROM;" ,
+    "SC3,NVR,NVRAM;" ,
     "O67,Aspect ratio,4:3,Full Screen,[ARC1],[ARC2];" ,
     "O8,AutoBoot,ON,OFF;" ,
     "O9,Boot,Video,Serial;" ,
@@ -104,16 +105,16 @@ localparam CONF_STR = {
 wire forced_scandoubler;
 
 wire [127:0] status;
-wire  [2:0]  img_mounted;
+wire  [3:0]  img_mounted;
 wire  img_readonly;
 wire  [63:0] img_size;
-wire  [31:0] sd_lba0,sd_lba1,sd_lba2;
-wire  [2:0] sd_rd;
-wire  [2:0] sd_wr;
-wire  [2:0] sd_ack;
+wire  [31:0] sd_lba0,sd_lba1,sd_lba2,sd_lba3;
+wire  [3:0] sd_rd;
+wire  [3:0] sd_wr;
+wire  [3:0] sd_ack;
 wire  [7:0] sd_buff_addr;
 wire  [15:0] sd_buff_dout;
-wire  [15:0] sd_buff_din0,sd_buff_din1,sd_buff_din2;
+wire  [15:0] sd_buff_din0,sd_buff_din1,sd_buff_din2,sd_buff_din3;
 wire  sd_buff_wr;
 wire  ioctl_download;
 wire [15:0] ioctl_index;
@@ -130,7 +131,7 @@ hps_io #(
     .CONF_STR(CONF_STR),
     .PS2DIV(1000),
     .WIDE(1),
-    .VDNUM(3),
+    .VDNUM(4),
     .PS2WE(0))
 hps_io
  (
@@ -154,15 +155,15 @@ hps_io
   .img_readonly(img_readonly),
   .img_size(img_size),
 
-  .sd_lba('{sd_lba0, sd_lba1, sd_lba2}),
-  .sd_blk_cnt('{0, 0, 0}),
+  .sd_lba('{sd_lba0, sd_lba1, sd_lba2, sd_lba3}),
+  .sd_blk_cnt('{0, 0, 0, 0}),
   .sd_rd(sd_rd),
   .sd_wr(sd_wr),
   .sd_ack(sd_ack),
 
   .sd_buff_addr(sd_buff_addr),
   .sd_buff_dout(sd_buff_dout),
-  .sd_buff_din('{sd_buff_din0,sd_buff_din1,sd_buff_din2}),
+  .sd_buff_din('{sd_buff_din0,sd_buff_din1,sd_buff_din2,sd_buff_din3}),
   .sd_buff_wr(sd_buff_wr),
 
   .ioctl_download(ioctl_download),
@@ -380,6 +381,7 @@ ss_core
  .sd_lba0(sd_lba0),
  .sd_lba1(sd_lba1),
  .sd_lba2(sd_lba2),
+ .sd_lba3(sd_lba3),
  .sd_rd(sd_rd),
  .sd_wr(sd_wr),
  .sd_ack(sd_ack),
@@ -388,6 +390,7 @@ ss_core
  .sd_buff_din0(sd_buff_din0),
  .sd_buff_din1(sd_buff_din1),
  .sd_buff_din2(sd_buff_din2),
+ .sd_buff_din3(sd_buff_din3),
  .sd_buff_wr(sd_buff_wr),
  .ioctl_download(ioctl_download),
  .ioctl_index(ioctl_index[7:0]),

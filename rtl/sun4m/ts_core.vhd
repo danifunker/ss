@@ -95,6 +95,9 @@ ENTITY ts_core IS
     -- RTC init.
     rtcinit     : IN unsigned(55 DOWNTO 0);
     rtcset      : IN std_logic;
+    -- NVRAM image on the SD card
+    nv_w        : IN  type_nvram_w;
+    nv_r        : OUT type_nvram_r;
     
     -- Ethernet MII / RMII
     phy_txd     : OUT uv4;       -- MII/RMII Data
@@ -400,6 +403,8 @@ ARCHITECTURE rtl OF ts_core IS
       sd_reg_r    : IN  type_sd_reg_r;
       rtcinit     : IN unsigned(55 DOWNTO 0);
       rtcset      : IN std_logic;
+      nv_w        : IN  type_nvram_w;
+      nv_r        : OUT type_nvram_r;
       phy_txd     : OUT uv4;
       phy_tx_clk  : IN  std_logic;
       phy_tx_en   : OUT std_logic;
@@ -1432,6 +1437,8 @@ BEGIN
       sd_reg_r    => sd_reg_r,
       rtcinit     => rtcinit,
       rtcset      => rtcset,
+      nv_w        => nv_w,
+      nv_r        => nv_r,
       phy_txd     => phy_txd,
       phy_tx_clk  => phy_tx_clk,
       phy_tx_en   => phy_tx_en,

@@ -39,6 +39,10 @@ ENTITY ts_rtc IS
     
     rtcinit : IN unsigned(55 DOWNTO 0);
     rtcset  : IN std_logic;
+
+    -- The NVRAM image on the SD card (rtl/mister/nvram_sd.vhd)
+    nv_w    : IN  type_nvram_w;
+    nv_r    : OUT type_nvram_r;
     
     -- Global
     clk     : IN std_logic;
@@ -290,8 +294,22 @@ BEGIN
     PORT MAP (
       mem_w => m_w,
       mem_r => m_r,
+      nv_w  => nv_w,
+      nv_dr => nv_r.dr,
       clk   => clk,
       reset_n => reset_n);
+
+  -- A CPU write to the RAM makes its sector of the SD image dirty. The
+  -- clock registers (0x1FF8-0x1FFF) are left out: an OS writes the control
+  -- byte at every read of the clock.
+  NV_Chg:PROCESS (clk)
+  BEGIN
+    IF rising_edge(clk) THEN
+      nv_r.chg<=w.req AND w.wr AND sel AND
+                 NOT to_std_logic(w.a(12 DOWNTO 3)="1111111111");
+      nv_r.sec<=w.a(12 DOWNTO 9);
+    END IF;
+  END PROCESS NV_Chg;
   
   R_Gen:PROCESS(w,m_r,cw,cr,st,
                 mem_s,mem_i,mem_h,mem_j,mem_d,mem_m,mem_y,a_delay,sel)

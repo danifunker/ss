@@ -90,6 +90,8 @@ ENTITY ts_io IS
     -- RTC init.
     rtcinit     : IN unsigned(55 DOWNTO 0);
     rtcset      : IN std_logic;
+    nv_w        : IN  type_nvram_w;
+    nv_r        : OUT type_nvram_r;
     
     -- Ethernet MII / RMII
     phy_txd     : OUT uv4;       -- MII/RMII Data
@@ -484,6 +486,8 @@ BEGIN
       r        => rtc_r,
       rtcinit  => rtcinit,
       rtcset   => rtcset,
+      nv_w     => nv_w,
+      nv_r     => nv_r,
       clk      => clk,
       reset_n  => reset_n);
 

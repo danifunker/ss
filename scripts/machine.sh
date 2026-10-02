@@ -4,7 +4,8 @@
 # Both revisions share the CONF_STR name SunSparcStation (decided
 # 2026-09-30, for now), so they share games/SunSparcStation/boot.rom,
 # config/SunSparcStation.CFG and the remembered slots
-# config/SunSparcStation.s0-s2. This keeps one set per machine in
+# config/SunSparcStation.s0-s3 (s3: the NVRAM image, whose content is
+# per machine too). This keeps one set per machine in
 # games/SunSparcStation/machines/{ss5,ss20}/ and swaps them:
 #
 #   machine.sh 20     save the live files as the current machine's set,
@@ -32,7 +33,7 @@ esac
 # One remote script: the live file names and the sets are all on the MiSTer.
 ssh "${SSH_OPTS[@]}" "$DEV" sh -s -- "$WANT" "$GAMES" "$CFG" "$M" "$GAMES_DIR" <<'EOF'
 want=$1; games=$2; cfg=$3; m=$4; name=$5
-live="$games/boot.rom $cfg/$name.CFG $cfg/$name.s0 $cfg/$name.s1 $cfg/$name.s2"
+live="$games/boot.rom $cfg/$name.CFG $cfg/$name.s0 $cfg/$name.s1 $cfg/$name.s2 $cfg/$name.s3"
 mkdir -p "$m/ss5" "$m/ss20"
 cur=$(cat "$m/current" 2>/dev/null || echo ss5)
 if [ "$want" = status ]; then
