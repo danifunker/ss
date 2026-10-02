@@ -5,8 +5,24 @@
 > with `SunSparcStation.sv`. The VHDL moved unchanged, so its line numbers
 > still hold.
 
-Status: design, 2026-09-28. Not implemented. Input to REWORK.md phase 5,
-item 0 ("SCSI storage modelled on the Mac cores").
+Status: design, 2026-09-28; input to REWORK.md phase 5, item 0 ("SCSI
+storage modelled on the Mac cores").
+
+**Update 2026-10-02 (session 7).** The user chose the **current Mac
+approach** (option (a) of section 4, without the block cache): the Mac's
+release builds with `SCSI_CACHE_OFF=1` since 2026-09-25 (its engine talks
+to `hps_io` directly, one 512-byte block per disk request) and gets its
+write speed from Main's write buffer (the user's PR #1336, gated on the
+Mac family). So `scsi_cache.sv` is **not** used here; steps S3's cache and
+the 13-bit buffer/`sd_blk_cnt` glue are dropped. The SS20's transport
+already is the Mac's (single-block requests straight to `hps_io`). What is
+left is the target engine (S2, S4, S5), and, once #1336 is merged, adding
+the SPARC core to Main's write-buffer hook (a Main branch, with the user's
+leave). Done so far: S0 (Direct SD removed, `96e37b6`), S7 (the NVRAM on
+its own slot, TOD-6), D7 (the last block), the CD's `[5:4]` range and the
+`SC` slots (D1, D2), IDs 3/1/6 (D8); the test bench is
+`tests/cpu/src/scsitest.S` (`sim/run-scsi.sh`, `hwtest.sh scsi`, board
+= simulation). Research on Main's bridges: [main-bridges.md](main-bridges.md).
 
 **Paths.** SunSparcStation files are cited at their **post-phase-3 paths**
 (`rtl/sun4m/X` → `rtl/sun4m/X`, `rtl/cpu/X` → `rtl/cpu/X`,

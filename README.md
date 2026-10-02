@@ -56,7 +56,7 @@ ID's. It is written back to the file at once, so the machine keeps its
 identity from then on.
 
 Both firmwares keep their settings there: `setenv` at the `ok` prompt,
-or `eeprom` from Solaris and NetBSD. OpenBIOS stores the variables that
+or `eeprom` from the OS (checked with Solaris). OpenBIOS stores the variables that
 differ from their defaults. Two OSD options win over the NVRAM for one
 boot without changing it: **Boot** (Video or Serial) picks the OpenBIOS
 console, and **AutoBoot OFF** stops at `ok`; with AutoBoot ON,

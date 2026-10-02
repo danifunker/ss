@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's three `rtl/cpu` fixes (`b775165`) verified on the board (session 5): NetBSD 11 to a shell, and **Solaris 8 under the official Sun OBP 2.25 with no in-memory patch, 3 CPUs**. **NVRAM saved to the SD card** (TOD-6, OSD "NVRAM"): the OBP keeps its settings, and `hwtest.sh 20 solaris-obp` boots Solaris unattended in 4 minutes. The **memory corruption under sustained disk I/O with the caches on** (Solaris with 1 or 3 CPUs, NetBSD) is **fixed** (session 6: `mcu_multi_ext.vhd` released the CPU side on every gap between the DDR beats of a line fill; `sim --ddr-gaps` reproduces the board's bus; rbf `scratch/SunSparcStation20-fillfix-s3.rbf`, on the board: suite 65/0/0, memstress, and 40 minutes each of Solaris with one and three CPUs and of NetBSD under the disk stress). Hand-off: [RESUME-20261002.md](../RESUME-20261002.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris under OpenBIOS, **Solaris under the Sun PROM with a saved NVRAM**); CPU suite on the board: **SS20 63/0/0, SS5 53/0/0** (`9a99e4b` + tests, session 5), simulation = board (session 6 adds `t_cache3.S`: **SS20 65/0/0 on the board** = simulation, with and without `--ddr-gaps`; SS5 55 in simulation, its board baseline to re-record); `memstress` (board-only RAM stress, 3 CPUs) passes; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20 only** (the SS5 is parked). SS20 at 55 MHz, 3 CPUs, closes on every clock (`nosd-s3`, 86 % ALMs). NetBSD 11 and Solaris 8 boot under OpenBIOS and under the official Sun OBP 2.25 (Solaris with 3 CPUs, no patch); the disk-I/O corruption is fixed (session 6) and a **120-minute three-CPU Solaris stress survives** (session 7). NVRAM on the SD card for both firmwares (**OpenBIOS keeps its settings now**, Solaris `eeprom` works, halt returns to `ok`); a blank NVRAM image gets its own IDPROM. SCSI: Direct SD gone, last-block fix, the two-disk hang gone; next the new target engine on the current Mac approach. Hand-off: [RESUME-20261003.md](../RESUME-20261003.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, **SCSI test ROM**, NetBSD, Solaris under OpenBIOS, Solaris under the Sun PROM with a saved NVRAM); CPU suite on the board: **SS20 65/0/0** = simulation (with and without `--ddr-gaps`); **scsitest 6/0/0** = simulation (`sim/run-scsi.sh`); `memstress`; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump`; the stress scripts in `scratch/` (`solstress.sh`, `nbstress.sh`) |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -748,6 +748,61 @@ drop one of the two machines, and asked to focus on the SS20.
   `hwtest.sh 5 cpu` → 55/0/0 and re-record `ss5-core-hw.log` (no new SS5
   rbf is needed, its RTL is unchanged).
 
+### Session 7 results (2026-10-02, SS20)
+
+- **The SS20 is the only focus** (user): SS5 work is parked (its suite
+  baseline stays at 53 tests). Hand-offs list board work for the next
+  session, not for the user; the user only pushes.
+- **The 2-hour stress:** `solstress.sh` with all three CPUs on-line,
+  caches on, survived **120 minutes** (process IDs wrapped past 30,000
+  several times), on `fillfix-s3`.
+- **Licence: GPL-2** (`4bbc610`, user decision): `LICENSE`, README; the
+  rework's own work GPL-2.0+, Grabulosaure's files keep their notice until
+  he confirms.
+- **OpenBIOS ports the Sun PROM's NVRAM behaviour** (`4cc0ee6`, now
+  `bios/boot.rom`, md5 50fd0042): `setenv`/`set-default(s)` write the
+  NVRAM (0x1F50 bytes of configuration; only non-default variables are
+  stored); the OSD console, OSD AutoBoot OFF, the screen size and the
+  one-shot reboot command are values for one boot (`$setenv-temp`) that
+  the NVRAM does not keep; romvec `setprop` on `/options` goes through
+  `$setenv`, so **Solaris's `eeprom` changes and saves variables**;
+  NVRAM accesses use the physical pass-through ASI (0x2F on the SS20),
+  which also brings the one-shot reboot command to the SS20; a valid
+  IDPROM is kept; **a client's halt (`init 0`) returns to `ok`** ("Program
+  terminated") instead of hanging after the failed power-off; the caches
+  go on right after the MMU setup. Checked under QEMU (a stock sparc32
+  build of the tree) and on the board (`setenv` survives a core reload,
+  `eeprom` reaches the `.nvr` file, `init 0` → `ok`, NetBSD and Solaris
+  boot).
+- **A blank NVRAM image gets an identity of its own** (`c6c45eb`): the
+  built-in IDPROM with a serial from a free-running counter sampled at the
+  load (Ethernet `08:00:20:xx:xx:xx`, hostid `72xxxxxx`), written back to
+  the file at once; on the board `08:00:20:fc:c2:8d`, kept across a
+  reload. `sim/run-nvram.sh` checks it; `t_idprom` checks that the
+  Ethernet address ends with the hostid's serial.
+- **SCSI test bench** (`af7b035`): `tests/cpu/src/scsitest.S` drives the
+  ESP through DMA2 and the IOMMU as OpenBIOS does (mode 0, no MESSAGE
+  ACCEPTED) and the full way (mode 1), against images of known content
+  (`tests/cpu/mkscsiimg.py`): probe, reads, the two-disk interleave, a
+  write with restore, the last block. `sim/run-scsi.sh` (one and two
+  disks), `hwtest.sh 20 scsi` (board baseline
+  `tests/cpu/expected/ss20-scsi-hw.log`, identical to the simulation).
+  QEMU accepts mode 1 only.
+- **SCSI fixes** (`96e37b6`): Direct SD removed (design S0; ~480 ALMs
+  freed, SS20 at 86 %), the last block of a disk readable (D7, the
+  targets' microcode). **The two-disk hang of session 2 is gone**:
+  OpenBIOS boots Solaris with HD0 + HD1 on the board. Fit seed 3
+  (`scratch/SunSparcStation20-nosd-s3.rbf`, the live SS20 rbf): every
+  clock met, core +0.618 ns, HDMI +0.192 ns, hold +0.250 ns; suite
+  65/0/0, scsitest 6/0/0.
+- **SCSI direction** (user): the current Mac approach: no FPGA block
+  cache (the Mac's release runs `SCSI_CACHE_OFF=1`; Main's write buffer,
+  PR #1336, gives the write speed), targets straight to `hps_io`. Next: the
+  new target engine (design S2, S4, S5). Research on Main's Ethernet and
+  SCSI bridges: [design/main-bridges.md](design/main-bridges.md); Ethernet
+  comes later (NeXT's frame mailbox plus the A2065's network layer; the
+  Amiga's ARM-side LANCE cannot serve a LANCE that DMAs through an IOMMU).
+
 ### Work items (the content of the stages)
 
 0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
@@ -884,6 +939,13 @@ drop one of the two machines, and asked to focus on the SS20.
   had it.
 
 ## Session log
+
+- **2026-10-02, session 7 (SS20).** 120-minute three-CPU Solaris stress
+  survived. GPL-2 licence. OpenBIOS keeps its settings in the NVRAM
+  (setenv, Solaris eeprom), halt returns to ok; a blank NVRAM image gets
+  its own IDPROM. The SCSI test ROM (simulation = board); Direct SD
+  removed, the last-block fix; the two-disk hang is gone. SCSI follows
+  the current Mac approach (no FPGA cache). Hand-off: RESUME-20261003.md.
 
 - **2026-10-02, session 6 (Fable, SS20 corruption).** Found and fixed the
   memory corruption under disk I/O: `mcu_multi_ext.vhd` released the CPU
