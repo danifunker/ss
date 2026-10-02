@@ -76,7 +76,8 @@ PACKAGE asi_pack IS
   CONSTANT ASI_SUPER_INSTRUCTION_TABLEWALK        : uv8 := x"39"; --#MMU EXT
   CONSTANT ASI_USER_DATA_TABLEWALK                : uv8 := x"3A"; --#MMU EXT
   CONSTANT ASI_SUPER_DATA_TABLEWALK               : uv8 := x"3B"; --#MMU EXT
-  
+  CONSTANT ASI_SUPERSPARC_ACTION                  : uv8 := x"4C"; --SuperSPARC MMU breakpoint action
+
   -- MMU MULTI :
   --  ASI(6)  = 1 : RWITM
   --  ASI(5:4)=01 : FLUSH

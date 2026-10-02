@@ -138,6 +138,12 @@ ARCHITECTURE multi OF mcu_mp IS
   -- table-walk ASI of the same number exists only on the external bus.
   SIGNAL mmu_bp : arr_uv32(0 TO 7);
   SIGNAL mmu_bp_wr : std_logic;
+  -- SuperSPARC MMU breakpoint action register (CPU ASI 0x4c, any va):
+  -- plain storage, 13 bits as in QEMU, 0 after reset. Solaris 8's
+  -- SuperSPARC setup writes 0x1000 (MIX) and spins until it reads it back;
+  -- OBP 2.25 writes 0. Nothing acts on it.
+  SIGNAL mmu_action : unsigned(12 DOWNTO 0);
+  SIGNAL mmu_action_wr : std_logic;
 
   TYPE enum_mmu_fclass IS (RIEN,DATA,INST,WALK);
   SIGNAL mmu_fclass : enum_mmu_fclass;  -- Type de faute mémorisée
@@ -474,7 +480,7 @@ BEGIN
   -- Interface bus de Données
   
   -- Process combinatoire bus DATA
-  Comb_Data:PROCESS (data_etat,reset,dreg,dflash_cpt,mmu_bp,flushdone,
+  Comb_Data:PROCESS (data_etat,reset,dreg,dflash_cpt,mmu_bp,mmu_action,flushdone,
                      tw_op,tw_va,
                      data_tw_rdy,mmu_ctxr,mmu_cr_e,mmu_cr_dce,mmu_cr_nf,
                      data_w,data2_w,filling_d2,filldone,ext_dfill,
@@ -661,6 +667,7 @@ BEGIN
     mmu_tmpr_maj<='0';
     mmu_far_wr<='0';
     mmu_bp_wr<='0';
+    mmu_action_wr<='0';
     cross_req_c<='0';
     
     -------------------------------------------------------------------------
@@ -1092,7 +1099,16 @@ BEGIN
               mmu_bp_wr<=ls_v;
               dreq_v:='1';
               na_v:='1';
-              
+
+              --------------------------
+            WHEN ASI_SUPERSPARC_ACTION =>
+              -- The MMU breakpoint action register (mmu_action), 13 bits
+              dout_v.d:=x"0000" & "000" & mmu_action;
+              dout_v.code:=PB_OK;
+              mmu_action_wr<=ls_v;
+              dreq_v:='1';
+              na_v:='1';
+
               --------------------------
             WHEN OTHERS =>
               dreq_v:='1';
@@ -2325,6 +2341,9 @@ BEGIN
       IF mmu_bp_wr='1' THEN
         mmu_bp(to_integer(data2_w.a(9 DOWNTO 8) & data2_w.a(2)))<=data2_w.d;
       END IF;
+      IF mmu_action_wr='1' THEN
+        mmu_action<=data2_w.d(12 DOWNTO 0);
+      END IF;
 
       -- Diagnostic write of the SFAR (0x1400, sun4m B.I.4.5)
       IF mmu_far_wr='1' THEN
@@ -2400,6 +2419,7 @@ BEGIN
         mmu_fsr_ow<='0';
         mmu_fsr_ft<=FT_NONE;
         mmu_fsr_fav<='0';
+        mmu_action<=(OTHERS => '0');
       END IF;
     END IF;
   END PROCESS Sync_Regs;
