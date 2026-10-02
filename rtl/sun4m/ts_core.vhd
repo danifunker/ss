@@ -99,28 +99,17 @@ ENTITY ts_core IS
     nv_w        : IN  type_nvram_w;
     nv_r        : OUT type_nvram_r;
     
-    -- Ethernet MII / RMII
-    phy_txd     : OUT uv4;       -- MII/RMII Data
-    phy_tx_clk  : IN  std_logic; -- MII/RMII Transmit Clock
-    phy_tx_en   : OUT std_logic; -- MII/RMII Transmit Enable
-    phy_tx_er   : OUT std_logic; -- MII      Transmit Error
-    
-    phy_col     : IN  std_logic; -- MII      Collision (async.)
-    
-    phy_rxd     : IN  uv4;       -- MII/RMII Data
-    phy_rx_dv   : IN  std_logic; -- MII/RMII Receive Data Valid
-    phy_rx_er   : IN  std_logic; -- MII      Receive Error
-    phy_rx_clk  : IN  std_logic; -- MII/RMII Receive Clock 25MHz/2.5MHz
-    
-    phy_crs     : IN  std_logic; -- MII      Carrier Sense (async.)
+    -- Ethernet: the LANCE's MAC side (the MAC is outside: eth_hps)
+    mac_emi_w   : OUT type_mac_emi_w;
+    mac_emi_r   : IN  type_mac_emi_r;
+    mac_rec_w   : OUT type_mac_rec_w;
+    mac_rec_r   : IN  type_mac_rec_r;
 
     -- Ethernet MDIO
     phy_mdc     : OUT std_logic;
     phy_mdio_o  : OUT std_logic;
     phy_mdio_en : OUT std_logic;
     phy_mdio_i  : IN  std_logic;
-    phy_int_n   : IN  std_logic;
-    phy_reset_n : OUT std_logic;    
 
     -- FLASH
     flash_w     : OUT type_pvc_w;
@@ -408,22 +397,14 @@ ARCHITECTURE rtl OF ts_core IS
       rtcset      : IN std_logic;
       nv_w        : IN  type_nvram_w;
       nv_r        : OUT type_nvram_r;
-      phy_txd     : OUT uv4;
-      phy_tx_clk  : IN  std_logic;
-      phy_tx_en   : OUT std_logic;
-      phy_tx_er   : OUT std_logic;
-      phy_col     : IN  std_logic;
-      phy_rxd     : IN  uv4;
-      phy_rx_dv   : IN  std_logic;
-      phy_rx_er   : IN  std_logic;
-      phy_rx_clk  : IN  std_logic;
-      phy_crs     : IN  std_logic;
+      mac_emi_w   : OUT type_mac_emi_w;
+      mac_emi_r   : IN  type_mac_emi_r;
+      mac_rec_w   : OUT type_mac_rec_w;
+      mac_rec_r   : IN  type_mac_rec_r;
       phy_mdc     : OUT std_logic;
       phy_mdio_o  : OUT std_logic;
       phy_mdio_en : OUT std_logic;
       phy_mdio_i  : IN  std_logic;
-      phy_int_n   : IN  std_logic;
-      phy_reset_n : OUT std_logic;
       irl0        : OUT uv4;
       irl1        : OUT uv4;
       irl2        : OUT uv4;
@@ -1453,22 +1434,14 @@ BEGIN
       rtcset      => rtcset,
       nv_w        => nv_w,
       nv_r        => nv_r,
-      phy_txd     => phy_txd,
-      phy_tx_clk  => phy_tx_clk,
-      phy_tx_en   => phy_tx_en,
-      phy_tx_er   => phy_tx_er,
-      phy_col     => phy_col,
-      phy_rxd     => phy_rxd,
-      phy_rx_dv   => phy_rx_dv,
-      phy_rx_er   => phy_rx_er,
-      phy_rx_clk  => phy_rx_clk,
-      phy_crs     => phy_crs,
+      mac_emi_w   => mac_emi_w,
+      mac_emi_r   => mac_emi_r,
+      mac_rec_w   => mac_rec_w,
+      mac_rec_r   => mac_rec_r,
       phy_mdc     => phy_mdc,
       phy_mdio_o  => phy_mdio_o,
       phy_mdio_en => phy_mdio_en,
       phy_mdio_i  => phy_mdio_i,
-      phy_int_n   => phy_int_n,
-      phy_reset_n => phy_reset_n,
       irl0        => irl0,
       irl1        => irl1,
       irl2        => irl2,

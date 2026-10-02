@@ -1027,6 +1027,7 @@ BEGIN
       -- REC_W
       mac_rec_w.padr <=padr;
       mac_rec_w.ladrf<=ladrf;
+      mac_rec_w.prom <=prom;
       mac_rec_w.pop  <=rec_pop_v;
       mac_rec_w.clr  <=init;
       

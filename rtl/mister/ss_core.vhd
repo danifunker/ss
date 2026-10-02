@@ -140,10 +140,17 @@ ENTITY ss_core IS
     ps2_mouse_clk_in      : OUT std_logic;
     ps2_mouse_data_in     : OUT std_logic;
     
-    rmii_rxd              : IN  std_logic_vector(1 DOWNTO 0);
-    rmii_txd              : OUT std_logic_vector(1 DOWNTO 0);
-    rmii_txen             : OUT std_logic;
-    rmii_clk              : IN  std_logic;
+    -- Ethernet: the LANCE's frame mailbox in DDR3 (eth_hps), a third master
+    ddram3_waitrequest   : IN    std_logic := '0';
+    ddram3_burstcount    : OUT   std_logic_vector(7 DOWNTO 0);
+    ddram3_address       : OUT   std_logic_vector(28 DOWNTO 0);
+    ddram3_readdata      : IN    std_logic_vector(63 DOWNTO 0) := (OTHERS => '0');
+    ddram3_readdatavalid : IN    std_logic := '0';
+    ddram3_read          : OUT   std_logic;
+    ddram3_writedata     : OUT   std_logic_vector(63 DOWNTO 0);
+    ddram3_byteenable    : OUT   std_logic_vector(7 DOWNTO 0);
+    ddram3_write         : OUT   std_logic;
+    eth_ena              : IN    std_logic := '0';  -- OSD Network not Off
     
     uart_txd        : OUT   std_logic;
     uart_rxd        : IN    std_logic);
@@ -225,11 +232,11 @@ ARCHITECTURE rtl OF ss_core IS
   
   -- PHY Ethernet
   SIGNAL phy_mdio_o,phy_mdc,phy_mdio_i : std_logic;
-  SIGNAL phy_mdio_en,phy_int_n,phy_reset_n : std_logic;
-  SIGNAL phy_txd,phy_rxd : uv4;
-  SIGNAL phy_tx_en,phy_tx_er,phy_col : std_logic;
-  SIGNAL phy_rx_dv,phy_rx_er,phy_crs : std_logic;
-  SIGNAL phy_tx_clk,phy_rx_clk : std_logic;
+  SIGNAL phy_mdio_en : std_logic;
+  SIGNAL mac_emi_w : type_mac_emi_w;
+  SIGNAL mac_emi_r : type_mac_emi_r;
+  SIGNAL mac_rec_w : type_mac_rec_w;
+  SIGNAL mac_rec_r : type_mac_rec_r;
   
   -- Video
   CONSTANT vga_en : std_logic :='1'; -- Clock enable
@@ -356,22 +363,14 @@ BEGIN
       rtcset      => rtcset,
       nv_w        => nv_w,
       nv_r        => nv_r,
-      phy_txd     => phy_txd,
-      phy_tx_clk  => phy_tx_clk,
-      phy_tx_en   => phy_tx_en,
-      phy_tx_er   => phy_tx_er,
-      phy_col     => phy_col,
-      phy_rxd     => phy_rxd,
-      phy_rx_dv   => phy_rx_dv,
-      phy_rx_er   => phy_rx_er,
-      phy_rx_clk  => phy_rx_clk,
-      phy_crs     => phy_crs,
+      mac_emi_w   => mac_emi_w,
+      mac_emi_r   => mac_emi_r,
+      mac_rec_w   => mac_rec_w,
+      mac_rec_r   => mac_rec_r,
       phy_mdc     => phy_mdc,
       phy_mdio_o  => phy_mdio_o,
       phy_mdio_en => phy_mdio_en,
       phy_mdio_i  => phy_mdio_i,
-      phy_int_n   => phy_int_n,
-      phy_reset_n => phy_reset_n,
       flash_w     => flash_w,
       flash_r     => flash_r,
       ibram_w     => ibram_w,
@@ -745,16 +744,28 @@ BEGIN
   iic3_sda_i<='0';
 
   ----------------------------------------------------------
-  -- PHY RMII
-  rmii_txd<=std_logic_vector(phy_txd(1 DOWNTO 0));
-  rmii_txen<=phy_tx_en;
-  
-  phy_tx_clk<=rmii_clk;
-  phy_rx_clk<=rmii_clk;
-  phy_rxd<=unsigned("00" & rmii_rxd(1 DOWNTO 0));
-  phy_rx_dv<='0';
-  phy_rx_er<='0';
-  phy_crs<='0';
+  -- Ethernet: the LANCE's MAC is a frame mailbox to Main (sparc_enet)
+  i_eth_hps: ENTITY work.eth_hps
+    GENERIC MAP (
+      SYSFREQ => SYSFREQ,
+      SIMU    => SIMU)
+    PORT MAP (
+      mac_emi_w         => mac_emi_w,
+      mac_emi_r         => mac_emi_r,
+      mac_rec_w         => mac_rec_w,
+      mac_rec_r         => mac_rec_r,
+      ena               => eth_ena,
+      avl_waitrequest   => ddram3_waitrequest,
+      avl_address       => ddram3_address,
+      avl_read          => ddram3_read,
+      avl_write         => ddram3_write,
+      avl_writedata     => ddram3_writedata,
+      avl_byteenable    => ddram3_byteenable,
+      avl_burstcount    => ddram3_burstcount,
+      avl_readdata      => ddram3_readdata,
+      avl_readdatavalid => ddram3_readdatavalid,
+      clk               => sclk,
+      reset_n           => reset_n);
   
   ----------------------------------------------------------
   -- UART

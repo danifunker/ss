@@ -65,6 +65,7 @@ PACKAGE ts_pack IS
     pop      : std_logic;               -- Dépile mot
     padr     : unsigned(47 DOWNTO 0);   -- MAC Dest
     ladrf    : unsigned(63 DOWNTO 0);   -- Filtrage HASH
+    prom     : std_logic;               -- promiscuous mode (MODE bit 15)
     clr      : std_logic;               -- Réinitialisation
   END RECORD;
   

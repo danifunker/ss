@@ -68,6 +68,7 @@ module sim_top
 	input         opt_wb,         // O[18]
 	input         opt_aow,        // O[19]
 	input   [1:0] opt_iommu,      // O[21:20]
+	input         opt_eth,        // O[26:24] not Off: the Ethernet mailbox
 
 	// video
 	output  [7:0] vga_r,
@@ -89,6 +90,51 @@ wire [63:0] vram_rdata, dram_rdata, vram_wdata, dram_wdata;
 wire        vram_rvalid, dram_rvalid;
 wire        vram_rd, dram_rd, vram_wr, dram_wr;
 wire  [7:0] vram_be, dram_be;
+wire        eth_wait, cpu_wait;
+wire  [7:0] eth_bc, cpu_bc;
+wire [28:0] eth_addr, cpu_addr;
+wire [63:0] eth_rdata, cpu_rdata, eth_wdata, cpu_wdata;
+wire        eth_rvalid, cpu_rvalid;
+wire        eth_rd, cpu_rd, eth_wr, cpu_wr;
+wire  [7:0] eth_be, cpu_be;
+
+// As in SunSparcStation.sv: the Ethernet mailbox merged into the CPU's port,
+// that merged with video.
+ddram_arb ddram_arb_eth
+(
+	.clk(clk),
+	.reset(reset),
+
+	.m0_waitrequest(eth_wait),
+	.m0_burstcount(eth_bc),
+	.m0_address(eth_addr),
+	.m0_read(eth_rd),
+	.m0_write(eth_wr),
+	.m0_writedata(eth_wdata),
+	.m0_byteenable(eth_be),
+	.m0_readdata(eth_rdata),
+	.m0_readdatavalid(eth_rvalid),
+
+	.m1_waitrequest(cpu_wait),
+	.m1_burstcount(cpu_bc),
+	.m1_address(cpu_addr),
+	.m1_read(cpu_rd),
+	.m1_write(cpu_wr),
+	.m1_writedata(cpu_wdata),
+	.m1_byteenable(cpu_be),
+	.m1_readdata(cpu_rdata),
+	.m1_readdatavalid(cpu_rvalid),
+
+	.s_waitrequest(dram_wait),
+	.s_burstcount(dram_bc),
+	.s_address(dram_addr),
+	.s_read(dram_rd),
+	.s_write(dram_wr),
+	.s_writedata(dram_wdata),
+	.s_byteenable(dram_be),
+	.s_readdata(dram_rdata),
+	.s_readdatavalid(dram_rvalid)
+);
 
 ddram_arb ddram_arb
 (
@@ -139,8 +185,6 @@ wire  [7:0] fb_pal_a;
 wire        led_power;
 wire        ps2_kbd_clk_in, ps2_kbd_data_in, ps2_mouse_clk_in, ps2_mouse_data_in;
 wire  [2:0] ps2_kbd_led_status, ps2_kbd_led_use;
-wire  [1:0] rmii_txd;
-wire        rmii_txen;
 
 ss_core ss_core
 (
@@ -177,15 +221,15 @@ ss_core ss_core
 	.ddram_write(vram_wr),
 
 	.ddram2_clk(dram_clk),
-	.ddram2_waitrequest(dram_wait),
-	.ddram2_burstcount(dram_bc),
-	.ddram2_address(dram_addr),
-	.ddram2_readdata(dram_rdata),
-	.ddram2_readdatavalid(dram_rvalid),
-	.ddram2_read(dram_rd),
-	.ddram2_writedata(dram_wdata),
-	.ddram2_byteenable(dram_be),
-	.ddram2_write(dram_wr),
+	.ddram2_waitrequest(cpu_wait),
+	.ddram2_burstcount(cpu_bc),
+	.ddram2_address(cpu_addr),
+	.ddram2_readdata(cpu_rdata),
+	.ddram2_readdatavalid(cpu_rvalid),
+	.ddram2_read(cpu_rd),
+	.ddram2_writedata(cpu_wdata),
+	.ddram2_byteenable(cpu_be),
+	.ddram2_write(cpu_wr),
 
 	.reset_mask_rev(reset_mask_rev),
 	.kbm_layout(8'h21),
@@ -241,10 +285,16 @@ ss_core ss_core
 	.ps2_mouse_clk_in(ps2_mouse_clk_in),
 	.ps2_mouse_data_in(ps2_mouse_data_in),
 
-	.rmii_rxd(2'b00),
-	.rmii_txd(rmii_txd),
-	.rmii_txen(rmii_txen),
-	.rmii_clk(1'b0),
+	.ddram3_waitrequest(eth_wait),
+	.ddram3_burstcount(eth_bc),
+	.ddram3_address(eth_addr),
+	.ddram3_readdata(eth_rdata),
+	.ddram3_readdatavalid(eth_rvalid),
+	.ddram3_read(eth_rd),
+	.ddram3_writedata(eth_wdata),
+	.ddram3_byteenable(eth_be),
+	.ddram3_write(eth_wr),
+	.eth_ena(opt_eth),
 	.uart_txd(uart_txd),
 	.uart_rxd(uart_rxd)
 );

@@ -108,7 +108,11 @@ struct Ddr {
         if (mem == MAP_FAILED) { perror("mmap"); exit(3); }
     }
     static const uint32_t BASE = 0x04000000;     // word address of 0x2000_0000
+    // The Ethernet mailbox (eth_hps), ARM physical 0x1FF0_0000, 64 KB
+    static const uint32_t MB_BASE = 0x1FF00000u / 8, MB_WORDS = 0x10000 / 8;
+    uint64_t mbox[MB_WORDS] = {};
     uint64_t &at(uint32_t a) {
+        if (a >= MB_BASE && a < MB_BASE + MB_WORDS) return mbox[a - MB_BASE];
         a -= BASE;
         if (a >= WORDS) {
             if (oob++ < 4) fprintf(stderr, "[sim] DDR word address %08x outside the FPGA window\n", a + BASE);
@@ -160,6 +164,75 @@ struct Ddr {
 };
 
 // ---------------------------------------------------------------------------
+// Main's side of the Ethernet mailbox (Main: support/sparc/sparc_enet.cpp;
+// layout in rtl/mister/eth_hps.vhd). Every POLL cycles: frames the core
+// posted in the TX ring are logged and, with --eth-loop, sent back through
+// the RX ring (with the FCS and the LADRF index, as Main adds them), so the
+// LANCE receives what it sent.
+struct EthHost {
+    static const uint64_t MAGIC = 0x5353455448303031ull;   // "SSETH001"
+    enum { W_MAGIC, W_GEN, W_TXW, W_TXR, W_RXW, W_RXR, W_MAC };
+    static const uint32_t W_TX = 0x1000 / 8, W_RX = 0x5000 / 8, RING = 8, POLL = 2000;
+    bool loop = false;
+    uint64_t gen = ~0ull, tx_rd = 0, tx_frames = 0, rx_frames = 0;
+    std::deque<std::vector<uint8_t>> pending;
+
+    static uint32_t crc_le(const uint8_t *p, size_t n) {
+        uint32_t c = 0xFFFFFFFFu;
+        for (size_t i = 0; i < n; i++) {
+            c ^= p[i];
+            for (int k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320u & -(c & 1u));
+        }
+        return c;
+    }
+    static void get(const uint64_t *w, uint8_t *p, size_t n) {
+        for (size_t i = 0; i < n; i++) p[i] = (uint8_t)(w[i / 8] >> (8 * (i % 8)));
+    }
+    static void put(uint64_t *w, const uint8_t *p, size_t n) {
+        for (size_t i = 0; i < (n + 7) / 8; i++) w[i] = 0;
+        for (size_t i = 0; i < n; i++) w[i / 8] |= (uint64_t)p[i] << (8 * (i % 8));
+    }
+    void step(Ddr &d, uint64_t cyc) {
+        if (cyc % POLL) return;
+        uint64_t *m = d.mbox;
+        if (m[W_MAGIC] != MAGIC) return;
+        if (m[W_GEN] != gen) {
+            gen = m[W_GEN];
+            tx_rd = m[W_TXR];
+            pending.clear();
+            fprintf(stderr, "[eth] mailbox up, generation %08" PRIx64 "\n", gen);
+        }
+        while ((uint32_t)m[W_TXW] != (uint32_t)tx_rd) {
+            uint64_t *slot = &m[W_TX + 256 * (tx_rd % RING)];
+            unsigned len = slot[0] & 0x7FF;
+            std::vector<uint8_t> f(len);
+            get(slot + 1, f.data(), len);
+            tx_frames++;
+            fprintf(stderr, "[eth] TX %u bytes, %02x:%02x:%02x:%02x:%02x:%02x <- "
+                    "%02x:%02x:%02x:%02x:%02x:%02x type %02x%02x\n", len,
+                    f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11],
+                    f[12], f[13]);
+            if (loop) pending.push_back(f);
+            tx_rd++;
+            m[W_TXR] = tx_rd;
+        }
+        while (!pending.empty() && (uint32_t)(m[W_RXW] - m[W_RXR]) < RING) {
+            std::vector<uint8_t> f = pending.front();
+            pending.pop_front();
+            if (f.size() < 60) f.resize(60, 0);
+            uint32_t fcs = ~crc_le(f.data(), f.size());
+            for (int k = 0; k < 4; k++) f.push_back((uint8_t)(fcs >> (8 * k)));
+            unsigned hash = crc_le(f.data(), 6) >> 26;
+            uint64_t *slot = &m[W_RX + 256 * (m[W_RXW] % RING)];
+            put(slot + 1, f.data(), f.size());
+            slot[0] = f.size() | ((uint64_t)hash << 16);
+            m[W_RXW]++;
+            rx_frames++;
+        }
+    }
+};
+
+// ---------------------------------------------------------------------------
 // hps_io SD-block service for one image. The core raises sd_rd/sd_wr with
 // sd_lba (and, for the SCSI slots 0-2, sd_blk_cnt = blocks - 1); we raise
 // sd_ack for the length of the transfer (the core drops its request when it
@@ -185,6 +258,7 @@ struct Disk {
 struct SdHost {
     enum { IDLE, DELAY, RD_WORD, WR_WORD, END } st = IDLE;
     int slot = -1, word = 0, sub = 0, wait = 0, nblk = 1;
+    int latency = 40;   // request to ack: Main's poll and SD latency, shortened
     bool is_write = false;
     uint32_t lba = 0;
     uint8_t buf[16384];
@@ -209,7 +283,7 @@ struct SdHost {
                     d->reads++;
                 }
                 st = DELAY;
-                wait = 40;     // Main's poll and SD latency, shortened
+                wait = latency;
                 break;
             }
             break;
@@ -379,6 +453,10 @@ static void usage() {
         "  --frame FILE.ppm    save the last complete video frame at the end\n"
         "  --ddr-stress        random DDR waitrequest\n"
         "  --ddr-gaps          random bubbles between the beats of a DDR read burst\n"
+        "  --sd-latency N      cycles from a block request to hps_io's ack (default 40;\n"
+        "                      Main takes a millisecond or more: 20000 and up)\n"
+        "  --eth               OSD Network on: the Ethernet mailbox runs, TX frames logged\n"
+        "  --eth-loop          ... and every TX frame comes back as a received frame\n"
         "  --full-download     send the whole ROM through ioctl (slow; default: preload\n"
         "                      it into DDR and send only the last word)\n"
         "  --dl-gap N          cycles between download words (default 32)\n"
@@ -404,7 +482,8 @@ int main(int argc, char **argv) {
     uint64_t ddr_log_from = 0;
     bool readonly = false, video = false, noautoboot = false, cg3 = false,
          nocache = false, quiet = false, progress = false, stress = false, gaps = false,
-         full_download = false;
+         full_download = false, eth = false, eth_loop = false;
+    int sd_latency = 40;
     struct tm rtc_tm = {};
     rtc_tm.tm_year = 126; rtc_tm.tm_mon = 0; rtc_tm.tm_mday = 1;
 
@@ -434,6 +513,9 @@ int main(int argc, char **argv) {
         else if (a == "--frame") frame_path = next();
         else if (a == "--ddr-stress") stress = true;
         else if (a == "--ddr-gaps") gaps = true;
+        else if (a == "--eth") eth = true;
+        else if (a == "--sd-latency") sd_latency = (int)parse_count(next().c_str());
+        else if (a == "--eth-loop") eth = eth_loop = true;
         else if (a == "--full-download") full_download = true;
         else if (a == "--dl-gap") dl_gap = (int)parse_count(next().c_str());
         else if (a == "--ddr-log") ddr_log = parse_count(next().c_str());
@@ -466,6 +548,7 @@ int main(int argc, char **argv) {
 
     Disk disks[4];
     SdHost sd;
+    sd.latency = sd_latency;
     for (int n = 0; n < 4; n++) {
         if (hd[n].empty()) continue;
         if (!disks[n].open(hd[n], readonly || n == 2)) return 3;
@@ -500,6 +583,7 @@ int main(int argc, char **argv) {
     t->opt_wb = 0;
     t->opt_aow = 0;
     t->opt_iommu = 0;
+    t->opt_eth = eth;
     t->uart_rxd = 1;
     t->ddr_busy = 0;
     t->ddr_dout_ready = 0;
@@ -524,6 +608,8 @@ int main(int argc, char **argv) {
     }
 
     Ddr ddr;
+    EthHost ethh;
+    ethh.loop = eth_loop;
     ddr.stress = stress;
     ddr.gaps = gaps;
     ddr.log_left = ddr_log;
@@ -583,6 +669,7 @@ int main(int argc, char **argv) {
 
         // Models, driving the inputs for the next cycle.
         ddr.step(t, cyc, rd, we, addr, bc, din, be, busy);
+        if (eth) ethh.step(ddr, cyc);
         sd.step(t, sd_rd, sd_wr, lbas, sdin);
         vid.step(t->vga_r, t->vga_g, t->vga_b, t->vga_de, t->vga_vs);
 
@@ -694,6 +781,8 @@ int main(int argc, char **argv) {
     if (disks[3].f)
         fprintf(stderr, "[sim] NVRAM image: %" PRIu64 " sector reads, %" PRIu64 " writes\n",
                 disks[3].reads, disks[3].writes);
+    if (eth) fprintf(stderr, "[sim] Ethernet: %" PRIu64 " frames sent, %" PRIu64 " looped back\n",
+                     ethh.tx_frames, ethh.rx_frames);
     if (ddr.oob) fprintf(stderr, "[sim] %" PRIu64 " DDR accesses outside the FPGA window\n", ddr.oob);
     if (!frame_path.empty() && !vid.save(frame_path.c_str()))
         fprintf(stderr, "[sim] no complete video frame to save\n");
