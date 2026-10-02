@@ -2362,11 +2362,16 @@ BEGIN
       -- <Ecriture MMU Fault Status Reg sur faute>
       -- Fault status (Sun-4M 4.4, microSPARC-II table 28): a data fault
       -- overwrites any pending status and sets OW over an unread data
-      -- fault; an instruction fault does not overwrite an unread data
-      -- fault and sets OW over an unread instruction fault. Walk faults
-      -- (invalid, reserved entries) are faults of their side.
+      -- fault. An instruction fault is recorded only while nothing unread
+      -- is pending (never OW): the fetch unit goes on fetching after a
+      -- faulted fetch until the IU takes the trap, so a jump into an
+      -- unmapped page faults twice on the same page; the first fault is
+      -- the one trapped on, and recording the second (with OW) made
+      -- Solaris 8's get_fault_type re-probe for ever instead of paging
+      -- the text in. Walk faults (invalid, reserved entries) are faults
+      -- of their side.
       IF mmu_tw_fault='1' AND NOT MMU_DIS THEN
-        IF mmu_tw_di='0' OR mmu_fsr_fav='0' OR mmu_fclass/=DATA THEN
+        IF mmu_tw_di='0' OR mmu_fsr_fav='0' THEN
           mmu_fsr_l<=mmu_tw_st;           -- Level
           mmu_fsr_ft<=mmu_tw_ft;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
@@ -2378,7 +2383,7 @@ BEGIN
           ELSE
             mmu_fclass<=INST;
             mmu_fsr_at<=inst_at_c;
-            mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=INST);
+            mmu_fsr_ow<='0';
           END IF;
         END IF;
         
@@ -2393,18 +2398,18 @@ BEGIN
         mmu_far<=data2_w.a;
         
       ELSIF mmu_fault_inst_acc_c='1' AND NOT MMU_DIS THEN
-        IF mmu_fsr_fav='0' OR mmu_fclass/=DATA THEN
+        IF mmu_fsr_fav='0' THEN
           -- Faute sur accès normal instruction : PROTECTION ou PRIVILEGE
           mmu_fsr_l<=inst_st_c;
           mmu_fsr_at<=inst_at_c;          -- Access Type
           mmu_fsr_ft<=inst_ft_c;          -- Fault Type
           mmu_fsr_fav<='1';               -- Fault Address Valid
-          mmu_fsr_ow<=mmu_fsr_fav AND to_std_logic(mmu_fclass=INST);
+          mmu_fsr_ow<='0';
           mmu_fclass<=INST;
           -- L'écriture de FAR est facultative !!!
           mmu_far<=imux2_w.a;
         END IF;
-        
+
       END IF;
 
       IF reset_n='0' THEN
