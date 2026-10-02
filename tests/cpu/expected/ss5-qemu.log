@@ -38,6 +38,7 @@ PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
 PASS chipset: system control reads 0 after power-on (RS, WD clear)
 PASS chipset: NVRAM IDPROM format 1, machine type, checksum
+PASS chipset: NVRAM byte and word stores read back (restored)
 PASS chipset: frame buffer slot starts with FCode (0xf1 header)
     check 00000001 exp=000000ff obs=00000000
 FAIL chipset: DMA2 E_BASE_ADDR resets to 0xff
@@ -56,11 +57,14 @@ FAIL mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserve
 FAIL mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
 PASS mmu: an instruction access fault sets the SFSR once (FAV, no OW)
 PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: a store then ldstub/swap on the same line keeps the store
 PASS cache: a patched instruction runs after FLUSH
+PASS cache: the words of a line used right after its miss are memory's
+PASS cache: a routine fetched through its line fill runs memory's words
 PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
 PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
 PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000004 exp=5a5a1234 obs=00000000
 FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
-CPUTEST DONE pass=44 fail=7 skip=0
+CPUTEST DONE pass=48 fail=7 skip=0

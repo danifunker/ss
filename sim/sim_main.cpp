@@ -83,6 +83,7 @@ struct Ddr {
     uint32_t wr_addr = 0;
     int wr_left = 0;
     bool stress = false;          // random waitrequest
+    bool gaps = false;            // random bubbles inside read bursts
     uint64_t log_left = 0;        // --ddr-log: accesses still to print
     uint64_t log_from = 0;        // --ddr-log-from: first cycle to log
     // The core's own byte address for a DDR word address, and back.
@@ -144,7 +145,10 @@ struct Ddr {
             }
         }
         t->ddr_dout_ready = 0;
-        if (!rq.empty() && rq.front().start <= cyc) {
+        // --ddr-gaps: the board's DDR port does not deliver the beats of a
+        // burst back to back under load (the HPS shares the SDRAM with
+        // the ARM side); a bubble on about half the cycles reproduces it.
+        if (!rq.empty() && rq.front().start <= cyc && !(gaps && rnd())) {
             Rd &r = rq.front();
             t->ddr_dout = at(r.addr);
             t->ddr_dout_ready = 1;
@@ -372,6 +376,7 @@ static void usage() {
         "  --nocache           OSD Cachena OFF\n"
         "  --frame FILE.ppm    save the last complete video frame at the end\n"
         "  --ddr-stress        random DDR waitrequest\n"
+        "  --ddr-gaps          random bubbles between the beats of a DDR read burst\n"
         "  --full-download     send the whole ROM through ioctl (slow; default: preload\n"
         "                      it into DDR and send only the last word)\n"
         "  --dl-gap N          cycles between download words (default 32)\n"
@@ -396,7 +401,7 @@ int main(int argc, char **argv) {
     int dl_gap = 32;
     uint64_t ddr_log_from = 0;
     bool readonly = false, video = false, noautoboot = false, cg3 = false,
-         nocache = false, quiet = false, progress = false, stress = false,
+         nocache = false, quiet = false, progress = false, stress = false, gaps = false,
          full_download = false;
     struct tm rtc_tm = {};
     rtc_tm.tm_year = 126; rtc_tm.tm_mon = 0; rtc_tm.tm_mday = 1;
@@ -426,6 +431,7 @@ int main(int argc, char **argv) {
         else if (a == "--nocache") nocache = true;
         else if (a == "--frame") frame_path = next();
         else if (a == "--ddr-stress") stress = true;
+        else if (a == "--ddr-gaps") gaps = true;
         else if (a == "--full-download") full_download = true;
         else if (a == "--dl-gap") dl_gap = (int)parse_count(next().c_str());
         else if (a == "--ddr-log") ddr_log = parse_count(next().c_str());
@@ -517,6 +523,7 @@ int main(int argc, char **argv) {
 
     Ddr ddr;
     ddr.stress = stress;
+    ddr.gaps = gaps;
     ddr.log_left = ddr_log;
     ddr.log_from = ddr_log_from;
     Uart uart((double)SIM_SYSFREQ / 115200.0);

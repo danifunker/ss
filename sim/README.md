@@ -69,6 +69,9 @@ sim/obj_ss5/Vsim_top --rom tests/cpu/out/ss5-core/cputest.rom --stop "CPUTEST DO
   entity port and named signal keeps its name, for example
   `ss_core.i_ts_core.nosmp_i_iu.pc`.
 - `--ddr-log N`: print the first N DDR commands, as core addresses.
+- `--ddr-gaps`: random bubbles between the beats of a DDR read burst,
+  as the board's port shows under load (the HPS shares the SDRAM with the
+  ARM side). The CPU suite must pass with it too: `t_cache3.S`.
 
 The exit status is 0 for a stop string, 1 for a fail string, 2 for the cycle
 limit, and 3 for a usage error.
@@ -112,8 +115,9 @@ OS is a job for the hardware.
   other clock.
 - **Memory.** No DRAM clear (SIMU). The DDR sits in the MiSTer's FPGA window
   (byte `0x2000_0000` up); `ss_core` inverts word-address bits 25:17. DDR latency is a fixed 8 cycles to the
-  first beat, with up to 8 reads outstanding. `--ddr-stress` adds random
-  waitrequest.
+  first beat, with up to 8 reads outstanding, and the beats of a burst come
+  back to back; the board's do not. `--ddr-stress` adds random
+  waitrequest, `--ddr-gaps` bubbles inside read bursts.
 - **Disks.** SD requests are answered after 40 cycles. On the board, Main takes
   far longer.
 - **Assertions.** They are not checked.

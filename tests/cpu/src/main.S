@@ -17,6 +17,7 @@
 #include "mmu_setup.S"
 #include "t_mmu.S"
 #include "t_cache2.S"
+#include "t_cache3.S"
 #include "t_smp.S"
 #include "t_iu2.S"
 

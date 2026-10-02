@@ -35,6 +35,7 @@ PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
 PASS chipset: system control reads 0 after power-on (RS, WD clear)
 PASS chipset: NVRAM IDPROM format 1, machine type, checksum
+PASS chipset: NVRAM byte and word stores read back (restored)
 PASS chipset: frame buffer slot starts with FCode (0xf1 header)
     check 00000001 exp=000000ff obs=00000000
 FAIL chipset: DMA2 E_BASE_ADDR resets to 0xff
@@ -61,11 +62,15 @@ PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
 PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
 PASS cache: SS20 line flush after a DTLB miss reaches the line
 PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: a store then ldstub/swap on the same line keeps the store
 PASS cache: SS20 write-backs of 32 modified lines reach memory intact
 PASS cache: a patched instruction runs after FLUSH
+PASS cache: the words of a line used right after its miss are memory's
+PASS cache: a routine fetched through its line fill runs memory's words
 SKIP smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
 SKIP smp: SS20 3 CPUs increment a shared counter under ldstub and swap locks
 SKIP smp: SS20 with SE off CPU 0 keeps its stale copy of CPU 1's line (C-4)
+SKIP smp: SS20 3 CPUs pass a token through one cached line, with counters and ldstub
 PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
 PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
 PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
@@ -73,4 +78,4 @@ PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000004 exp=5a5a1234 obs=00000000
 FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=48 fail=7 skip=5
+CPUTEST DONE pass=52 fail=7 skip=6
