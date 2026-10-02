@@ -38,8 +38,10 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 - Sun PROM images (`scratch/SparcStation/*.bin`, `*.ROM`) are Sun/Oracle
   copyright: never commit them. The core boots OpenBIOS (`boot.rom` from
   `github.com/Grabulosaure/ss_openbios`).
-- The upstream RTL has no license file yet (REWORK phase 0); do not add or
-  change license headers.
+- License: GPL-2 (`LICENSE`, README "License"; user, 2026-10-02). New
+  files and the rework's changes are GPL-2.0-or-later. Grabulosaure's
+  files ("All rights reserved" headers) await his confirmation: do not
+  change their license headers.
 
 ## Tools on this box
 

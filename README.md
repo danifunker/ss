@@ -95,3 +95,20 @@ to enable different cache and MMU management code. Awful.
 
 And NextSTEP has some bugs as well, it does weird things during boot and cannot yet be emulated with QEMU.
 I didn't expect all these problems when I started this project, a long, long time ago.
+
+## License
+This core is distributed under the GNU General Public License, version 2
+([LICENSE](LICENSE)), like the other MiSTer cores:
+
+- the MiSTer framework (`sys/`): GPL-2.0 or later;
+- OpenBIOS (`bios/`) and the TCX/CG3 FCode it carries (from the OpenBIOS
+  project, as shipped with QEMU): GPL-2.0;
+- the files and changes of this rework (branch `danifunker`, by Dani
+  Sarfati): GPL-2.0 or later;
+- Grabulosaure's original sources (the files whose header reads "This source
+  file is copyrighted. Read the "lic.txt" file before use. … All rights
+  reserved."): the author has been asked to confirm the GPL-2 licence for
+  them; until he does, those files keep their own notice.
+
+The Sun PROM images are Sun/Oracle copyright and are not part of this
+repository.

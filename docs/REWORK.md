@@ -22,7 +22,7 @@ first.**
 
 | Phase | What | State |
 |---|---|---|
-| 0 | Distribution blockers (license, ROM redistribution) | **open**: the user is asking Grabulosaure for a GPL licence (2026-09-30) |
+| 0 | Distribution blockers (license, ROM redistribution) | **GPL-2** (user, 2026-10-02): `LICENSE` and the README's License section; the rework's own work is GPL-2.0-or-later; Grabulosaure's files keep their notice until he confirms (asked 2026-09-30, no answer yet) |
 | 1 | Disassembly of the SS5 and SS20 boot PROMs; POST self-test catalogue; CPU test suite | **disassembly done** ([rom-disassembly/](rom-disassembly/README.md): machine code, POST catalogues, Forth dictionaries, device trees, FCode); CPU suite: ISA tests + Swift MMU registers done, more POST-derived hardware tests to lift (1f) |
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
@@ -58,7 +58,15 @@ phases 1–3.
    Grabulosaure directly; until he confirms, no `LICENSE` file or header
    changes.
    Upstream still had no license on 2026-09-30 (GitHub reports none; last
-   push 2026-07-23).
+   push 2026-07-23), nor on 2026-10-02.
+   **Decided (user, 2026-10-02): GPL-2, "standard with MiSTer cores",
+   after almost a week without an answer.** Done: `LICENSE` (GPL-2 text)
+   and a License section in the README: `sys/` GPL-2.0+, OpenBIOS and its
+   FCode GPL-2.0, the rework's own files and changes GPL-2.0+. Only the
+   copyright holder can license Grabulosaure's files (headers "All rights
+   reserved"), so they keep their notice and the README says his
+   confirmation is pending; their headers stay unchanged. MiSTer-devel
+   distribution still needs his confirmation (or a rewrite of his files).
 2. **Sun PROM images and their disassembly.** The Sun OBP ROMs are Sun/Oracle
    copyright. The images stay in `scratch/` (gitignored) and are never
    committed. **Decided (user, 2026-09-28): commit everything else,** the full
@@ -838,6 +846,8 @@ drop one of the two machines, and asked to focus on the SS20.
 | 2026-09-28 | Disk images: the OSD takes VHD, IMG, HDA and RAW (all raw sector data to the core); slots are remembered (`SC0`-`SC2`). Test images are built in QEMU 11.1.1; the raw copies are kept on the NAS (`Sun-Solaris/SparcStation-Images/`) |
 | 2026-09-28 | QEMU: use the locally built 11.1.1 (`~/.local/qemu-11.1.1`), not Ubuntu's 8.2.2 |
 | 2026-09-30 | License: aim for GPL like the other MiSTer cores; pending Grabulosaure's confirmation (phase 0.1) |
+| 2026-10-02 | **License: GPL-2** (user). `LICENSE` + README: the rework's work GPL-2.0+; Grabulosaure's files keep their notice until he confirms |
+| 2026-10-02 | **SCSI (Stage 4) follows the NeXT or the Macintosh model** (user); it waits for the user's Mac-side PR to be approved |
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
