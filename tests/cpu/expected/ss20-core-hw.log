@@ -43,6 +43,8 @@ PASS mmu: SS20 contexts 1, 0x101, 0x8001 translate the same VA differently
 PASS mmu: a changed PTE is seen after the matching ASI 3 flush, not before
 PASS mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserved
 PASS mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
+    check 00000003 exp=00000366 obs=00000367
+FAIL mmu: an instruction access fault sets the SFSR once (FAV, no OW)
 PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
     dcache mode: write-through
 PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
@@ -57,6 +59,13 @@ PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
 PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
 PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
-PASS trap: reserved ASRs and CASA -> illegal_instruction
-PASS mmu: SS20 ASI 0x4c is not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=59 fail=0 skip=0
+    check 00000001 exp=ffffffff obs=00000002
+    check 00000002 exp=5a5a1234 obs=00000000
+    check 00000003 exp=5a5a1234 obs=00000000
+    check 00000004 exp=5a5a1234 obs=00000000
+FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
+    unexpected trap tt=00000002 pc=00005c70
+    check 00000006 exp=00001000 obs=00000000
+    check 00000007 exp=00000aaa obs=00000000
+FAIL mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
+CPUTEST DONE pass=57 fail=3 skip=0
