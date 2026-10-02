@@ -9,9 +9,17 @@
 #            'login:', log in as root, run a command, check its output
 #   solaris  OpenBIOS, console on ttya, HD0 = sol8.img (target 3): wait for
 #            'console login:', log in as root, run a command, check its output
+#   solaris-obp  the Sun PROM (--obp FILE, here; Sun's image is never in the
+#            repo) with the NVRAM image --nvram NAME (default ss20-obp.nvr in
+#            games/SunSparcStation/), HD0 = sol8-ss20.img: as solaris, plus
+#            psrinfo, then 'init 0' so the disk is clean. The NVRAM image
+#            must already hold diag-switch? false, auto-boot? true,
+#            boot-device disk, input-device and output-device ttya (set them
+#            once at the PROM's ok prompt: they are saved, TOD-6)
 #
 #   scripts/hwtest.sh 5 cpu netbsd
 #   scripts/hwtest.sh 5 --bios bios/build/boot.rom netbsd   (a new OpenBIOS)
+#   scripts/hwtest.sh 20 --obp scratch/ss20-obp225.rom solaris-obp
 #
 # The rbf must already be on the MiSTer (deploy.sh --no-launch). Logs go to
 # sim/out/hw-<rev>-<test>.log. One capture at a time: a second reader on
@@ -23,17 +31,21 @@ set -u
 REV=$(rev_of "${1:-}") || exit 2; shift
 RECORD=0
 BIOS=""
+OBP=""
+NVRAM=ss20-obp.nvr
 TESTS=()
 while [ $# -gt 0 ]; do
     a=$1; shift
     case "$a" in
         --record) RECORD=1 ;;
         --bios) BIOS=$1; shift ;;
-        cpu|netbsd|solaris) TESTS+=("$a") ;;
+        --obp) OBP=$1; shift ;;
+        --nvram) NVRAM=$1; shift ;;
+        cpu|netbsd|solaris|solaris-obp) TESTS+=("$a") ;;
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
-[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] cpu|netbsd|solaris..." >&2; exit 2; }
+[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] cpu|netbsd|solaris|solaris-obp..." >&2; exit 2; }
 case "$REV" in
     SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log ;;
     SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log ;;
@@ -88,13 +100,24 @@ for t in "${TESTS[@]}"; do
             FAILED=$((FAILED + 1))
         fi
         ;;
-    netbsd|solaris)
+    netbsd|solaris|solaris-obp)
         if [ "$t" = netbsd ]; then img=netbsd11.raw; want='login:'; secs=900
-        else img=sol8.img; want='console login:'; secs=1800; fi
-        if [ -n "$BIOS" ]; then
-            scp -q "${SSH_OPTS[@]}" "$BIOS" "$DEV:$G/boot.rom" || exit 1
+        elif [ "$t" = solaris ]; then img=sol8.img; want='console login:'; secs=1800
+        else img=sol8-ss20.img; want='console login:'; secs=1800; fi
+        if [ "$t" = solaris-obp ]; then
+            [ -f "$OBP" ] || { log "solaris-obp needs --obp FILE (the Sun PROM image)"; exit 2; }
+            rsh "test -s $G/$NVRAM" || { log "no $G/$NVRAM on the MiSTer"; exit 2; }
+            scp -q "${SSH_OPTS[@]}" "$OBP" "$DEV:$G/boot.rom" || exit 1
+            scripts/mount.sh --nvram "$NVRAM" > /dev/null
         else
-            rsh "cp $G/openbios.rom $G/boot.rom"
+            # OpenBIOS formats any NVRAM image it does not recognise: run it
+            # with the slot empty, so a saved Sun PROM image survives.
+            scripts/mount.sh --nvram "" > /dev/null
+            if [ -n "$BIOS" ]; then
+                scp -q "${SSH_OPTS[@]}" "$BIOS" "$DEV:$G/boot.rom" || exit 1
+            else
+                rsh "cp $G/openbios.rom $G/boot.rom"
+            fi
         fi
         scripts/setopt.sh console=serial > /dev/null
         scripts/mount.sh --hd0 "$img" > /dev/null
@@ -108,9 +131,14 @@ for t in "${TESTS[@]}"; do
         # the echoed command line cannot match (any shell, Bourne included).
         sleep 2; type_tty 'root\r'; sleep 8
         type_tty 'uname -sr; echo X-""42\r'; sleep 8
+        if [ "$t" = solaris-obp ]; then
+            type_tty 'psrinfo\r'; sleep 5
+            type_tty 'sync; init 0\r'; sleep 90
+            rsh "cp $G/openbios.rom $G/boot.rom"
+        fi
         stop_capture "$cp"
         if clean "$log" | grep -q '^X-42$'; then
-            log "$t: PASS, login and shell on ttya ($(clean "$log" | grep -a -m1 -E '^(NetBSD|SunOS) [0-9]' || true))"
+            log "$t: PASS, login and shell on ttya ($(clean "$log" | grep -a -m1 -E '^(NetBSD|SunOS) [0-9]' || true))$([ "$t" = solaris-obp ] && echo "; $(clean "$log" | grep -a -c 'on-line') CPUs on-line")"
         else
             log "$t: FAIL, '$want' seen but the shell did not answer"
             FAILED=$((FAILED + 1))

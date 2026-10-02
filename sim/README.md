@@ -13,6 +13,7 @@ applied to the whole machine rather than to the CPU alone.
 | `sim_main.cpp` | the harness: DDR3, ROM download, SD blocks, RTC, ttya, video frame |
 | `build.sh 5\|20 [--trace] [--diag]` | regenerate if the RTL changed, verilate, compile → `obj_ss{5,20}/Vsim_top` (`obj_ss{5,20}_trace/` with VCD support) |
 | `run-cputest.sh 5\|20` | the CPU suite as the boot PROM, diffed against the **hardware** log `tests/cpu/expected/ss{5,20}-core-hw.log` |
+| `run-nvram.sh 5\|20` | the NVRAM image on the SD card (TOD-6): the suite runs with a blank and a random image in slot 3; both must survive the load and the write-back byte for byte |
 | `vcd.py` | query a trace: `vcd.py F.vcd list REGEX`, `vcd.py F.vcd show REGEX… --from C --to C` |
 
 ## Tools
@@ -55,6 +56,9 @@ sim/obj_ss5/Vsim_top --rom tests/cpu/out/ss5-core/cputest.rom --stop "CPUTEST DO
 `Vsim_top --help` lists the options. The ones used most:
 
 - `--hd0/--hd1/--cd FILE`: disk images, served the way `hps_io` serves them.
+- `--nvram FILE`: the NVRAM image (8192 bytes, slot 3), mounted before the
+  ROM download as Main does; it is read at the start and written back when
+  the machine changes the NVRAM (the summary counts the sectors).
 - `--stop STR`, `--fail STR`: end the run when the console prints STR.
 - `--send 'PAT=>TEXT'`: type TEXT on ttya once PAT has appeared.
 - `--video`: put the console on the screen (the default is ttya);

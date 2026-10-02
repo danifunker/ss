@@ -32,6 +32,7 @@ PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
 PASS chipset: system control reads 0 after power-on (RS, WD clear)
 PASS chipset: NVRAM IDPROM format 1, machine type, checksum
+PASS chipset: NVRAM byte and word stores read back (restored)
 PASS chipset: frame buffer slot starts with FCode (0xf1 header)
 PASS chipset: DMA2 E_BASE_ADDR resets to 0xff
 PASS chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
@@ -54,10 +55,11 @@ PASS cache: a patched instruction runs after FLUSH
 PASS smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
 PASS smp: SS20 3 CPUs increment a shared counter under ldstub and swap locks
 PASS smp: SS20 with SE off CPU 0 keeps its stale copy of CPU 1's line (C-4)
+PASS smp: SS20 3 CPUs pass a token through one cached line, with counters and ldstub
 PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
 PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
 PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
 PASS iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=60 fail=0 skip=0
+CPUTEST DONE pass=62 fail=0 skip=0
