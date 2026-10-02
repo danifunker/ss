@@ -1945,16 +1945,21 @@ int openbios(void)
     //   20 : AW
     //   40 : L2TLB
     //  100 : DCE
-    //  200 : ICE non
+    //  200 : ICE
     // 4000 : DSNOOP/ISNOOP
-    
+    //
+    // The I-cache was left off here: every instruction came from DDR, and
+    // OpenBIOS took about two minutes to reach "Trying disk" on the SS20.
+    // OpenBIOS runs no code it writes (its Forth is threaded data), and
+    // go() turns both caches off and flushes them before it enters a
+    // loaded program, so the I-cache is on while OpenBIOS runs.
     
     if ((srmmu_get_mmureg() >> 24)==4) {
         printk ("SET MMUREGS MS2\n");
-        srmmu_set_mmureg(srmmu_get_mmureg() | 0x0140);
+        srmmu_set_mmureg(srmmu_get_mmureg() | 0x0340);
     } else {
         printk ("SET MMUREGS SS\n");
-        srmmu_set_mmureg(srmmu_get_mmureg() | 0x4140);
+        srmmu_set_mmureg(srmmu_get_mmureg() | 0x4340);
     }
 
 	cache_flush_all();
