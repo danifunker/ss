@@ -762,7 +762,21 @@ BEGIN(t_scsi_write1, "scsi: WRITE(10) at t3 block 8, read back, restore, mode 1"
         st %l0, [%g7 + V_SKIP]
 1:      call esp_init
         nop
-        /* block 8 with block 9's content: write it, read it back */
+        /* the bus reset leaves a UNIT ATTENTION: TEST UNIT READY takes it */
+        mov 3, %l0
+2:      mov 3, %o0
+        set cdb_tur, %o1
+        mov 6, %o2
+        clr %o3
+        clr %o4
+        call scsi_cmd
+        mov 1, %o5
+        tst %o0
+        be 3f
+        subcc %l0, 1, %l0
+        bne 2b
+        nop
+3:      /* block 8 with block 9's content: write it, read it back */
         mov 3, %o0
         set TAG_HD0, %o1
         mov 9, %o2
@@ -801,13 +815,13 @@ BEGIN(t_scsi_write1, "scsi: WRITE(10) at t3 block 8, read back, restore, mode 1"
         sta %l2, [%l1 + %l3] MEM_ASI
         mov 3, %l3
         set 0xa5a5a5a5, %l5
-2:      or %l3, 0x800, %l2              /* (8 << 8) | k */
+4:      or %l3, 0x800, %l2              /* (8 << 8) | k */
         xor %l2, %l5, %l2
         sll %l3, 2, %l4
         sta %l2, [%l1 + %l4] MEM_ASI
         add %l3, 1, %l3
         cmp %l3, 128
-        bl 2b
+        bl 4b
         nop
         mov 3, %o0
         mov 0x2a, %o1

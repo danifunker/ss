@@ -161,9 +161,10 @@ struct Ddr {
 
 // ---------------------------------------------------------------------------
 // hps_io SD-block service for one image. The core raises sd_rd/sd_wr with
-// sd_lba; we raise sd_ack for the length of the transfer (the core drops its
-// request when it sees ack) and move 256 16-bit words through the buffer
-// port, low byte first, at hps_io's pace.
+// sd_lba (and, for the SCSI slots 0-2, sd_blk_cnt = blocks - 1); we raise
+// sd_ack for the length of the transfer (the core drops its request when it
+// sees ack) and move 256 16-bit words per block through the buffer port,
+// low byte first, at hps_io's pace, sd_buff_addr counting through them all.
 struct Disk {
     FILE *f = nullptr;
     std::string path;
@@ -183,10 +184,10 @@ struct Disk {
 
 struct SdHost {
     enum { IDLE, DELAY, RD_WORD, WR_WORD, END } st = IDLE;
-    int slot = -1, word = 0, sub = 0, wait = 0;
+    int slot = -1, word = 0, sub = 0, wait = 0, nblk = 1;
     bool is_write = false;
     uint32_t lba = 0;
-    uint8_t buf[512];
+    uint8_t buf[16384];
     Disk *disks[4] = {nullptr, nullptr, nullptr, nullptr};
 
     void step(Vsim_top *t, uint8_t sd_rd, uint8_t sd_wr, const uint32_t lbas[4],
@@ -199,11 +200,12 @@ struct SdHost {
                 slot = n;
                 is_write = sd_wr & (1 << n);
                 lba = lbas[n];
+                nblk = n < 3 ? t->sd_blk_cnt + 1 : 1;
                 memset(buf, 0, sizeof buf);
                 Disk *d = disks[n];
                 if (!is_write && d && d->f && (uint64_t)lba * 512 < d->size) {
                     fseeko(d->f, (off_t)lba * 512, SEEK_SET);
-                    if (fread(buf, 1, 512, d->f) == 0) {}
+                    if (fread(buf, 1, 512 * nblk, d->f) == 0) {}
                     d->reads++;
                 }
                 st = DELAY;
@@ -229,7 +231,7 @@ struct SdHost {
             }
             if (++sub == 4) {
                 sub = 0;
-                if (++word == 256) { st = END; wait = 4; }
+                if (++word == 256 * nblk) { st = END; wait = 4; }
             }
             break;
         case WR_WORD:
@@ -240,11 +242,11 @@ struct SdHost {
             }
             if (++sub == 4) {
                 sub = 0;
-                if (++word == 256) {
+                if (++word == 256 * nblk) {
                     Disk *d = disks[slot];
                     if (d && d->f && !d->ro && (uint64_t)lba * 512 < d->size) {
                         fseeko(d->f, (off_t)lba * 512, SEEK_SET);
-                        fwrite(buf, 1, 512, d->f);
+                        fwrite(buf, 1, 512 * nblk, d->f);
                         d->writes++;
                     }
                     st = END;

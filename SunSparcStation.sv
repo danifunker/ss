@@ -112,7 +112,8 @@ wire  [31:0] sd_lba0,sd_lba1,sd_lba2,sd_lba3;
 wire  [3:0] sd_rd;
 wire  [3:0] sd_wr;
 wire  [3:0] sd_ack;
-wire  [7:0] sd_buff_addr;
+wire  [12:0] sd_buff_addr;
+wire  [5:0] sd_blk_cnt;                 // the SCSI request's blocks - 1
 wire  [15:0] sd_buff_dout;
 wire  [15:0] sd_buff_din0,sd_buff_din1,sd_buff_din2,sd_buff_din3;
 wire  sd_buff_wr;
@@ -156,7 +157,7 @@ hps_io
   .img_size(img_size),
 
   .sd_lba('{sd_lba0, sd_lba1, sd_lba2, sd_lba3}),
-  .sd_blk_cnt('{0, 0, 0, 0}),
+  .sd_blk_cnt('{sd_blk_cnt, sd_blk_cnt, sd_blk_cnt, 6'd0}),
   .sd_rd(sd_rd),
   .sd_wr(sd_wr),
   .sd_ack(sd_ack),
@@ -375,6 +376,7 @@ ss_core
  .sd_rd(sd_rd),
  .sd_wr(sd_wr),
  .sd_ack(sd_ack),
+ .sd_blk_cnt(sd_blk_cnt),
  .sd_buff_addr(sd_buff_addr),
  .sd_buff_dout(sd_buff_dout),
  .sd_buff_din0(sd_buff_din0),

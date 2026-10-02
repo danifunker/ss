@@ -107,8 +107,10 @@ ENTITY ss_core IS
     sd_rd                : OUT std_logic_vector(3 DOWNTO 0);
     sd_wr                : OUT std_logic_vector(3 DOWNTO 0);
     sd_ack               : IN  std_logic_vector(3 DOWNTO 0);
+    -- blocks - 1 of the SCSI request being served (slots 0-2; slot 3 is 0)
+    sd_blk_cnt           : OUT std_logic_vector(5 DOWNTO 0);
     
-    sd_buff_addr         : IN std_logic_vector(7 DOWNTO 0);
+    sd_buff_addr         : IN std_logic_vector(12 DOWNTO 0);
     sd_buff_dout         : IN std_logic_vector(15 DOWNTO 0);
     sd_buff_din0         : OUT std_logic_vector(15 DOWNTO 0);
     sd_buff_din1         : OUT std_logic_vector(15 DOWNTO 0);
@@ -197,11 +199,15 @@ ARCHITECTURE rtl OF ss_core IS
   SIGNAL swconf : uv8;
   
   -- SCSI
-  SIGNAL scsi_w,scsi0_mist_w,scsi1_mist_w,scsi6_mist_w : type_scsi_w;
-  SIGNAL scsi_r,scsi0_mist_r,scsi1_mist_r,scsi6_mist_r : type_scsi_r;
+  SIGNAL scsi_w : type_scsi_w;
+  SIGNAL scsi_r : type_scsi_r;
   SIGNAL scsi_bis : std_logic;
-  SIGNAL disk_busy,busy0_mist,busy1_mist,busy6_mist  : std_logic;
-  SIGNAL id0_mist,id1_mist,id6_mist : unsigned(2 DOWNTO 0);
+  SIGNAL disk_busy : std_logic;
+  SIGNAL t_ena : std_logic_vector(2 DOWNTO 0);
+  SIGNAL t_cd2048 : std_logic;
+  SIGNAL t_lba : std_logic_vector(31 DOWNTO 0);
+  SIGNAL t_rd,t_wr,t_ack,t_bwr : std_logic_vector(2 DOWNTO 0);
+  SIGNAL t_bdr : std_logic_vector(15 DOWNTO 0);
   SIGNAL sd_reg_w : type_sd_reg_w;
   SIGNAL sd_reg_r : type_sd_reg_r;
 
@@ -414,79 +420,43 @@ BEGIN
   -- 000 : HD Image
   -- 010 : Image0 + Image1
   ----------------------------------------------------------
-  i_scsi_mist: ENTITY work.scsi_mist
-    GENERIC MAP (SYSFREQ => SYSFREQ)
+  -- The SCSI targets (rtl/sun4m/scsi_targets.vhd): HD0 at target 3 (the
+  -- boot disk, sd3 / c0t3d0), HD1 at 1 (OSD "HD0+HD1"), the CD at 6 (OSD
+  -- CDROM 2048 or 512), as on a real Sun (REWORK Decisions, 2026-09-28).
+  t_ena<=to_std_logic(scsi_cdconf/="00") & to_std_logic(scsi_conf="010") & '1';
+  t_cd2048<=to_std_logic(scsi_cdconf="01");
+
+  i_scsi_targets: ENTITY work.scsi_targets
     PORT MAP (
-      scsi_w     => scsi0_mist_w,
-      scsi_r     => scsi0_mist_r,
-      id         => id0_mist,
-      busy       => busy0_mist,
-      hd_lba     => sd0_lba,
-      hd_rd      => sd0_rd,
-      hd_wr      => sd0_wr,
-      hd_ack     => sd0_ack,
-      hdb_adrs   => sd_buff_addr,
-      hdb_dw     => sd_buff_dout,
-      hdb_dr     => sd0_buff_din,
-      hdb_wr     => sd0_buff_wr,
-      hd_size    => img0_size,
-      hd_mounted => img_mounted(0),
-      hd_ro      => img0_readonly,
-      clk        => sclk,
-      reset_n    => reset_n);
-  
-  -- SCSI IDs as on a real Sun: HD0 at target 3 (the boot disk, sd3 /
-  -- c0t3d0), HD1 at 1, the CD at 6 (REWORK Decisions, 2026-09-28).
-  id0_mist<="011";
-  
-  ----------------------------------------------------------
-  i_scsi_mist2: ENTITY work.scsi_mist
-    GENERIC MAP (SYSFREQ => SYSFREQ)
-    PORT MAP (
-      scsi_w     => scsi1_mist_w,
-      scsi_r     => scsi1_mist_r,
-      id         => id1_mist,
-      busy       => busy1_mist,
-      hd_lba     => sd1_lba,
-      hd_rd      => sd1_rd,
-      hd_wr      => sd1_wr,
-      hd_ack     => sd1_ack,
-      hdb_adrs   => sd_buff_addr,
-      hdb_dw     => sd_buff_dout,
-      hdb_dr     => sd1_buff_din,
-      hdb_wr     => sd1_buff_wr,
-      hd_size    => img1_size,
-      hd_mounted => img_mounted(1),
-      hd_ro      => img1_readonly,
-      clk        => sclk,
-      reset_n    => reset_n);
- 
-  id1_mist<="001";
-  
-  ----------------------------------------------------------
-  i_scsi_mist6: ENTITY work.scsi_mist_cdrom
-    GENERIC MAP (SYSFREQ => SYSFREQ)
-    PORT MAP (
-      scsi_w     => scsi6_mist_w,
-      scsi_r     => scsi6_mist_r,
-      id         => id6_mist,
-      busy       => busy6_mist,
-      hd_lba     => sd6_lba,
-      hd_rd      => sd6_rd,
-      hd_wr      => sd6_wr,
-      hd_ack     => sd6_ack,
-      hdb_adrs   => sd_buff_addr,
-      hdb_dw     => sd_buff_dout,
-      hdb_dr     => sd6_buff_din,
-      hdb_wr     => sd6_buff_wr,
-      hd_size    => img6_size,
-      hd_mounted => img_mounted(2),
-      hd_ro      => img6_readonly,
-      ssize      => scsi_cdconf(1),
-      clk        => sclk,
-      reset_n    => reset_n);
-  
-  id6_mist<="110";
+      scsi_w       => scsi_w,
+      scsi_r       => scsi_r,
+      id0          => "011",
+      id1          => "001",
+      id2          => "110",
+      ena          => t_ena,
+      cd2048       => t_cd2048,
+      img_mounted  => img_mounted(2 DOWNTO 0),
+      img_size     => img_size,
+      img_readonly => img_readonly,
+      hd_lba       => t_lba,
+      hd_blk_cnt   => sd_blk_cnt,
+      hd_rd        => t_rd,
+      hd_wr        => t_wr,
+      hd_ack       => t_ack,
+      hdb_adrs     => sd_buff_addr,
+      hdb_dw       => sd_buff_dout,
+      hdb_dr       => t_bdr,
+      hdb_wr       => t_bwr,
+      busy         => disk_busy,
+      clk          => sclk,
+      reset_n      => reset_n);
+
+  sd0_lba<=t_lba; sd1_lba<=t_lba; sd6_lba<=t_lba;
+  sd0_rd<=t_rd(0); sd1_rd<=t_rd(1); sd6_rd<=t_rd(2);
+  sd0_wr<=t_wr(0); sd1_wr<=t_wr(1); sd6_wr<=t_wr(2);
+  t_ack<=sd6_ack & sd1_ack & sd0_ack;
+  t_bwr<=sd6_buff_wr & sd1_buff_wr & sd0_buff_wr;
+  sd0_buff_din<=t_bdr; sd1_buff_din<=t_bdr; sd6_buff_din<=t_bdr;
   
   ----------------------------------------------------------
   -- SCSI ID (SunOS) :
@@ -618,7 +588,7 @@ BEGIN
       sd_rd        => sd_rd(3),
       sd_wr        => sd_wr(3),
       sd_ack       => sd_ack(3),
-      sd_buff_addr => sd_buff_addr,
+      sd_buff_addr => sd_buff_addr(7 DOWNTO 0),
       sd_buff_dout => sd_buff_dout,
       sd_buff_din  => sd_buff_din3,
       sd_buff_wr   => sd_buff_wr,
@@ -628,34 +598,8 @@ BEGIN
       clk          => sclk);
   
   ----------------------------------------------------------
-  MUX_SCSI:PROCESS(scsi0_mist_r,scsi1_mist_r,scsi6_mist_r,
-                   scsi_w,scsi_conf,scsi_cdconf) IS
-  BEGIN
-    scsi0_mist_w<=scsi_w;
-    scsi1_mist_w<=scsi_w;
-    scsi6_mist_w<=scsi_w;
 
-    IF scsi_cdconf/="00" AND scsi6_mist_r.sel='1' THEN
-      scsi_r<=scsi6_mist_r;
-    ELSIF scsi_conf="010" AND scsi1_mist_r.sel='1' THEN -- Image + Image
-      scsi_r<=scsi1_mist_r;
-    ELSE
-      scsi_r<=scsi0_mist_r;
-    END IF;
-    
-    scsi0_mist_w.bsy<=scsi_w.bsy AND scsi0_mist_r.sel;
-    scsi0_mist_w.ack<=scsi_w.ack AND scsi0_mist_r.sel;
-    scsi0_mist_w.atn<=scsi_w.atn AND scsi0_mist_r.sel;
-    scsi1_mist_w.bsy<=scsi_w.bsy AND scsi1_mist_r.sel;
-    scsi1_mist_w.ack<=scsi_w.ack AND scsi1_mist_r.sel;
-    scsi1_mist_w.atn<=scsi_w.atn AND scsi1_mist_r.sel;
-    scsi6_mist_w.bsy<=scsi_w.bsy AND scsi6_mist_r.sel;
-    scsi6_mist_w.ack<=scsi_w.ack AND scsi6_mist_r.sel;
-    scsi6_mist_w.atn<=scsi_w.atn AND scsi6_mist_r.sel;
-    
-  END PROCESS MUX_SCSI;
   
-  disk_busy<=busy0_mist OR busy1_mist OR busy6_mist;
   
   ----------------------------------------------------------
   led_disk<=disk_busy WHEN rising_edge(sclk);
