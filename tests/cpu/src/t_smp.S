@@ -282,4 +282,154 @@ BEGIN(t_smp_nosnoop, "smp: SS20 with SE off CPU 0 keeps its stale copy of CPU 1'
         EXPECT(%l3, 0x72720000, 5)
         EXPECT(%l4, 0x72720000, 6)
 END
+/* A token goes round CPUs 0, 1 and 2 through words 0-2 of one cached
+ * line (MT_PAGE(10) + 0x60), RING_ROUNDS times: CPU n > 0 polls word n-1
+ * for k, then stores k in word n; CPU 0 stores k in word 0 and polls word
+ * 2. Every round each CPU also increments its own counter, word 4 + n,
+ * and takes and drops its own byte n of word 3 with ldstub. Each poll
+ * hits the CPU's cached copy until the other CPU's store invalidates it:
+ * a missed invalidation is a poll that times out. An atomic or a
+ * write-back that wrote the whole line from a stale copy would undo
+ * another CPU's counter. (Solaris 8 on the board, 3 CPUs: lost updates
+ * and a fault on a PTE the kernel had installed, 2026-10-01.) */
+#define RING_ROUNDS     2000
+#define RING_POLLS      200000
+
+/* ring_loop(line %o0, n %o1, rounds %o2): %o0 = rounds completed; leaf,
+ * %o0-%o5 and %g1-%g4 */
+ring_loop:
+        sll %o1, 2, %g2
+        add %o0, %g2, %g2               /* word n: my token */
+        add %g2, 16, %g3                /* word 4 + n: my counter */
+        add %o0, 12, %g4
+        add %g4, %o1, %g4               /* byte n of word 3 */
+        tst %o1
+        bne 1f
+        add %o0, 8, %g1                 /* CPU 0 waits on word 2 */
+        ba 2f
+        nop
+1:      sub %g2, 4, %g1                 /* CPU n waits on word n - 1 */
+2:      mov 1, %o3                      /* k */
+3:      tst %o1
+        be 5f
+        nop
+        set RING_POLLS, %o4
+4:      ld [%g1], %o5
+        cmp %o5, %o3
+        be 5f
+        nop
+        subcc %o4, 1, %o4
+        bne 4b
+        nop
+        ba 9f
+        nop
+5:      st %o3, [%g2]                   /* pass the token */
+        ld [%g3], %o5
+        add %o5, 1, %o5
+        st %o5, [%g3]
+        ldstub [%g4], %o5
+        stb %g0, [%g4]
+        tst %o1
+        bne 7f
+        nop
+        set RING_POLLS, %o4             /* CPU 0: the token comes back */
+6:      ld [%g1], %o5
+        cmp %o5, %o3
+        be 7f
+        nop
+        subcc %o4, 1, %o4
+        bne 6b
+        nop
+        ba 9f
+        nop
+7:      cmp %o3, %o2
+        bge 8f
+        nop
+        ba 3b
+        add %o3, 1, %o3
+8:      add %o3, 1, %o3
+9:      retl
+        sub %o3, 1, %o0
+
+/* smp_fn_ring(line %o0, rounds %o1), on CPU n: caches on, ring_loop as
+ * participant n, caches off; %o0 = rounds completed. Keeps %l6 (the
+ * dispatcher's mailbox pointer). */
+smp_fn_ring:
+        mov %o7, %l7
+        mov %o0, %l0
+        mov %o1, %l1
+        call mmu_on
+        nop
+        lda [%g0] 4, %o1
+        srl %o1, 2, %o1
+        and %o1, 3, %o1
+        mov %l0, %o0
+        call ring_loop
+        mov %l1, %o2
+        mov %o0, %l2
+        call mmu_off
+        nop
+        jmp %l7 + 8
+        mov %l2, %o0
+
+BEGIN(t_smp_ring, "smp: SS20 3 CPUs pass a token through one cached line, with counters and ldstub")
+        SMP_ALIVE_OR_SKIP(1)
+        SMP_ALIVE_OR_SKIP(2)
+        call mmu_tables_init
+        nop
+        set MT_PAGE(10) + 0x60, %l0
+        clr %o0
+1:      sta %g0, [%l0 + %o0] 0x20
+        add %o0, 4, %o0
+        cmp %o0, 32
+        bl 1b
+        nop
+        call mmu_on
+        nop
+        mov 1, %o0
+        set smp_fn_ring, %o1
+        mov %l0, %o2
+        call mp_post
+        set RING_ROUNDS, %o3
+        mov 2, %o0
+        set smp_fn_ring, %o1
+        mov %l0, %o2
+        call mp_post
+        set RING_ROUNDS, %o3
+        mov %l0, %o0
+        mov 0, %o1
+        call ring_loop
+        set RING_ROUNDS, %o2
+        mov %o0, %l1                    /* CPU 0's rounds */
+        call mp_wait
+        mov 1, %o0
+        mov %o0, %l2
+        mov %o1, %l3
+        call mp_wait
+        mov 2, %o0
+        mov %o0, %l4
+        mov %o1, %l5
+        ld [%l0 + 16], %i0              /* the counters, CPU 0 cached */
+        ld [%l0 + 20], %i1
+        ld [%l0 + 24], %i2
+        ld [%l0 + 12], %i3              /* the ldstub bytes, all free */
+        sta %g0, [%l0] 0x10
+        add %l0, 20, %o0
+        lda [%o0] 0x20, %i4             /* CPU 1's counter in memory */
+        add %l0, 24, %o0
+        lda [%o0] 0x20, %i5             /* CPU 2's */
+        call mmu_off
+        nop
+        EXPECT(%l1, RING_ROUNDS, 1)
+        EXPECT(%l2, RING_ROUNDS, 2)
+        EXPECT(%l3, 0, 3)
+        EXPECT(%l4, RING_ROUNDS, 4)
+        EXPECT(%l5, 0, 5)
+        EXPECT(%i0, RING_ROUNDS, 6)
+        EXPECT(%i1, RING_ROUNDS, 7)
+        EXPECT(%i2, RING_ROUNDS, 8)
+        EXPECT(%i3, 0, 9)
+        EXPECT(%i4, RING_ROUNDS, 10)
+        EXPECT(%i5, RING_ROUNDS, 11)
+END
 #endif

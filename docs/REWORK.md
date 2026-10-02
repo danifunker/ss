@@ -639,6 +639,40 @@ drop one of the two machines, and asked to focus on the SS20.
 - The SS5 rbf at 60 MHz with the merge (`41007eb`, +0.054 ns) passes
   everything on the board but the two shared regressions.
 
+### Session 5 results (2026-10-01 night to 2026-10-02)
+
+- **Fable's three fixes on the board** (`b775165`, rbf
+  `02569da` seed 1): SS20 CPU suite **60/0/0**, identical to the
+  simulation (new baseline `1f878e7`); **NetBSD 11 on the SS20: login and
+  shell** (`hwtest.sh 20 netbsd` PASS, `syslogd` runs).
+- **Solaris 8 under the official OBP 2.25 without any in-memory patch**:
+  the ACTION loop and the user-text page-in work; the second boot reached
+  `console login:` with **3 CPUs on-line**. But the kernel corrupts memory
+  under disk I/O, with 3 CPUs and with one (`psradm -f 1 2`): a panic at
+  boot (`bread_common+0x190`, a data fault at an ALU instruction, the
+  window's outs from another frame), a hang after ~7000 `cksum` processes
+  (a stack-growth fault that the kernel never resolves: the PTE stays 0,
+  flash-clearing every D-cache does not help), a panic with one CPU after
+  ~1000 (the kernel jumps to a garbage address in `pagefault`). Crash dumps
+  `vmcore.0-2` on `sol8-ss20.img`. Evidence and leads for Fable:
+  `scratch/handoff/fable-ss20-corruption.md`. New suite test
+  `t_smp_ring` (3 CPUs, a token through one cached line, counters and
+  ldstub in the same line): passes in simulation.
+- **NVRAM persistence (TOD-6, `9a99e4b`)**: OSD "NVRAM" (`SC3`), an
+  8192-byte image file, loaded at every core start (the machine waits for
+  it), written back half a second after the last change; a blank file gets
+  the built-in IDPROM; `t_nvram`, `sim --nvram`, `sim/run-nvram.sh 20`
+  PASS. The first SS20 fit missed the 55 MHz clock by 0.257 ns on a path
+  inside CPU 1 (`mmu_cr_e` → decode bypass), not the NVRAM: another seed.
+- **OpenBIOS was slow on the SS20** (about two minutes to "Trying disk",
+  15 s to zap the NVRAM): its MMU setup turned on the D-cache but left the
+  I-cache off ("ICE non"), so every instruction came from DDR. Turned on
+  (`bios/openbios/arch/sparc32/openbios.c`): `go()` turns both caches off
+  and flushes them before it enters a loaded program, and OpenBIOS runs no
+  code it writes.
+- A blank NVRAM on the SS20 OBP: "Incorrect configuration checksum" sets
+  `diag-switch?` true, hence the diag boot after every core load.
+
 ### Work items (the content of the stages)
 
 0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
@@ -747,6 +781,7 @@ drop one of the two machines, and asked to focus on the SS20.
 | 2026-09-30 (night) | The SS20 runs at 55 MHz (closes with +0.9 ns; 60 MHz misses by 1.15 ns) |
 | 2026-10-01 | **Focus on the SS20** (user): the core may drop one machine; work goes to the SS20 first. Fable sessions are run by the user from prompts in `scratch/handoff/` |
 | 2026-10-01 | MSI arbiter: power-on value enables all CPUs (the real MSI enables 8 and 9 only), because OpenBIOS starts every CPU from reset; the Sun OBP enables 9-B in its first instructions anyway |
+| 2026-10-01 (night) | **NVRAM persistence (TOD-6) through a fourth hps_io slot** (OSD "NVRAM", `SC3`, an 8192-byte file the user picks once; Main remounts it at every core start), as the MacLC/LBMacTwo cores save PRAM: needs no Main change. The file is a plain byte image; the user decides per machine / per firmware / per disk (HARDWARE_GAPS question 10). A blank file gets the built-in IDPROM. The machine is held in reset until the image is in (3 s without one) |
 
 ### What phase 3 did (session 1)
 

@@ -109,7 +109,7 @@ README's "reboot MiSTer between OSes".
 | ZS-2 | ESCC | No break detection / external-status interrupts; ttya BREAK is consumed by the debug-monitor mux, so a serial console can never reach `ok` from a running OS | S2 | M |
 | KBD-1 | keyboard | No Stop (L1) or other left-block keys: no Stop-A, Stop-N, Stop-D | S2 | S |
 | TMR-2 | timer | User-timer RUN bit taken from D<n> instead of D<0>: CPU1-3 user timers never start | S2 (S1-diag SS20) | S |
-| TOD-6 | NVRAM | NVRAM is not persistent across core loads (see video-audio-glue.md) | S2 | M (glue) |
+| TOD-6 | NVRAM | NVRAM is not persistent across core loads (see video-audio-glue.md). **Fixed in `9a99e4b`**: an image file in the OSD "NVRAM" slot (`rtl/mister/nvram_sd.vhd`) | S2 | M (glue) |
 | DEC-3 | decode | Unimplemented/reserved offsets of `ts_inter`, `ts_timer`, `ts_esp` return the previous access's data | S2 (ESP) / S3 | S |
 | IOM-3 | IOMMU | SS5: IOCR DE bit writable and IBAR bits 31:27 stored (microSPARC-II has neither) | S1-diag | S |
 | IOM-7 | IOMMU | Address flush flushes everything; no tag/TLB/comparator diagnostic windows | S1-diag | M |
