@@ -93,7 +93,7 @@ localparam CONF_STR = {
     "-;" ,
     "SC0,VHDIMGHDARAW,Disk 0 (SCSI 3);" ,
     "SC1,VHDIMGHDARAW,Disk 1 (SCSI 1);" ,
-    "SC2,ISO,CD-ROM (SCSI 6);" ,
+    "SC2,ISOCUECHD,CD-ROM (SCSI 6);" ,
     "SC3,NVR,NVRAM;" ,
     "-;" ,
     "P1,Video;" ,
