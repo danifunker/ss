@@ -20,7 +20,7 @@ newest `RESUME-*.md` at the root is the hand-off from the last session.
 | `rtl/plomb/`, `rtl/peri/` | internal bus ("plomb"), generic peripherals |
 | `tools/romdis/` | SPARC V8 disassembler, sun4m ROM analyser, OBP Forth decoder, QEMU tracer |
 | `tools/sparc_link.py` | ELF32 SPARC linker for one object (LLVM has none) |
-| `tools/debugarm/` | upstream's ARM-side debug monitor; `pcdump` (ours, `make pcdump`, run on the MiSTer): stops each CPU over the debug link on ttya and prints PC, registers, memory |
+| `tools/debugarm/` | upstream's ARM-side debug monitor; `pcdump` (ours, `make pcdump`, run on the MiSTer): stops each CPU over the debug link on ttya and prints PC, registers, memory, ASI registers; can patch a word through its physical address (`-W`), store through an ASI (`-S`) and resume a CPU elsewhere (`-j`) |
 | `tools/ufsread.py` | lists/extracts files from a Solaris UFS disk image (kernel modules for symbols) |
 | `tests/cpu/` | bare-metal test suite that runs as the boot PROM (QEMU and core): CPU tests plus `t_chipset.S`; `expected/ss{5,20}-core-hw.log` are the hardware baselines |
 | `sim/` | whole-machine Verilator simulation (GHDL 6 lowers `ss_core`); `run-cputest.sh 5\|20` must match the hardware baseline; `build.sh 20 --diag` starts with `diag-switch?` set (Sun POST); see `sim/README.md` |

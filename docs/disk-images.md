@@ -23,6 +23,7 @@ HD slots accept all four).
 |---|---|---|---|
 | `netbsd11.vhd` | 2 GB | any (installed at 0) | NetBSD 11.0 GENERIC; `sd0a` / 1.7 GB FFSv1, `sd0b` 256 MB swap; sets base etc kern-GENERIC modules rescue text misc man games comp; root password empty |
 | `sol8-t3.vhd` | 2.9 GB | **3** (`c0t3d0`) | Solaris 8 2/04, Entire Group, 32-bit, C locale, GMT; `s0` / 1.39 GB, `s1` swap 512 MB, `s7` /export/home; host `sunsparc8`; root password empty |
+| `sol8-ss20.img` | 2.9 GB | **3** (`c1t3d0`) | the same installation made bootable on an SS20 (below): device links for the SS20's ESP path, `vfstab` and `dumpadm.conf` on `c1t3d0` |
 
 NetBSD finds its disk as `sd0` whatever the target. Solaris names it by
 target (`c0t3d0`) in `/etc/vfstab`, so `sol8-t3` boots only where the disk
@@ -125,3 +126,33 @@ rework. The core still puts HD0 at target 0 today.
    0 > boot /iommu@0,10000000/sbus@0,10001000/espdma@5,8400000/esp@5,8800000/sd@3,0:a
    ```
    You get `sunsparc8 console login:`. Log in as `root` with no password.
+
+### The SS20 copy (`sol8-ss20.img`, 2026-10-01)
+
+The installation above was made on an SS5, so its `/dev/dsk/c0t3d0*`
+links point at the SS5's ESP
+(`/iommu@0,10000000/sbus@0,10001000/espdma@5,8400000/esp@5,8800000`). On
+an SS20 the ESP is at `/iommu@f,e0000000/sbus@f,e0001000/espdma@f,400000/
+esp@f,800000`: the kernel mounts `/` from the boot path, but `rcS` cannot
+remount it through `vfstab` ("Can't open /dev/rdsk/c0t3d0s0", maintenance
+mode), and `boot -r` does not help, since the links would be made after
+that remount. Fixed once in QEMU's SS-20 (OpenBIOS; the real SS20 PROM
+stops with "Data Access Error" under QEMU, and OpenBIOS cannot boot the
+Solaris CD there):
+
+1. `cp --sparse=always sol8.img sol8-ss20.img`; boot it on `-M SS-20
+   -nographic -prom-env 'auto-boot?=false'` with the disk at target 3:
+   `boot /iommu/sbus/espdma/esp/sd@3,0:a -s`. It stops in maintenance mode;
+   Enter (empty root password).
+2. Make a device node for `/` and remount it read-write through it:
+   `mount -F tmpfs swap /tmp; prtconf -D` gives the `sd` instance of
+   target 3 on the new path (10: instances 7-13 for targets 0-6, after the
+   SS5's 0-6 in `path_to_inst`); `sd` is major 32 (`/etc/name_to_major`),
+   slice 0 minor = instance × 8: `mknod /tmp/r0 b 32 80; mount -F ufs -o
+   remount,rw /tmp/r0 /`.
+3. `devfsadm`: the SS20 path gets controller `c1` (`c0` keeps the SS5's
+   links), so `sed s/c0t3d0/c1t3d0/g` over `/etc/vfstab` and
+   `/etc/dumpadm.conf`.
+4. `reboot`; it comes up to `sunsparc8 console login:` on QEMU's SS-20.
+   On the core it needs the official OBP 2.25 (or OpenBIOS) with the disk
+   at target 3.
