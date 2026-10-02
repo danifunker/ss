@@ -18,6 +18,13 @@
 #            must already hold diag-switch? false, auto-boot? true,
 #            boot-device disk, input-device and output-device ttya (set them
 #            once at the PROM's ok prompt: they are saved, TOD-6)
+#   scsi     the SCSI path: tests/cpu/out/<target>/scsitest.rom as boot.rom
+#            with two images of known content (tests/cpu/mkscsiimg.py, copied
+#            to games/SunSparcStation/scsi-hd{0,1}.img) at HD0 (t3) and HD1
+#            (t1), OSD "HD0+HD1"; the output must equal
+#            tests/cpu/expected/ss{5,20}-scsi-hw.log (--record writes it), and
+#            HD0 must be unchanged afterwards (the write test restores it).
+#            HD0 = the OS image again and HD1 empty afterwards
 #
 #   scripts/hwtest.sh 5 cpu netbsd
 #   scripts/hwtest.sh 5 --bios bios/build/boot.rom netbsd   (a new OpenBIOS)
@@ -43,14 +50,14 @@ while [ $# -gt 0 ]; do
         --bios) BIOS=$1; shift ;;
         --obp) OBP=$1; shift ;;
         --nvram) NVRAM=$1; shift ;;
-        cpu|netbsd|solaris|solaris-obp) TESTS+=("$a") ;;
+        cpu|netbsd|solaris|solaris-obp|scsi) TESTS+=("$a") ;;
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
-[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] cpu|netbsd|solaris|solaris-obp..." >&2; exit 2; }
+[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] cpu|netbsd|solaris|solaris-obp|scsi..." >&2; exit 2; }
 case "$REV" in
-    SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log ;;
-    SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log ;;
+    SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log; OSIMG=sol8.img ;;
+    SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log; OSIMG=sol8-ss20.img ;;
 esac
 G="/media/fat/games/$GAMES_DIR"
 mkdir -p sim/out
@@ -99,6 +106,32 @@ for t in "${TESTS[@]}"; do
             log "cpu: PASS, identical to $EXP ($(clean "$log" | grep 'CPUTEST DONE'))"
         else
             log "cpu: FAIL, differs from $EXP (diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
+            FAILED=$((FAILED + 1))
+        fi
+        ;;
+    scsi)
+        sexp=tests/cpu/expected/${T%-core}-scsi-hw.log
+        python3 tests/cpu/build.py "$T" --main=scsitest > /dev/null || exit 1
+        for n in 0 1; do
+            python3 tests/cpu/mkscsiimg.py "sim/out/scsi-hd$n.img" "HD$n" || exit 1
+            scp -q "${SSH_OPTS[@]}" "sim/out/scsi-hd$n.img" "$DEV:$G/scsi-hd$n.img" || exit 1
+        done
+        rsh "cp $G/boot.rom /tmp/boot.rom.hwtest"
+        scp -q "${SSH_OPTS[@]}" "tests/cpu/out/$T/scsitest.rom" "$DEV:$G/boot.rom" || exit 1
+        scripts/mount.sh --hd0 scsi-hd0.img --hd1 scsi-hd1.img > /dev/null
+        scripts/setopt.sh console=serial disks=hd0+hd1 > /dev/null
+        cp=$(run_capture "$log" 120 'CPUTEST DONE')
+        sleep 2; stop_capture "$cp"
+        rsh "cp /tmp/boot.rom.hwtest $G/boot.rom"
+        scripts/mount.sh --hd0 "$OSIMG" --hd1 "" > /dev/null
+        scripts/setopt.sh console=serial > /dev/null
+        same=$( [ "$(rsh "md5sum < $G/scsi-hd0.img" | cut -c1-32)" = "$(md5sum < sim/out/scsi-hd0.img | cut -c1-32)" ] && echo yes || echo no)
+        if [ "$RECORD" = 1 ]; then
+            clean "$log" > "$sexp"; log "scsi: baseline recorded: $(grep 'CPUTEST DONE' "$sexp"); HD0 unchanged: $same"
+        elif [ "$same" = yes ] && diff <(clean "$sexp") <(clean "$log") > "$log.diff"; then
+            log "scsi: PASS, identical to $sexp ($(clean "$log" | grep 'CPUTEST DONE'))"
+        else
+            log "scsi: FAIL (HD0 unchanged: $same; diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
             FAILED=$((FAILED + 1))
         fi
         ;;
