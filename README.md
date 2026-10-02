@@ -27,7 +27,13 @@ There is also the OpenBIOS sources with the changes for this core (original repo
 
 ## Setup
 ### BIOS
-Place [boot.rom](https://github.com/Grabulosaure/ss_openbios/raw/refs/heads/main/boot.rom) in the `games/SunSparcStation` folder.
+Place this repository's [`bios/boot.rom`](bios/boot.rom) in the
+`games/SunSparcStation` folder, as `boot.rom`. It is OpenBIOS (GPL-2) built
+from [`bios/`](bios/) (Grabulosaure's
+[ss_openbios](https://github.com/Grabulosaure/ss_openbios) with this core's
+changes) by `scripts/build-bios.sh`; one image serves the SS5 and the SS20.
+The Sun PROMs (SS5 OBP 2.15, SS20 OBP 2.25) also work, from your own
+machine: they are not distributed.
 
 **Upgrading from the SparcStation core:** the folder was `games/SparcStation`.
 Move `boot.rom` and your disk images to `games/SunSparcStation`.
