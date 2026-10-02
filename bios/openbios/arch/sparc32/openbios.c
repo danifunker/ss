@@ -910,13 +910,15 @@ static void setup_stdio(void)
         stdout = "screen";
     }
 
+    /* The console follows the OSD on every boot: for this boot only, the
+       NVRAM keeps its own input-device / output-device. */
     push_str(stdin);
     push_str("input-device");
-    fword("$setenv");
+    fword("$setenv-temp");
 
     push_str(stdout);
     push_str("output-device");
-    fword("$setenv");
+    fword("$setenv-temp");
 
     obp_stdin_path = stdin;
     obp_stdout_path = stdout;
@@ -1765,15 +1767,12 @@ arch_init( void )
         /* Setup nvram variables */
         push_str("/options");
         fword("find-device");
+#ifndef CONFIG_TACUS
         push_str(cmdline);
         fword("encode-string");
         push_str("boot-file");
         fword("property");
-#ifndef CONFIG_TACUS
 	boot_device = fw_cfg_read_i16(FW_CFG_BOOT_DEVICE);
-#else
-    boot_device = 'c';
-#endif
 	switch (boot_device) {
 	case 'a':
 		push_str("floppy");
@@ -1793,19 +1792,16 @@ arch_init( void )
 	fword("encode-string");
 	push_str("boot-device");
 	fword("property");
-
-#ifdef CONFIG_TACUS
+#else
+    /* boot-file and boot-device come from the NVRAM (defaults "" and
+       "disk"). The OSD's AutoBoot OFF stops at ok for this boot only; ON
+       leaves auto-boot? to the NVRAM (default true). */
     if (*aux_reg & 8) {
-      printk(">> auto-boot = false\n");
+      printk(">> auto-boot = false (OSD)\n");
       push_str("false");
-    } else {
-      printk(">> auto-boot = true\n");
-      push_str("true");
+      push_str("auto-boot?");
+      fword("$setenv-temp");
     }
-    
-    fword("encode-string");
-    push_str("auto-boot?");
-    fword("property");
     
     if (video_type)
       printk (">> Video = CG3\n");
@@ -1814,13 +1810,20 @@ arch_init( void )
 
     /* One-shot boot command left behind by obp_reboot() (e.g. the Solaris
        installer's "reboot disk:b").  Consume it here and override boot-command
-       in RAM only (no update-nvram), so this boot honours it and it reverts to
-       the NVRAM default next time.  nvram_get_reboot_command() clears the
-       magic, so the override never repeats. */
+       for this boot only ($setenv-temp: the NVRAM keeps its own), so it
+       reverts to the NVRAM's next time.  nvram_get_reboot_command() clears
+       the magic, so the override never repeats. */
     {
-        char rbtcmd[128];
+        char rbtcmd[128] = "";
 
-        if (nvram_get_reboot_command(rbtcmd, sizeof(rbtcmd))) {
+        if (nvram_get_reboot_command(rbtcmd, sizeof(rbtcmd)) &&
+            strcmp(rbtcmd, NVRAM_REBOOT_HALT) == 0) {
+            /* the client halted (romvec halt/abort): back to ok */
+            printk("Program terminated\n");
+            push_str("false");
+            push_str("auto-boot?");
+            fword("$setenv-temp");
+        } else if (rbtcmd[0]) {
             char bootcmd[160];
 
             /* The romvec reboot string is the argument to "boot"; prepend
@@ -1834,7 +1837,7 @@ arch_init( void )
             printk(">> reboot boot-command = %s\n", bootcmd);
             push_str(bootcmd);
             push_str("boot-command");
-            fword("$setenv");
+            fword("$setenv-temp");
         }
     }
 
@@ -1863,6 +1866,37 @@ arch_init( void )
 }
 
 extern struct _console_ops arch_console_ops;
+
+#ifdef CONFIG_TACUS
+/* The caches go on as soon as the MMU is set up (init_mmu_swift), so the
+ * whole start-up runs cached; the message is printed once the console is up.
+ *
+ *     10 : WB
+ *     20 : AW
+ *     40 : L2TLB
+ *    100 : DCE
+ *    200 : ICE
+ *   4000 : DSNOOP/ISNOOP
+ *
+ * The I-cache was left off at first: every instruction came from DDR, and
+ * OpenBIOS took about two minutes to reach "Trying disk" on the SS20.
+ * OpenBIOS runs no code it writes (its Forth is threaded data), and go()
+ * turns both caches off and flushes them before it enters a loaded program,
+ * so the I-cache is on while OpenBIOS runs. */
+static const char *tacus_cache_msg;
+
+static void tacus_caches_on(void)
+{
+    if ((srmmu_get_mmureg() >> 24)==4) {
+        tacus_cache_msg = "SET MMUREGS MS2\n";
+        srmmu_set_mmureg(srmmu_get_mmureg() | 0x0340);
+    } else {
+        tacus_cache_msg = "SET MMUREGS SS\n";
+        srmmu_set_mmureg(srmmu_get_mmureg() | 0x4340);
+    }
+    cache_flush_all();
+}
+#endif
 
 int openbios(void)
 {
@@ -1894,6 +1928,9 @@ int openbios(void)
 
 #ifdef CONFIG_DRIVER_SBUS
         init_mmu_swift();
+#endif
+#ifdef CONFIG_TACUS
+        tacus_caches_on();
 #endif
 #ifdef CONFIG_DEBUG_CONSOLE
 #ifdef CONFIG_DEBUG_CONSOLE_SERIAL
@@ -1941,28 +1978,7 @@ int openbios(void)
 #endif
 
 #ifdef CONFIG_TACUS
-    //   10 : WB
-    //   20 : AW
-    //   40 : L2TLB
-    //  100 : DCE
-    //  200 : ICE
-    // 4000 : DSNOOP/ISNOOP
-    //
-    // The I-cache was left off here: every instruction came from DDR, and
-    // OpenBIOS took about two minutes to reach "Trying disk" on the SS20.
-    // OpenBIOS runs no code it writes (its Forth is threaded data), and
-    // go() turns both caches off and flushes them before it enters a
-    // loaded program, so the I-cache is on while OpenBIOS runs.
-    
-    if ((srmmu_get_mmureg() >> 24)==4) {
-        printk ("SET MMUREGS MS2\n");
-        srmmu_set_mmureg(srmmu_get_mmureg() | 0x0340);
-    } else {
-        printk ("SET MMUREGS SS\n");
-        srmmu_set_mmureg(srmmu_get_mmureg() | 0x4340);
-    }
-
-	cache_flush_all();
+    printk("%s", tacus_cache_msg);
 #endif
     
 	enterforth((xt_t)PC);

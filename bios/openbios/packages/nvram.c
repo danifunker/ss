@@ -209,14 +209,21 @@ nvconf_init( void )
 			}
 		}
 		if( err || !nvram.config ) {
+			/* Formatted in RAM only: the chip is written at the first
+			   change of a variable, so an image in another format (the
+			   Sun OBP's) survives until then. */
 			printk("nvram error detected, zapping pram\n");
 			zap_nvram();
 			if( !once++ )
-				fword("set-defaults");
+				fword("(set-defaults)");
 			continue;
 		}
 		break;
 	}
+
+	/* From now on $setenv and set-default(s) write the NVRAM. */
+	PUSH( pointer2cell(update_nvram) );
+	fword("nvram-commit-func!");
 }
 
 

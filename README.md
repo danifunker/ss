@@ -48,11 +48,21 @@ address and host ID) is kept in an image file on the SD card. Create an
 
 and pick it in the OSD under **NVRAM**. The core loads it at every start
 and writes changes back to it about half a second after the machine
-makes them. Without a file, the NVRAM starts blank at every core load. A
-blank file gets the core's built-in IDPROM. The Sun PROMs keep their
-settings there (`setenv` at the `ok` prompt). OpenBIOS takes its settings
-from the OSD options and stores none in the NVRAM. Keep one file per
-machine (SS5, SS20).
+makes them. Without a file, the NVRAM starts blank at every core load.
+
+A blank file gets an IDPROM of its own on its first load: the Sun
+Ethernet prefix `08:00:20` and a random serial, which is also the host
+ID's. It is written back to the file at once, so the machine keeps its
+identity from then on.
+
+Both firmwares keep their settings there: `setenv` at the `ok` prompt,
+or `eeprom` from Solaris and NetBSD. OpenBIOS stores the variables that
+differ from their defaults. Two OSD options win over the NVRAM for one
+boot without changing it: **Boot** (Video or Serial) picks the OpenBIOS
+console, and **AutoBoot OFF** stops at `ok`; with AutoBoot ON,
+`auto-boot?` in the NVRAM decides. OpenBIOS and the Sun PROMs use
+different formats: each formats the area for itself the first time a
+setting changes, so keep one file per firmware and machine (SS5, SS20).
 
 ### OS
 You can make your own images using the core, QEMU, or a real SparcStation.

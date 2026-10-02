@@ -136,67 +136,96 @@ ob_eccmemctl_init(uint64_t base)
 static unsigned char *nvram;
 static uint64_t nvram_phys;      /* physical base of the NVRAM (base + offset) */
 
-#define NVRAM_OB_START   (0)
+/* The NVRAM (M48T08, 8 KB; the MiSTer core saves it to the SD card):
+ *
+ *   0x0000-0x1F4F  OpenBIOS configuration (packages/nvram.c partitions: a
+ *                  "common" SYSTEM partition holding the variables that
+ *                  differ from their defaults, then a FREE partition)
+ *   0x1F50-0x1FD7  one-shot reboot command (below)
+ *   0x1FD8-0x1FF7  IDPROM (16 bytes used)
+ *   0x1FF8-0x1FFF  clock registers
+ *
+ * The partition walk must end exactly at NVRAM_OB_SIZE, or nvconf_init()
+ * reports "nvram error detected" and formats a fresh area in RAM.  The chip
+ * is only written when a variable changes (update-nvram), so an image in
+ * another format (the Sun OBP's) survives a boot of OpenBIOS untouched.
+ *
+ * Every access goes to the PHYSICAL address through an MMU pass-through ASI
+ * (0x20 + PA[35:32]), not through the nvram[] virtual pointer: setenv may
+ * come from a client OS (romvec setprop on /options, obp_reboot()), whose MMU
+ * context no longer maps the PROM's I/O window -- a plain nvram[] store there
+ * faults.  The pass-through reaches the same cell in any context: ASI 0x20
+ * on the SS5 (0x7120_0000), ASI 0x2F on the SS20 (0xF_F120_0000).
+ */
+#define NVRAM_OB_START       (0)
+#define NVRAM_REBOOT_OFF     ((NVRAM_IDPROM - 0x80) & ~15)              /* 0x1f50 */
+#define NVRAM_REBOOT_STR_MAX (NVRAM_IDPROM - (NVRAM_REBOOT_OFF + 4))    /* string room */
+#define NVRAM_OB_SIZE        (NVRAM_REBOOT_OFF - NVRAM_OB_START)
 
 /* One-shot "reboot boot-command" scratch.
  *
  * obp_reboot() (e.g. the Solaris installer's "reboot disk:b") leaves the boot
- * string here so the next boot can honour it exactly once.  It sits just below
- * the idprom, inside the old FREE partition that OpenBIOS no longer walks (see
- * NVRAM_OB_SIZE below), so the config machinery never touches it.  It survives
- * a warm reset because the M48T08 NVRAM is on-chip RAM that the core reset does
- * not clear.
- *
- * Access is by PHYSICAL address via ASI 0x20 (ASI_M_BYPASS), NOT the nvram[]
- * virtual pointer: obp_reboot() runs in the client OS's MMU context, where the
- * PROM's NVRAM virtual mapping has been reclaimed -- a plain nvram[] store
- * there faults and the reset never fires.  The bypass hits the same physical
- * cell in any context.
+ * string here so the next boot can honour it exactly once.  It survives a
+ * warm reset because the NVRAM is on-chip RAM that the core reset does not
+ * clear.
  *
  * Layout at NVRAM_REBOOT_OFF: [4-byte 'RBTC' magic][NUL-terminated string]
  */
-/* Size of the OBP config area walked by nvconf_init().  This MUST stop exactly
- * on a partition boundary in the NVRAM image, or the partition walk overshoots
- * and prints "nvram error detected, zapping pram" on every boot.  The image's
- * first partition is the 0x20-byte SYSTEM ("system") partition -- the only one
- * OpenBIOS ever uses for config -- so stop there.  The rest (the old FREE
- * partition up to the idprom) is unused by OpenBIOS and is where the reboot
- * scratch lives, safely outside the walked region.
- */
-#define NVRAM_OB_SIZE        0x20
-
-#define NVRAM_REBOOT_OFF     ((NVRAM_IDPROM - 0x80) & ~15)              /* 0x1f50 */
-#define NVRAM_REBOOT_STR_MAX (NVRAM_IDPROM - (NVRAM_REBOOT_OFF + 4))    /* string room */
-
 static const unsigned char nvram_reboot_magic[4] = { 'R', 'B', 'T', 'C' };
 
-static inline void nvram_pb_put(unsigned long pa, unsigned char v)
+/* True when the NVRAM's physical base is reachable through a pass-through
+   ASI this code knows: PA[35:32] = 0 (SS5) or 0xF (SS20). */
+static int nvram_phys_usable(void)
 {
-    __asm__ __volatile__("stba %0, [%1] 0x20" : : "r"(v), "r"(pa) : "memory");
+    unsigned int hi = (unsigned int)(nvram_phys >> 32);
+
+    return nvram_phys != 0 && (hi == 0 || hi == 0xf);
 }
 
-static inline unsigned char nvram_pb_get(unsigned long pa)
+static void nvram_pb_put(unsigned int off, unsigned char v)
 {
+    unsigned long pa = (unsigned long)nvram_phys + off;
+
+    if ((nvram_phys >> 32) == 0xf)
+        __asm__ __volatile__("stba %0, [%1] 0x2f" : : "r"(v), "r"(pa) : "memory");
+    else
+        __asm__ __volatile__("stba %0, [%1] 0x20" : : "r"(v), "r"(pa) : "memory");
+}
+
+static unsigned char nvram_pb_get(unsigned int off)
+{
+    unsigned long pa = (unsigned long)nvram_phys + off;
     unsigned char v;
-    __asm__ __volatile__("lduba [%1] 0x20, %0" : "=r"(v) : "r"(pa) : "memory");
+
+    if ((nvram_phys >> 32) == 0xf)
+        __asm__ __volatile__("lduba [%1] 0x2f, %0" : "=r"(v) : "r"(pa) : "memory");
+    else
+        __asm__ __volatile__("lduba [%1] 0x20, %0" : "=r"(v) : "r"(pa) : "memory");
     return v;
 }
 
-/* True only when the NVRAM physical base is reachable through a 32-bit
-   ASI-bypass address.  SS5 (0x71200000) qualifies; SS20 (0xff1200000) does
-   not, so the reboot-arg feature is simply skipped there (reset still works). */
-static int nvram_reboot_usable(void)
+/* Byte access for the rest of this file: physical when possible, else the
+   PROM's virtual mapping (valid while OpenBIOS's own context is live). */
+static unsigned char nvram_get(unsigned int off)
 {
-    return nvram_phys != 0 && (nvram_phys >> 32) == 0;
+    return nvram_phys_usable() ? nvram_pb_get(off) : nvram[off];
+}
+
+static void nvram_put(unsigned int off, unsigned char v)
+{
+    if (nvram_phys_usable())
+        nvram_pb_put(off, v);
+    else
+        nvram[off] = v;
 }
 
 void
 nvram_set_reboot_command(const char *str)
 {
-    unsigned long base = (unsigned long)nvram_phys + NVRAM_REBOOT_OFF;
+    unsigned int base = NVRAM_REBOOT_OFF;
     int i;
 
-    if (!nvram_reboot_usable() || !str)
+    if (!nvram_phys_usable() || !str)
         return;
     for (i = 0; i < NVRAM_REBOOT_STR_MAX - 1 && str[i]; i++)
         nvram_pb_put(base + 4 + i, (unsigned char)str[i]);
@@ -211,10 +240,10 @@ nvram_set_reboot_command(const char *str)
 int
 nvram_get_reboot_command(char *buf, int len)
 {
-    unsigned long base = (unsigned long)nvram_phys + NVRAM_REBOOT_OFF;
+    unsigned int base = NVRAM_REBOOT_OFF;
     int i;
 
-    if (!nvram_reboot_usable() || !buf || len <= 0)
+    if (!nvram_phys_usable() || !buf || len <= 0)
         return 0;
     if (nvram_pb_get(base + 0) != nvram_reboot_magic[0] ||
         nvram_pb_get(base + 1) != nvram_reboot_magic[1] ||
@@ -239,13 +268,22 @@ nvram_get_reboot_command(char *buf, int len)
 void
 arch_nvram_get(char *data)
 {
-    memcpy(data, &nvram[NVRAM_OB_START], NVRAM_OB_SIZE);
+    int i;
+
+    for (i = 0; i < NVRAM_OB_SIZE; i++)
+        data[i] = nvram_get(NVRAM_OB_START + i);
 }
 
+/* Only the bytes that changed are written: each write marks its sector of
+   the image on the SD card for write-back. */
 void
 arch_nvram_put(char *data)
 {
-    memcpy(&nvram[NVRAM_OB_START], data, NVRAM_OB_SIZE);
+    int i;
+
+    for (i = 0; i < NVRAM_OB_SIZE; i++)
+        if (nvram_get(NVRAM_OB_START + i) != (unsigned char)data[i])
+            nvram_put(NVRAM_OB_START + i, data[i]);
 }
 
 int
@@ -309,16 +347,34 @@ ob_nvram_init(uint64_t base, uint64_t offset)
     nvram_phys = base + offset;
 #ifdef CONFIG_TACUS
     struct Sun_nvram header;
-    
+    uint8_t *id = (uint8_t *)&header;
+    uint8_t type = (machine_id == 32) ? 0x80 : 0x72;   /* SS5 : SS20 */
+    unsigned int i;
+    uint8_t sum = 0;
+
     ob_new_obio_device("eeprom", NULL);
     nvram = (unsigned char *)ob_reg(base, offset, NVRAM_SIZE, 1);
 
-    if (machine_id == 32)
-        Sun_init_header(&header, tacus_macaddr, 0x80); // SS5
-    else
-        Sun_init_header(&header, tacus_macaddr, 0x72); // SS20
-
-    memcpy(&nvram[NVRAM_IDPROM], &header, 32);
+    /* The IDPROM is the user's (Ethernet address, hostid): keep a valid one,
+       with this machine's type.  Only an invalid one gets the default, and
+       only changed bytes are written (each write is saved to the SD card). */
+    for (i = 0; i < sizeof(header); i++)
+        id[i] = nvram_get(NVRAM_IDPROM + i);
+    for (i = 0; i < 15; i++)
+        sum ^= id[i];
+    if (header.type != 1 || sum != header.checksum) {
+        memset(&header, 0, sizeof(header));
+        Sun_init_header(&header, tacus_macaddr, type);
+    }
+    else if (header.machine_id != type) {
+        header.machine_id = type;
+        header.checksum = 0;
+        for (i = 0; i < 15; i++)
+            header.checksum ^= id[i];
+    }
+    for (i = 0; i < sizeof(header); i++)
+        if (nvram_get(NVRAM_IDPROM + i) != id[i])
+            nvram_put(NVRAM_IDPROM + i, id[i]);
 #else
     ob_new_obio_device("eeprom", NULL);
     nvram = (unsigned char *)ob_reg(base, offset, NVRAM_SIZE, 1);
@@ -334,13 +390,20 @@ ob_nvram_init(uint64_t base, uint64_t offset)
 
     fword("finish-device");
 
-    // Add /idprom
+    // Add /idprom, from a byte-read copy (encode-bytes may copy by words)
     push_str("/");
     fword("find-device");
 
-    PUSH((long)&nvram[NVRAM_IDPROM]);
-    PUSH(32);
-    fword("encode-bytes");
+    {
+        unsigned char idprom[32];
+        unsigned int j;
+
+        for (j = 0; j < sizeof(idprom); j++)
+            idprom[j] = nvram_get(NVRAM_IDPROM + j);
+        PUSH(pointer2cell(idprom));
+        PUSH(sizeof(idprom));
+        fword("encode-bytes");
+    }
     push_str("idprom");
     fword("property");
 }

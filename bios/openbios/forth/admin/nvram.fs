@@ -14,6 +14,8 @@ struct ( config )
   /n field >cf.check-xt
   /n field >cf.exec-xt
   /n field >cf.next
+  2 cells field >cf.saved              \ value kept in the NVRAM while >cf.temp?
+  /n field >cf.temp?                   \ the value is for this boot only
 constant config-info.size
 
 0 value config-root 
@@ -165,10 +167,42 @@ constant config-info.size
 
 
 \ --------------------------------------------------------
+\ writing the NVRAM
+\ --------------------------------------------------------
+
+\ update_nvram(), set by nvconf_init() once the NVRAM has been read: before
+\ that, nothing is written.
+0 value nvram-commit-func
+: nvram-commit-func! ( func -- ) to nvram-commit-func ;
+
+: nvram-commit ( -- )
+  nvram-commit-func ?dup if call then
+;
+
+\ The value a variable keeps in the NVRAM: the one it had before a value
+\ for this boot only ($setenv-temp), else its /options property.
+: (config-nvvalue) ( configptr ph -- str len true | false )
+  over >cf.temp? @ if
+    drop >cf.saved 2@ dup 0< if 2drop false else true then exit
+  then
+  >r >cf.name 2@ r> get-package-property if
+    false
+  else
+    dup if 1- then true      \ drop the trailing zero
+  then
+;
+
+: (config-default?) ( str len configptr -- flag )
+  >cf.default 2@ dup 0< if 2drop 2drop false exit then
+  strcmp 0=
+;
+
+\ --------------------------------------------------------
 \ 7.4.4    Nonvolatile memory
 \ --------------------------------------------------------
 
-: $setenv    ( data-addr data-len name-str name-len -- )
+\ $setenv sets a variable and saves it in the NVRAM, (setenv) only sets it.
+: (setenv)   ( data-addr data-len name-str name-len -- )
   2dup find-config ?dup if
     >r 2swap r>
     ( name len data len configptr )
@@ -183,6 +217,33 @@ constant config-info.size
   2swap encode-string 2swap
   s" /options" find-package drop
   encode-property
+;
+
+: $setenv    ( data-addr data-len name-str name-len -- )
+  2dup 2>r (setenv) 2r>
+  find-config ?dup if 0 swap >cf.temp? ! then
+  nvram-commit
+;
+
+\ A value for this boot only (on the MiSTer: the OSD's console and autoboot
+\ choices, the one-shot reboot command): the NVRAM keeps the value from
+\ before, until a $setenv of the variable.
+: $setenv-temp ( data-addr data-len name-str name-len -- )
+  2dup find-config ?dup 0= if
+    2dup no-conf-def 2swap str-config
+  then
+  ( data len name len configptr )
+  dup >cf.temp? @ 0= if
+    dup s" /options" find-dev if
+      (config-nvvalue) 0= if 0 -1 then
+    else
+      drop 0 -1
+    then
+    dup 0> if dict-strdup then
+    2 pick >cf.saved 2!
+    true over >cf.temp? !
+  then
+  drop (setenv)
 ;
 
 : setenv    ( "nv-param< >new-value<eol>" -- )
@@ -205,8 +266,9 @@ constant config-info.size
 ;
 
 : (set-default) ( configptr -- )
+    0 over >cf.temp? !
     dup >cf.default 2@ dup 0>= if
-      rot >cf.name 2@ $setenv
+      rot >cf.name 2@ (setenv)
     else
       \ no default value
       3drop
@@ -216,18 +278,23 @@ constant config-info.size
 : set-default    ( "param-name<eol>" -- )
   linefeed parse
   find-config ?dup if
-    (set-default)
+    (set-default) nvram-commit
   else
     ." No such parameter." -2 throw
   then
 ;
-  
-: set-defaults    ( -- )
+
+\ every variable to its default, in RAM only (at boot)
+: (set-defaults)    ( -- )
   config-root
   begin ?dup while
     dup (set-default)
     >cf.next @
   repeat
+;
+
+: set-defaults    ( -- )
+  (set-defaults) nvram-commit
 ;
 
 ( maxlen "new-name< >" -- ) ( E: -- addr len )
@@ -248,36 +315,26 @@ constant config-info.size
     dup cstrlen 2dup + 1+ -rot
     ( next str len )
     ascii = left-split ( next val len name str )
-    ['] $setenv catch if
+    ['] (setenv) catch if
       2drop 2drop
     then
   repeat drop
 ;
 
-: (nvram-store-one) ( buf len str len -- buf len success? )
-  swap >r
-  2dup < if r> 2drop 2drop false exit then
-  ( buf len strlen R: str )
-  swap over - r> swap >r -rot
-  ( str buf strlen R: res_len )
-  2dup + >r move r> r> true
+: (nvram-append) ( buf len str slen -- buf+slen len-slen )
+  dup >r 3 pick swap move
+  swap r@ + swap r> -
 ;
 
-: (make-configstr) ( configptr ph -- str len )
-  >r
-  >cf.name 2@
-  2dup r> get-package-property if
-    2drop 0 0 exit
-  else
-    dup if 1- then
-  then
-  ( name len value-str len )
-  2swap s" =" 2swap
-  pocket tmpstrcat tmpstrcat drop
-  2dup + 0 swap c!
-  1+
+\ one "name=value" entry, if it fits
+: (nvram-store-one) ( buf len name nlen val vlen -- buf' len' )
+  2 pick over + 2 +  5 pick > if 2drop 2drop exit then
+  2>r (nvram-append) s" =" (nvram-append) 2r> (nvram-append)
+  over 0 swap c!  swap 1+ swap 1-
 ;
 
+\ The variables that differ from their defaults, so a later build's new
+\ defaults still apply to the rest.
 : nvram-store-configs ( data len -- )
   2 - \ make room for two trailing zeros
 
@@ -286,9 +343,15 @@ constant config-info.size
   config-root
   ( data len configptr R: phandle )
   begin ?dup while
-    r@ over >r (make-configstr)
-    ( buf len val len R: configptr phandle )
-    (nvram-store-one) drop
+    r@ over >r
+    ( data len configptr phandle R: phandle configptr )
+    (config-nvvalue) if
+      2dup r@ (config-default?) if
+        2drop
+      else
+        r@ >cf.name 2@ 2swap (nvram-store-one)
+      then
+    then
     r> >cf.next @
   repeat
   \ null terminate

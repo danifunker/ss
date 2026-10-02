@@ -190,7 +190,6 @@ void setup_video()
 	/* Make everything inside the video_info structure point to the
 	   values in the Forth dictionary. Hence everything is always in
 	   sync. */
-	phandle_t options;
 	char buf[6];
 
 	feval("['] display-ih cell+");
@@ -256,12 +255,16 @@ void setup_video()
 		VIDEO_DICT_VALUE(video.rb) = 1024;
 #endif
 
-	/* Setup screen-#rows/screen-#columns */
-	options = find_dev("/options");
+	/* Setup screen-#rows/screen-#columns: they follow the screen, for this
+	   boot only (the NVRAM keeps its own values) */
 	snprintf(buf, sizeof(buf), FMT_ucell, VIDEO_DICT_VALUE(video.w) / FONT_WIDTH);
-	set_property(options, "screen-#columns", buf, strlen(buf) + 1);
+	push_str(buf);
+	push_str("screen-#columns");
+	fword("$setenv-temp");
 	snprintf(buf, sizeof(buf), FMT_ucell, VIDEO_DICT_VALUE(video.h) / FONT_HEIGHT);
-	set_property(options, "screen-#rows", buf, strlen(buf) + 1);
+	push_str(buf);
+	push_str("screen-#rows");
+	fword("$setenv-temp");
 }
 
 

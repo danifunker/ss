@@ -201,14 +201,42 @@ const char *obp_nextprop(int node, const char *name)
     }
 }
 
-int obp_setprop(__attribute__((unused)) int node,
-                       __attribute__((unused)) const char *name,
-		       __attribute__((unused)) char *value,
-		       __attribute__((unused)) int len)
+/* A property of /options is an NVRAM variable: it goes through $setenv,
+   which checks the value and saves it, as the Sun PROM does for an OS's
+   eeprom command.  Other nodes just get the property. */
+int obp_setprop(int node, const char *name, char *value, int len)
 {
+    int options = 0;
+
     DPRINTF("obp_setprop(0x%x, %s) = %s (%d)\n", node, name, value, len);
 
-    return -1;
+    if (!node || !name || len < 0)
+        return -1;
+
+    push_str("/options");
+    fword("find-package");
+    if (POP())
+        options = POP();
+
+    if (node == options) {
+        int n = len;
+
+        /* a string value comes with its terminating zero */
+        if (n > 0 && value[n - 1] == '\0')
+            n--;
+        PUSH(pointer2cell(value));
+        PUSH(n);
+        push_str(name);
+        if (eword("$setenv", 4))
+            return -1;
+    } else {
+        PUSH(pointer2cell(value));
+        PUSH(len);
+        push_str(name);
+        PUSH(node);
+        fword("set-property");
+    }
+    return len;
 }
 
 static const struct linux_nodeops nodeops0 = {
@@ -262,20 +290,28 @@ void obp_reboot(char *str)
     for (;;) {}
 }
 
-void obp_abort(void)
+/* The MiSTer core has no power switch to turn off: a halt or an abort
+   returns to ok, as a real SPARCstation does ("Program terminated"). A
+   one-shot marker in the NVRAM reboot scratch, then the soft reset;
+   arch_init() finds the marker and stops at ok for that boot only. */
+static void obp_halt_to_ok(const char *what)
 {
-    printk("abort, power off\n");
+    printk("%s, power off\n", what);
     *power_reg = 1;
+    nvram_set_reboot_command(NVRAM_REBOOT_HALT);
+    *reset_reg = 1;
     printk("power off failed\n");
     for (;;) {}
 }
 
+void obp_abort(void)
+{
+    obp_halt_to_ok("abort");
+}
+
 void obp_halt(void)
 {
-    printk("halt, power off\n");
-    *power_reg = 1;
-    printk("power off failed\n");
-    for (;;) {}
+    obp_halt_to_ok("halt");
 }
 
 int obp_devopen(char *str)
