@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's three `rtl/cpu` fixes (`b775165`) verified on the board (session 5): NetBSD 11 to a shell, and **Solaris 8 under the official Sun OBP 2.25 with no in-memory patch, 3 CPUs**. **NVRAM saved to the SD card** (TOD-6, OSD "NVRAM"): the OBP keeps its settings, and `hwtest.sh 20 solaris-obp` boots Solaris unattended in 4 minutes. Open: **memory corruption under sustained disk I/O with the caches on** (Solaris with 1 or 3 CPUs, NetBSD), handed to Fable: `scratch/handoff/fable-ss20-corruption.md`. Hand-off: [RESUME-20261002.md](../RESUME-20261002.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris under OpenBIOS, **Solaris under the Sun PROM with a saved NVRAM**); CPU suite on the board: **SS20 63/0/0, SS5 53/0/0** (`9a99e4b` + tests, session 5), simulation = board; `memstress` (board-only RAM stress, 3 CPUs) passes; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's three `rtl/cpu` fixes (`b775165`) verified on the board (session 5): NetBSD 11 to a shell, and **Solaris 8 under the official Sun OBP 2.25 with no in-memory patch, 3 CPUs**. **NVRAM saved to the SD card** (TOD-6, OSD "NVRAM"): the OBP keeps its settings, and `hwtest.sh 20 solaris-obp` boots Solaris unattended in 4 minutes. The **memory corruption under sustained disk I/O with the caches on** (Solaris with 1 or 3 CPUs, NetBSD) is explained and fixed in simulation (session 6: `mcu_multi_ext.vhd` released the CPU side on every gap between the DDR beats of a line fill; `sim --ddr-gaps` reproduces the board's bus; fit `scratch/SunSparcStation20-fillfix-s3.rbf`), **board verification pending**. Hand-off: [RESUME-20261002.md](../RESUME-20261002.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris under OpenBIOS, **Solaris under the Sun PROM with a saved NVRAM**); CPU suite on the board: **SS20 63/0/0, SS5 53/0/0** (`9a99e4b` + tests, session 5), simulation = board (session 6 adds `t_cache3.S`: SS20 65, SS5 55 in simulation, with and without `--ddr-gaps`; the board baselines are to be re-recorded); `memstress` (board-only RAM stress, 3 CPUs) passes; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -684,6 +684,55 @@ drop one of the two machines, and asked to focus on the SS20.
   `diag-switch?` true, hence the diag boot after every core load before
   TOD-6.
 
+### Session 6 results (2026-10-02, Fable: the SS20 corruption)
+
+- **The mechanism.** In `rtl/cpu/mcu_multi_ext.vhd` (the SS20's cache
+  controller, bus side) `filling_end` was set after the last beat of a
+  line fill and never cleared, so `filling_d` / `filling_i`, which hold
+  the CPU side off a line while it is being filled, only meant "a beat
+  arrived last cycle". A line's tag is written valid when the fill starts
+  (`sHIT`); its eight words land over the following cycles. Whenever the
+  DDR delivered the beats of a burst with a bubble between them, the CPU
+  side was released onto the half-written line: a load or a fetch of a not
+  yet written word hit the evicted line's words (the fetch streaming
+  `inst_cont` also stops on a bubble and falls back to a tag lookup), and a
+  write-through store to such a word was overwritten by the beat that
+  landed after it (memory keeps the store, the cache does not). The SS5's
+  `mcu_simple.vhd` clears `filling_end` every cycle (a one-cycle pulse) and
+  is right. The simulation's DDR model delivers bursts back to back, so
+  the suite could never see it, and the board's port does so only when
+  the ARM side is busy: Main's SD-card transfers during disk I/O, which is
+  exactly when the OSes died. Stale loads, lost stores and garbage
+  fetches cover every symptom of session 5 (the stack-growth loop, the
+  jump into garbage in `pagefault`, `recursive mutex_enter`, the `bread`
+  frame, NetBSD stopping dead); `memstress` passed because it caused no
+  SD traffic.
+- **The fix** (`mcu_multi_ext.vhd`): `filling_end` defaults to 0 each
+  cycle, as in `mcu_simple`, plus resets of the three flags. No other
+  change; the SS5 is untouched.
+- **Reproduction.** `sim/sim_main.cpp --ddr-gaps` skips the DDR model's
+  read beat on half the cycles. `tests/cpu/src/t_cache3.S`:
+  `t_cache_fill_words` (2048 lines: a load of word 0 misses and the next
+  instructions load words 7..1, then the same with stores, a bypass read
+  to wait for the fill and loads back) and `t_icache_fill_words` (ten
+  code lines 4 KB apart in one I-cache set, six of `add %o0,k` x 7 +
+  `retl`, called 64 times each; the sum must be 7k). Results: SS20
+  unfixed without gaps 65/0/0 (= the board baseline + 2); unfixed with
+  gaps: the suite never reaches `CPUTEST DONE` (stale fetches hang it in
+  the first MMU-on tests, and the two tests alone hang too); fixed: 65/0/0
+  with and without gaps, logs byte-identical. SS5 (no RTL change) 55/0/0
+  with and without gaps. QEMU: both tests pass on both targets; the QEMU
+  reference logs refreshed (they had been three lines behind since
+  session 5).
+- **Fit:** SS20 seed 3, `scratch/SunSparcStation20-fillfix-s3.rbf`:
+  +0.241 ns at 55 MHz, +0.252 ns on the HDMI clock, hold +0.107 ns, TNS 0,
+  87 % ALMs (36,311), 46,641 registers.
+- **To do on the board** (the user runs it): `hwtest.sh 20 cpu` (expect
+  65/0/0, then re-record `ss20-core-hw.log`; the SS5 image gains the two
+  tests too, re-record `ss5-core-hw.log` at the next SS5 build), the
+  memstress ROM, `scratch/solstress.sh LOG 40`, `ALLCPUS=1
+  scratch/solstress.sh LOG 40`, `scratch/nbstress.sh LOG 40`.
+
 ### Work items (the content of the stages)
 
 0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
@@ -818,6 +867,14 @@ drop one of the two machines, and asked to focus on the SS20.
   had it.
 
 ## Session log
+
+- **2026-10-02, session 6 (Fable, SS20 corruption).** Found and fixed the
+  memory corruption under disk I/O: `mcu_multi_ext.vhd` released the CPU
+  side on every bubble between the DDR beats of a line fill (`filling_end`
+  never cleared; the SS5 controller was right). `sim --ddr-gaps` and
+  `t_cache3.S` (`t_cache_fill_words`, `t_icache_fill_words`) reproduce it:
+  unfixed + gaps hangs, fixed 65/0/0 with and without gaps, SS5 55/0/0.
+  Fit seed 3 closes (+0.241 ns at 55 MHz). Board runs pending.
 
 - **2026-10-02, session 5 (SS20).** Fable's three fixes verified on the
   board (SS20 60/0/0, NetBSD shell); Solaris 8 under the Sun OBP without
