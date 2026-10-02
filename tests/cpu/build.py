@@ -41,6 +41,10 @@ def build(name, extra=(), main="main", stem="cputest"):
     os.makedirs(out, exist_ok=True)
     obj = os.path.join(out, stem + ".o")
     rom = os.path.join(out, stem + ".rom")
+    # the assemblers wrap a 13-bit immediate that does not fit, silently
+    subprocess.run([sys.executable, os.path.join(HERE, "check_imm.py"),
+                    os.path.join(HERE, "src", main + ".S"), f"-D{macro}",
+                    "-I" + os.path.join(HERE, "src"), *extra], check=True)
     subprocess.run([clang(), "--target=sparc-unknown-elf", "-mcpu=v8",
                     "-x", "assembler-with-cpp", f"-D{macro}", "-I",
                     os.path.join(HERE, "src"), *extra, "-c",
