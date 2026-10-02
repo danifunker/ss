@@ -220,10 +220,6 @@ wire [7:0] reset_mask_rev = (status[21:20]==0)?8'h26:
                             
 ///////////////////////   CLOCKS   ///////////////////////////////
 
-wire sd_sck;
-wire [3:0] sd_dat;
-wire sd_cmd;
-wire sd_cd;
 
 wire [1:0] rmii_txd;
 wire rmii_txen;
@@ -287,9 +283,6 @@ ddram_arb ddram_arb
 	.s_readdatavalid(DDRAM_DOUT_READY)
 );
 
-// the "Direct SD" pins: not available in the stock framework
-wire [3:0] sd_dat_nc;
-wire       sd_cmd_nc, sd_sck_nc;
    
 wire reset = RESET | status[0];
 
@@ -336,9 +329,6 @@ ss_core
  .led_user(LED_USER),
  .led_power(LED_POWER[0]),
     
- .sd_sck(sd_sck_nc),
- .sd_dat(sd_dat_nc),
- .sd_cmd(sd_cmd_nc),
  .ddram_clk(vram_clk),
  .ddram_waitrequest(vram_wait),
  .ddram_burstcount(vram_bc),

@@ -27,7 +27,6 @@ set_global_assignment -name VHDL_FILE rtl/sun4m/dl_scsi.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/iram_rtc.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/iram_ts.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/scsi_mist.vhd
-set_global_assignment -name VHDL_FILE rtl/sun4m/scsi_sd.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_aciamux.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_core.vhd
 set_global_assignment -name VHDL_FILE rtl/sun4m/ts_cs4231a.vhd

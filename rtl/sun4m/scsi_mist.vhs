@@ -920,7 +920,8 @@ BEGIN
           
         ----------------------------------
         WHEN TEST_ADRS =>
-          saut_v:=(r_adrs>=capacity_m);
+          -- capacity_m is the last block: it can be read (D7)
+          saut_v:=(r_adrs>capacity_m);
                    
         WHEN TEST_BSY =>
           saut_v:=(scsi_w.bsy=val8_v(0));

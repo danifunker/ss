@@ -57,11 +57,6 @@ ENTITY ss_core IS
     led_user         : OUT   std_logic;
     led_power        : OUT   std_logic;
     
-    -- SD card direct
-    sd_sck           : OUT   std_logic;
-    sd_dat           : INOUT std_logic_vector(3 DOWNTO 0);
-    sd_cmd           : INOUT std_logic;
-    
     -- High latency DDR3 RAM interface
     -- Use for non-critical time purposes
     ddram_clk           : OUT   std_logic;
@@ -202,21 +197,13 @@ ARCHITECTURE rtl OF ss_core IS
   SIGNAL swconf : uv8;
   
   -- SCSI
-  SIGNAL scsi_w,scsi0_mist_w,scsi1_mist_w,scsi6_mist_w,scsi_sd_w : type_scsi_w;
-  SIGNAL scsi_r,scsi0_mist_r,scsi1_mist_r,scsi6_mist_r,scsi_sd_r : type_scsi_r;
-  SIGNAL scsi_sd,scsi_bis : std_logic;
-  SIGNAL disk_busy,busy0_mist,busy1_mist,busy6_mist,busy_sd  : std_logic;
-  SIGNAL id_sd,id0_mist,id1_mist,id6_mist : unsigned(2 DOWNTO 0);
+  SIGNAL scsi_w,scsi0_mist_w,scsi1_mist_w,scsi6_mist_w : type_scsi_w;
+  SIGNAL scsi_r,scsi0_mist_r,scsi1_mist_r,scsi6_mist_r : type_scsi_r;
+  SIGNAL scsi_bis : std_logic;
+  SIGNAL disk_busy,busy0_mist,busy1_mist,busy6_mist  : std_logic;
+  SIGNAL id0_mist,id1_mist,id6_mist : unsigned(2 DOWNTO 0);
   SIGNAL sd_reg_w : type_sd_reg_w;
   SIGNAL sd_reg_r : type_sd_reg_r;
-  SIGNAL sd_clk_o  : std_logic;
-  SIGNAL sd_clk_i  : std_logic;
-  SIGNAL sd_dat_o  : unsigned(3 DOWNTO 0);
-  SIGNAL sd_dat_i  : unsigned(3 DOWNTO 0);
-  SIGNAL sd_dat_en : std_logic;
-  SIGNAL sd_cmd_o  : std_logic;
-  SIGNAL sd_cmd_i  : std_logic;
-  SIGNAL sd_cmd_en : std_logic;
 
   -- RTC
   SIGNAL rtcinit  : unsigned(55 DOWNTO 0);
@@ -417,47 +404,15 @@ BEGIN
       sclk        => sclk);
   
   ----------------------------------------------------------
-  i_scsi_sd: ENTITY work.scsi_sd
-    GENERIC MAP (SYSFREQ => SYSFREQ)
-    PORT MAP (
-      scsi_w    => scsi_sd_w,
-      scsi_r    => scsi_sd_r,
-      id        => id_sd,
-      busy      => busy_sd,
-      sd_clk_o  => sd_clk_o,
-      sd_clk_i  => sd_clk_i,
-      sd_dat_o  => sd_dat_o,
-      sd_dat_i  => sd_dat_i,
-      sd_dat_en => sd_dat_en,
-      sd_cmd_o  => sd_cmd_o,
-      sd_cmd_i  => sd_cmd_i,
-      sd_cmd_en => sd_cmd_en,
-      reg_w     => sd_reg_w,
-      reg_r     => sd_reg_r,
-      clk       => sclk,
-      reset_n   => reset_n);
-  
-  id_sd<="001" WHEN scsi_conf="100" ELSE "000";
-  
-  sd_sck<=sd_clk_o;
-  sd_clk_i<=sd_clk_o;
-  
-  sd_dat<=std_logic_vector(sd_dat_o) WHEN sd_dat_en='1' ELSE "ZZZZ";
-  sd_cmd<=sd_cmd_o WHEN sd_cmd_en='1' ELSE 'Z';
-  -- Direct SD is gone: the top leaves these pins unconnected, so reading
-  -- them back gave undefined values, and OpenBIOS's SD probe (run at every
-  -- boot, 'INIT SDCARD') hung on some boots and not others. An SD bus with
-  -- no card idles high: no response, so the probe times out ('No MMC, no
-  -- SD, no SDHC').
-  sd_dat_i<="1111";
-  sd_cmd_i<='1';
+  -- Direct SD (scsi_sd, the SD card on the USER_IO pins) is gone: disks
+  -- come only through the HPS (REWORK Decisions, 2026-09-28). The AUXIO0
+  -- SD controller registers (+0x18, +0x1C) read 0, and swconf(0), "SD
+  -- present", is 0, so OpenBIOS never probes a card.
+  sd_reg_r<=(d0=>x"00000000",d1=>x"00000000");
 
   -- SCSI_CONF
   -- 000 : HD Image
-  -- 001 : SDCARD
   -- 010 : Image0 + Image1
-  -- 011 : SD + Image0
-  -- 100 : Image0 + SD
   ----------------------------------------------------------
   i_scsi_mist: ENTITY work.scsi_mist
     GENERIC MAP (SYSFREQ => SYSFREQ)
@@ -673,47 +628,21 @@ BEGIN
       clk          => sclk);
   
   ----------------------------------------------------------
-  MUX_SCSI:PROCESS(scsi0_mist_r,scsi1_mist_r,scsi6_mist_r,scsi_sd_r,
-                   scsi_w,scsi_conf) IS
+  MUX_SCSI:PROCESS(scsi0_mist_r,scsi1_mist_r,scsi6_mist_r,
+                   scsi_w,scsi_conf,scsi_cdconf) IS
   BEGIN
     scsi0_mist_w<=scsi_w;
     scsi1_mist_w<=scsi_w;
     scsi6_mist_w<=scsi_w;
-    scsi_sd_w <=scsi_w;
 
     IF scsi_cdconf/="00" AND scsi6_mist_r.sel='1' THEN
       scsi_r<=scsi6_mist_r;
+    ELSIF scsi_conf="010" AND scsi1_mist_r.sel='1' THEN -- Image + Image
+      scsi_r<=scsi1_mist_r;
     ELSE
-      CASE scsi_conf IS
-        WHEN "000" => -- HD Image
-          scsi_r<=scsi0_mist_r;
-          
-        WHEN "001" => -- SDCARD
-          scsi_r<=scsi_sd_r;
-          
-        WHEN "010" => -- Image + Image
-          IF scsi1_mist_r.sel='1' THEN
-            scsi_r<=scsi1_mist_r;
-          ELSE
-            scsi_r<=scsi0_mist_r;
-          END IF;
-          
-        WHEN "011" | "100" => -- SD + Image / Image + SD
-          IF scsi_sd_r.sel='1' THEN
-            scsi_r<=scsi_sd_r;
-          ELSE
-            scsi_r<=scsi0_mist_r;
-          END IF;
-          
-        WHEN OTHERS =>
-          scsi_r<=scsi0_mist_r;
-          
-      END CASE;
+      scsi_r<=scsi0_mist_r;
     END IF;
     
-    scsi_sd_w.bsy   <=scsi_w.bsy AND scsi_sd_r.sel;
-    scsi_sd_w.ack   <=scsi_w.ack AND scsi_sd_r.sel;
-    scsi_sd_w.atn   <=scsi_w.atn AND scsi_sd_r.sel;
     scsi0_mist_w.bsy<=scsi_w.bsy AND scsi0_mist_r.sel;
     scsi0_mist_w.ack<=scsi_w.ack AND scsi0_mist_r.sel;
     scsi0_mist_w.atn<=scsi_w.atn AND scsi0_mist_r.sel;
@@ -726,7 +655,7 @@ BEGIN
     
   END PROCESS MUX_SCSI;
   
-  disk_busy<=busy0_mist OR busy_sd OR busy1_mist OR busy6_mist;
+  disk_busy<=busy0_mist OR busy1_mist OR busy6_mist;
   
   ----------------------------------------------------------
   led_disk<=disk_busy WHEN rising_edge(sclk);
@@ -940,10 +869,9 @@ BEGIN
   --  6 : 0=Serial           1=Video  
   --  7 :
 
-  scsi_sd<=to_std_logic(scsi_conf=1 OR scsi_conf=3 OR scsi_conf=4);
   scsi_bis<=to_std_logic(scsi_conf>=2);
   
-  swconf(0)<=scsi_sd WHEN rising_edge(sclk);
+  swconf(0)<='0' WHEN rising_edge(sclk);   -- no Direct SD
   swconf(1)<=scsi_bis WHEN rising_edge(sclk);
   swconf(2)<=NOT tcx  WHEN rising_edge(sclk);
   swconf(3)<=NOT autoboot WHEN rising_edge(sclk);

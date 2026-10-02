@@ -130,8 +130,6 @@ wire [7:0] reset_mask_rev = (opt_iommu==0) ? 8'h26 :
                             (opt_iommu==1) ? 8'h11 :
                             (opt_iommu==2) ? 8'h23 : 8'h30;
 
-wire [3:0] sd_dat_nc;
-wire       sd_cmd_nc, sd_sck_nc;
 wire       clk_sys, vga_ce, vga_clk;
 wire [15:0] audio_l, audio_r;
 wire        fb_pal_clk, fb_pal_wr;
@@ -165,9 +163,6 @@ ss_core ss_core
 	.led_disk(led_disk),
 	.led_user(led_user),
 	.led_power(led_power),
-	.sd_sck(sd_sck_nc),
-	.sd_dat(sd_dat_nc),
-	.sd_cmd(sd_cmd_nc),
 
 	.ddram_clk(vram_clk),
 	.ddram_waitrequest(vram_wait),

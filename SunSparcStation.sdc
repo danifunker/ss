@@ -19,7 +19,6 @@ set_clock_groups -asynchronous \
                        emu|ss_core|i_pll|pll_inst|altera_pll_i|*[1].*|divclk \
                        emu|ss_core|i_pll|pll_inst|altera_pll_i|*[2].*|divclk}] \
    -group [get_clocks {emu|ss_core|i_pll|pll_inst|altera_pll_i|*[3].*|divclk}] \
-   -group [get_clocks {emu|ss_core|scsi_sd:i_scsi_sd|sd_clk}] \
    -group [get_clocks {pll_hdmi|pll_hdmi_inst|altera_pll_i|*[0].*|divclk}] \
    -group [get_clocks {pll_audio|pll_audio_inst|altera_pll_i|*[0].*|divclk}] \
    -group [get_clocks {spi_sck}] \

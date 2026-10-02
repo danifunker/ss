@@ -930,7 +930,8 @@ BEGIN
             r_adrs<=r_adrs(29 DOWNTO 0) & "00";
             r_len<=r_len(15 DOWNTO 0) & "00";
           END IF;
-          saut_v:=(r_adrs>=capacity_m);
+          -- capacity_m is the last block: it can be read (D7)
+          saut_v:=(r_adrs>capacity_m);
 
         WHEN TEST_PC =>
           -- Mode Sense Page Code
