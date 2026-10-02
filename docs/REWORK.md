@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's three `rtl/cpu` fixes (`b775165`) verified on the board (session 5): NetBSD 11 to a shell, and **Solaris 8 under the official Sun OBP 2.25 with no in-memory patch, 3 CPUs**. **NVRAM saved to the SD card** (TOD-6, OSD "NVRAM"): the OBP keeps its settings, and `hwtest.sh 20 solaris-obp` boots Solaris unattended in 4 minutes. The **memory corruption under sustained disk I/O with the caches on** (Solaris with 1 or 3 CPUs, NetBSD) is explained and fixed in simulation (session 6: `mcu_multi_ext.vhd` released the CPU side on every gap between the DDR beats of a line fill; `sim --ddr-gaps` reproduces the board's bus; fit `scratch/SunSparcStation20-fillfix-s3.rbf`), **board verification pending**. Hand-off: [RESUME-20261002.md](../RESUME-20261002.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris under OpenBIOS, **Solaris under the Sun PROM with a saved NVRAM**); CPU suite on the board: **SS20 63/0/0, SS5 53/0/0** (`9a99e4b` + tests, session 5), simulation = board (session 6 adds `t_cache3.S`: SS20 65, SS5 55 in simulation, with and without `--ddr-gaps`; the board baselines are to be re-recorded); `memstress` (board-only RAM stress, 3 CPUs) passes; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's three `rtl/cpu` fixes (`b775165`) verified on the board (session 5): NetBSD 11 to a shell, and **Solaris 8 under the official Sun OBP 2.25 with no in-memory patch, 3 CPUs**. **NVRAM saved to the SD card** (TOD-6, OSD "NVRAM"): the OBP keeps its settings, and `hwtest.sh 20 solaris-obp` boots Solaris unattended in 4 minutes. The **memory corruption under sustained disk I/O with the caches on** (Solaris with 1 or 3 CPUs, NetBSD) is **fixed** (session 6: `mcu_multi_ext.vhd` released the CPU side on every gap between the DDR beats of a line fill; `sim --ddr-gaps` reproduces the board's bus; rbf `scratch/SunSparcStation20-fillfix-s3.rbf`, on the board: suite 65/0/0, memstress, and 40 minutes each of Solaris with one and three CPUs and of NetBSD under the disk stress). Hand-off: [RESUME-20261002.md](../RESUME-20261002.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris under OpenBIOS, **Solaris under the Sun PROM with a saved NVRAM**); CPU suite on the board: **SS20 63/0/0, SS5 53/0/0** (`9a99e4b` + tests, session 5), simulation = board (session 6 adds `t_cache3.S`: **SS20 65/0/0 on the board** = simulation, with and without `--ddr-gaps`; SS5 55 in simulation, its board baseline to re-record); `memstress` (board-only RAM stress, 3 CPUs) passes; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -727,11 +727,18 @@ drop one of the two machines, and asked to focus on the SS20.
 - **Fit:** SS20 seed 3, `scratch/SunSparcStation20-fillfix-s3.rbf`:
   +0.241 ns at 55 MHz, +0.252 ns on the HDMI clock, hold +0.107 ns, TNS 0,
   87 % ALMs (36,311), 46,641 registers.
-- **To do on the board** (the user runs it): `hwtest.sh 20 cpu` (expect
-  65/0/0, then re-record `ss20-core-hw.log`; the SS5 image gains the two
-  tests too, re-record `ss5-core-hw.log` at the next SS5 build), the
-  memstress ROM, `scratch/solstress.sh LOG 40`, `ALLCPUS=1
-  scratch/solstress.sh LOG 40`, `scratch/nbstress.sh LOG 40`.
+- **Board (the user's go-ahead, 2026-10-02 morning), rbf
+  `SunSparcStation20-fillfix-s3.rbf`:** `hwtest.sh 20 cpu` **65/0/0**,
+  byte-identical to the simulation (`ss20-core-hw.log` re-recorded,
+  `e62df75`); `memstress` PASS; `scratch/solstress.sh` one CPU, caches on:
+  **survived 40 minutes**, ~19,000 processes, no panic (before: a panic
+  within 1,000-2,500); `ALLCPUS=1`, three CPUs: **survived 40 minutes**,
+  process IDs wrapped past 30,000 (before: hung at ~7,000); `nbstress.sh`:
+  **survived 40 minutes** (before: dead at ~25). Logs
+  `sim/out/hw-20-{cpu,memstress-fix,solstress-fix1,solstress-fix3,nbstress-fix}.log`.
+  Still to do: the SS5 suite image gained the two tests, so
+  `hwtest.sh 5 cpu` → 55/0/0 and re-record `ss5-core-hw.log` (no new SS5
+  rbf is needed, its RTL is unchanged).
 
 ### Work items (the content of the stages)
 
@@ -874,7 +881,9 @@ drop one of the two machines, and asked to focus on the SS20.
   never cleared; the SS5 controller was right). `sim --ddr-gaps` and
   `t_cache3.S` (`t_cache_fill_words`, `t_icache_fill_words`) reproduce it:
   unfixed + gaps hangs, fixed 65/0/0 with and without gaps, SS5 55/0/0.
-  Fit seed 3 closes (+0.241 ns at 55 MHz). Board runs pending.
+  Fit seed 3 closes (+0.241 ns at 55 MHz). Board: suite 65/0/0, memstress,
+  Solaris one and three CPUs and NetBSD each survive 40 minutes of the
+  disk stress.
 
 - **2026-10-02, session 5 (SS20).** Fable's three fixes verified on the
   board (SS20 60/0/0, NetBSD shell); Solaris 8 under the Sun OBP without
