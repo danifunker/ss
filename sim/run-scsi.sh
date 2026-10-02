@@ -29,7 +29,7 @@ for t in hd0 hd1; do
     cp "$O-$t.orig" "$O-$t.img"
 done
 cp "$O-hd0.orig" "$O-one-hd0.img"
-"sim/obj_ss$REV/Vsim_top" --rom "$ROM" --hd0 "$O-one-hd0.img" --stop "CPUTEST DONE" \
+"sim/obj_ss$REV/Vsim_top" --rom "$ROM" --hd0 "$O-one-hd0.img" --stop "CPUTEST DONE" --sd-latency 20000 \
     --cycles 150M --quiet --log "$O-one.log" 2> "$O-one.err" &
 "sim/obj_ss$REV/Vsim_top" --rom "$ROM" --hd0 "$O-hd0.img" --hd1 "$O-hd1.img" \
     --stop "CPUTEST DONE" --cycles 150M --quiet --log "$O-two.log" 2> "$O-two.err" &

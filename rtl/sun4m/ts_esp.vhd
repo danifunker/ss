@@ -117,6 +117,7 @@ ARCHITECTURE rtl OF ts_esp IS
   
   TYPE enum_state IS (sIDLE,
                       sINFO_TRANSFER,sINFO_TRANSFER_FIN,sINFO_TRANSFER_CHANGE,
+                      sINFO_TRANSFER_DONE,
                       sICCS,sICCS_BIS,sICCS_TER,
                       sSELECT,sSELECT_ATN,sSELECT_ATN2,
                       sSELECT_COMMAND,sSELECT_FIN,sNOSEL);
@@ -135,6 +136,7 @@ ARCHITECTURE rtl OF ts_esp IS
   SIGNAL dma_mode : std_logic;
   SIGNAL dma_finw : std_logic;
   SIGNAL dma_fin_pre,dma_dernier : std_logic;
+  SIGNAL req_lo : std_logic;            -- REQ low since the count ran out
   SIGNAL dma_a : uv32;
   SIGNAL dma_a_bis : uv2;
   SIGNAL dma_buf    : uv32;
@@ -486,8 +488,17 @@ BEGIN
           --  - Soit le comptage est fini
           --  - Soit la phase a changé et il y a un REQ
           --  - Fin de message
-          IF ((dma_mode='1' AND dma_fin='1' AND dma_fin_pre='0') OR
-              (dma_mode='0' AND fifo_vv='0')) AND scsi_ena='1' THEN
+          IF dma_mode='1' AND dma_fin='1' AND dma_fin_pre='0' AND scsi_ena='1'
+          THEN
+            -- The count is out. As on a 53C9x (and in QEMU), the interrupt
+            -- (bus service) comes with the target's next REQ, in the next
+            -- phase or for more data: a target that takes a while before
+            -- its status phase (a write going through Main to the image)
+            -- must not be seen still in DATA OUT.
+            state<=sINFO_TRANSFER_DONE;
+            req_lo<=NOT scsi_r.req;
+            scsi_ena<='0';
+          ELSIF dma_mode='0' AND fifo_vv='0' AND scsi_ena='1' THEN
             state<=sINFO_TRANSFER_FIN;
             scsi_ena<='0';
           ELSIF scsi_r.phase/=mem_phase AND mem_dja='1' THEN
@@ -510,6 +521,15 @@ BEGIN
           int_sr<='1';
           int_so<='0';
           inter<='1';          -- Déclenche interruption
+
+        WHEN sINFO_TRANSFER_DONE =>
+          -- the REQ of the last byte has gone; the next one ends the command
+          IF scsi_r.req='0' THEN
+            req_lo<='1';
+          END IF;
+          IF scsi_r.req='1' AND req_lo='1' THEN
+            state<=sINFO_TRANSFER_FIN;
+          END IF;
 
         WHEN sINFO_TRANSFER_CHANGE =>
           -- On attend qu'il y ait réellement une nouvelle donnée

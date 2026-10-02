@@ -240,7 +240,7 @@ ss_core ss_core
 
 	.vga_on(1'b1),
 	.scsi_conf(scsi_conf),
-	.scsi_cdconf(opt_cdrom),
+	.scsi_cdconf(opt_cdrom == 2'd2 ? 2'd2 : 2'd1),   // the CD is always there (OSD)
 	.ram_sel(2'd0),
 	.tcx(~opt_cg3),
 	.autoboot(~opt_noautoboot),

@@ -337,6 +337,7 @@ s_type:         .asciz " type "
 s_blocks:       .asciz " blocks "
 s_bs:           .asciz " bs "
 s_id:           .asciz " id '"
+s_notready:     .asciz " not ready\n"
 s_q:            .asciz "'\n"
 s_err:          .asciz "    error "
 s_at_t:         .asciz " at t"
@@ -375,6 +376,7 @@ rw10:
 1:      call scsi_cmd
         mov %i4, %o5
         mov %o0, %i0
+        mov %o1, %i1                    /* the ESP status after the data */
         ret
         restore
 
@@ -505,6 +507,22 @@ probe:
         subcc %l4, 1, %l4
         bne 2b
         nop
+        /* never ready (a CD drive without a disc): OpenBIOS skips it too */
+6:      set s_t, %o0
+        call puts
+        nop
+        call putdec
+        mov %l0, %o0
+        set s_type, %o0
+        call puts
+        nop
+        call puthex
+        ld [%l1 + TB_TYPE], %o0
+        set s_notready, %o0
+        call puts
+        nop
+        ba 8f
+        nop
 3:      mov %l0, %o0
         set cdb_capacity, %o1
         mov 10, %o2
@@ -512,6 +530,13 @@ probe:
         clr %o4
         call scsi_cmd
         mov %l7, %o5
+        /* no capacity (status instead of data, or CHECK CONDITION): a drive
+           without a medium. Mode 0's TEST UNIT READY never reads its status,
+           so this is where OpenBIOS's sequence finds out */
+        cmp %o0, E_NODATA
+        be 6b
+        cmp %o0, 2
+        be 6b
         tst %o0
         bne 7f
         nop
@@ -790,7 +815,13 @@ BEGIN(t_scsi_write1, "scsi: WRITE(10) at t3 block 8, read back, restore, mode 1"
         mov 1, %o3
         call rw10
         mov 1, %o4
+        mov %o1, %l5
         EXPECT(%o0, 0, 2)
+        /* the DMA's end interrupt comes with the target's STATUS phase, not
+           while it still writes the block to the image (NetBSD reads the
+           phase there: session 8's write timeouts) */
+        and %l5, 7, %l5
+        EXPECT(%l5, 3, 6)
         mov 3, %o0                      /* block 8 now reads as block 9 */
         mov 0x28, %o1
         mov 8, %o2

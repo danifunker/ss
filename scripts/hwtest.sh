@@ -21,7 +21,7 @@
 #   scsi     the SCSI path: tests/cpu/out/<target>/scsitest.rom as boot.rom
 #            with two images of known content (tests/cpu/mkscsiimg.py, copied
 #            to games/SunSparcStation/scsi-hd{0,1}.img) at HD0 (t3) and HD1
-#            (t1); the output must equal
+#            (t1), and the CD drive (t6) empty; the output must equal
 #            tests/cpu/expected/ss{5,20}-scsi-hw.log (--record writes it), and
 #            HD0 must be unchanged afterwards (the write test restores it).
 #            HD0 = the OS image again and HD1 empty afterwards
@@ -118,7 +118,7 @@ for t in "${TESTS[@]}"; do
         done
         rsh "cp $G/boot.rom /tmp/boot.rom.hwtest"
         scp -q "${SSH_OPTS[@]}" "tests/cpu/out/$T/scsitest.rom" "$DEV:$G/boot.rom" || exit 1
-        scripts/mount.sh --hd0 scsi-hd0.img --hd1 scsi-hd1.img > /dev/null
+        scripts/mount.sh --hd0 scsi-hd0.img --hd1 scsi-hd1.img --cd "" > /dev/null
         scripts/setopt.sh console=serial > /dev/null
         cp=$(run_capture "$log" 120 'CPUTEST DONE')
         sleep 2; stop_capture "$cp"
