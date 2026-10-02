@@ -92,6 +92,8 @@ ENTITY ss_core IS
     vga_on               : IN    std_logic;
     scsi_conf            : IN    unsigned(2 DOWNTO 0);
     scsi_cdconf          : IN    unsigned(1 DOWNTO 0);
+    -- SS20 memory (OSD): 0 464 MB, 1 256 MB, 2 128 MB, 3 64 MB
+    ram_sel              : IN    unsigned(1 DOWNTO 0) := "00";
     tcx                  : IN    std_logic; -- 0=CG3    1=TCX
     autoboot             : IN    std_logic; -- 0=NoAuto 1=Auto
     viboot               : IN    std_logic; -- 0=Serial 1=Video
@@ -205,6 +207,8 @@ ARCHITECTURE rtl OF ss_core IS
   SIGNAL disk_busy : std_logic;
   SIGNAL t_ena : std_logic_vector(2 DOWNTO 0);
   SIGNAL t_cd2048 : std_logic;
+  SIGNAL ram_mb    : natural RANGE 0 TO 1023;
+  SIGNAL ram_slots : unsigned(3 DOWNTO 0);
   SIGNAL t_lba : std_logic_vector(31 DOWNTO 0);
   SIGNAL t_rd,t_wr,t_ack,t_bwr : std_logic_vector(2 DOWNTO 0);
   SIGNAL t_bdr : std_logic_vector(15 DOWNTO 0);
@@ -400,6 +404,7 @@ BEGIN
       reset_mask_rev => reset_mask_rev,
       kbm_layout  => kbm_layout,
       swconf      => swconf,
+      ram_slots   => ram_slots,
       cachena     => cachena,
       l2tlbena    => l2tlbena,
       wback       => wback,
@@ -414,7 +419,11 @@ BEGIN
   -- come only through the HPS (REWORK Decisions, 2026-09-28). The AUXIO0
   -- SD controller registers (+0x18, +0x1C) read 0, and swconf(0), "SD
   -- present", is 0, so OpenBIOS never probes a card.
-  sd_reg_r<=(d0=>x"00000000",d1=>x"00000000");
+  -- AUXIO0 +0x1C now tells OpenBIOS the memory chosen in the OSD:
+  -- 0x5A in bits 31:24 (so an older core's SD register is not taken for
+  -- it), megabytes in 11:0.
+  sd_reg_r<=(d0=>x"00000000",
+             d1=>x"5A000" & to_unsigned(ram_mb,12));
 
   -- SCSI_CONF
   -- 000 : HD Image
@@ -425,6 +434,14 @@ BEGIN
   -- CDROM 2048 or 512), as on a real Sun (REWORK Decisions, 2026-09-28).
   t_ena<=to_std_logic(scsi_cdconf/="00") & to_std_logic(scsi_conf="010") & '1';
   t_cd2048<=to_std_logic(scsi_cdconf="01");
+
+  -- The memory: RAMSIZE, or less on the SS20 (whole 64 MB SIMM slots)
+  ram_mb<=RAMSIZE WHEN SS20=0 OR ram_sel="00" ELSE
+          256 WHEN ram_sel="01" ELSE
+          128 WHEN ram_sel="10" ELSE 64;
+  ram_slots<=x"8" WHEN SS20=0 OR ram_sel="00" ELSE
+             x"4" WHEN ram_sel="01" ELSE
+             x"2" WHEN ram_sel="10" ELSE x"1";
 
   i_scsi_targets: ENTITY work.scsi_targets
     PORT MAP (

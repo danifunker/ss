@@ -197,6 +197,7 @@ ss_core ss_core
 	.vga_on(1'b1),
 	.scsi_conf(scsi_conf),
 	.scsi_cdconf(opt_cdrom),
+	.ram_sel(2'd0),
 	.tcx(~opt_cg3),
 	.autoboot(~opt_noautoboot),
 	.viboot(~opt_serial),

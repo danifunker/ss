@@ -86,9 +86,34 @@ entry:
         ! Get RAM SIZE
         ! MMU Register Dxx : SYSCONF[31:20] & x"00000"
         set     0xd00,%g1
-        lda     [%g1] ASI_M_MMUREGS, %g1
-        srl     %g1,20,%g1
+        lda     [%g1] ASI_M_MMUREGS, %g2
+        srl     %g2,20,%g1
         sll     %g1,20,%g1
+
+        ! The memory chosen in the MiSTer OSD, if less: AUXIO0 + 0x1C reads
+        ! 0x5A in bits 31:24 and megabytes in 11:0 (SYSCONF[4]: SS20, the
+        ! AUXIO at pa 0xf_f180_0000; else the SS5's, at 0x7190_0000)
+        andcc   %g2, 0x10, %g0
+        bne     1f
+         nop
+        set     0x7190001c, %g3
+        lda     [%g3] ASI_M_BYPASS, %g3
+        ba      2f
+         nop
+1:      set     0xf180001c, %g3
+        lda     [%g3] 0x2f, %g3
+2:      srl     %g3, 24, %g4
+        cmp     %g4, 0x5a
+        bne     3f
+         sll    %g3, 20, %g3            ! megabytes << 20 (the tag shifts out)
+        tst     %g3
+        be      3f
+         nop
+        cmp     %g3, %g1
+        bgeu    3f
+         nop
+        mov     %g3, %g1
+3:
 
         ! Get CPU number
         ! MMU Register 0xx : Control Register [3:2]

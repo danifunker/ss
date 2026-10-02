@@ -72,32 +72,57 @@ wire clk_sys;
 
 `include "build_id.v" 
 
+// The OSD (status bits in brackets; setopt.sh names them):
+//  - the model (text), the images: HD0 at SCSI target 3, HD1 at 1, the CD
+//    at 6, the NVRAM. A disk is there while its image is mounted, and an
+//    image can be mounted at any time (the targets report the change);
+//  - Video: graphics card (TCX/CG3) [10], output (the core's video or
+//    the MiSTer framebuffer) [11], aspect ratio [7:6], scale [15:14];
+//  - System: console (screen or ttya) [9], auto boot [8], keyboard
+//    layout [13:12], CD-ROM block size [4], memory (SS20) [23:22];
+//  - Advanced (developer tuning): cache [16], L2TLB [17], write-back [18],
+//    AOW [19], IOMMU revision [21:20].
+// [1] (two disks) and [5] (CD off) are retired.
 localparam CONF_STR = {
     "SunSparcStation;;" ,
-    "-;" ,
-    "O1,SCSI disks,HD0,HD0+HD1;" ,
-    "SC0,VHDIMGHDARAW,HD;" ,
-    "SC1,VHDIMGHDARAW,HD2;" ,
-    "O45,CDROM,OFF,2048,512;" ,
-    "SC2,ISO,CDROM;" ,
-    "SC3,NVR,NVRAM;" ,
-    "O67,Aspect ratio,4:3,Full Screen,[ARC1],[ARC2];" ,
-    "O8,AutoBoot,ON,OFF;" ,
-    "O9,Boot,Video,Serial;" ,
-    "OA,Video,TCX,CG3;" ,
-    "OB,Video,Internal,Scaler framebuffer;" ,
-    "OCD,Keyboard,US,FR,DE,ES;" ,
-    "-;" ,
-    "R0,RESET;" ,
-    "-;" ,
-    "OG,Cachena,ON,OFF;" ,
-    "OH,L2TLB,OFF,ON;" ,
 `ifdef SS20
-    "OI,WB,OFF,ON;" ,
-    "OJ,AOW,OFF,ON;" ,
+    "-,SPARCstation 20 3xCPU 55MHz;" ,
+`else
+    "-,SPARCstation 5 60MHz;" ,
 `endif
-    "OKL,IOMMU rev,26 (Default),11 (Next),23,30;" ,
-    "F,ROM,BIOS;" ,
+    "-;" ,
+    "SC0,VHDIMGHDARAW,Disk 0 (SCSI 3);" ,
+    "SC1,VHDIMGHDARAW,Disk 1 (SCSI 1);" ,
+    "SC2,ISO,CD-ROM (SCSI 6);" ,
+    "SC3,NVR,NVRAM;" ,
+    "-;" ,
+    "P1,Video;" ,
+    "P1-;" ,
+    "P1OA,Graphics card,TCX,CG3;" ,
+    "P1OB,Output,Core video,MiSTer framebuffer;" ,
+    "P1O67,Aspect ratio,4:3,Full Screen,[ARC1],[ARC2];" ,
+    "P1OEF,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;" ,
+    "P2,System;" ,
+    "P2-;" ,
+    "P2O9,Console,Screen+keyboard,Serial (ttya);" ,
+    "P2O8,Auto boot,On,Off;" ,
+    "P2OCD,Keyboard,US,FR,DE,ES;" ,
+    "P2O4,CD-ROM block size,2048,512;" ,
+`ifdef SS20
+    "P2OMN,Memory,464 MB,256 MB,128 MB,64 MB;" ,
+`endif
+    "P3,Advanced;" ,
+    "P3-;" ,
+    "P3OG,Cache,On,Off;" ,
+    "P3OH,L2TLB,Off,On;" ,
+`ifdef SS20
+    "P3OI,Write-back cache,Off,On;" ,
+    "P3OJ,AOW,Off,On;" ,
+`endif
+    "P3OKL,IOMMU rev,26 (Default),11 (Next),23,30;" ,
+    "-;" ,
+    "F,ROM,Load boot ROM;" ,
+    "R0,Reset;" ,
     "-;" ,
     "V,v",`BUILD_DATE 
 };
@@ -177,18 +202,24 @@ hps_io
 
 );
 
-// ss_core's scsi_conf: 0 image, 1 direct SD, 2 image+image, 3 SD+image,
-// 4 image+SD. The stock framework has no SDIO pins, so only the image
-// modes remain (status[3:2] stay free, so old configs do not map an SD
-// mode onto a new option). The upstream top declared both of these as
-// 1-bit wires, so only the low bit of each OSD field reached the core.
-wire [2:0] scsi_conf   = status[1] ? 3'd2 : 3'd0;
-wire [1:0] scsi_cdconf = status[5:4];
+// ss_core's scsi_conf 2: both disks (each answers while its image is
+// mounted); scsi_cdconf: the CD, 1 with 2048-byte blocks, 2 with 512.
+wire [2:0] scsi_conf   = 3'd2;
+wire [1:0] scsi_cdconf = status[4] ? 2'd2 : 2'd1;
+
+// Memory (SS20): 464 MB (all of it), 256, 128 or 64 MB
+`ifdef SS20
+wire [1:0] ram_sel = status[23:22];
+`else
+wire [1:0] ram_sel = 2'd0;
+`endif
 
 wire [1:0] ar = status[7:6];
 
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+// VIDEO_ARX/ARY and VGA_DE come from the framework's video_freak (below):
+// the aspect ratio and the OSD's Scale (V-Integer keeps every line an
+// integer number of output lines).
+wire core_de;
 
 wire autoboot  = ~status[8];
 wire viboot    = ~status[9];
@@ -314,7 +345,7 @@ ss_core
  .vga_b(VGA_B),
  .vga_hs(VGA_HS),
  .vga_vs(VGA_VS),
- .vga_de(VGA_DE),
+ .vga_de(core_de),
  .vga_ce(CE_PIXEL),
  .vga_clk(CLK_VIDEO),
  
@@ -362,6 +393,7 @@ ss_core
  .vga_on(vga_on),
  .scsi_conf(scsi_conf),
  .scsi_cdconf(scsi_cdconf),
+ .ram_sel(ram_sel),
  .tcx(tcx),
  .autoboot(autoboot),
  .viboot(viboot),
@@ -408,6 +440,24 @@ ss_core
  .uart_txd(UART_TXD),
  .uart_rxd(UART_RXD)
 
+);
+
+video_freak video_freak
+(
+	.CLK_VIDEO(CLK_VIDEO),
+	.CE_PIXEL(CE_PIXEL),
+	.VGA_VS(VGA_VS),
+	.HDMI_WIDTH(HDMI_WIDTH),
+	.HDMI_HEIGHT(HDMI_HEIGHT),
+	.VGA_DE(VGA_DE),
+	.VIDEO_ARX(VIDEO_ARX),
+	.VIDEO_ARY(VIDEO_ARY),
+	.VGA_DE_IN(core_de),
+	.ARX((!ar) ? 12'd4 : (ar - 1'd1)),
+	.ARY((!ar) ? 12'd3 : 12'd0),
+	.CROP_SIZE(12'd0),
+	.CROP_OFF(5'd0),
+	.SCALE({1'b0, status[15:14]})
 );
 
 endmodule

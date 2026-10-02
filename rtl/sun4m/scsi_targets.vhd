@@ -203,10 +203,15 @@ ARCHITECTURE rtl OF scsi_targets IS
     RETURN to_unsigned(character'pos(s(s'low + i)), 8);
   END FUNCTION ascii;
 
-  FUNCTION b8 (CONSTANT v : unsigned; CONSTANT k : natural) RETURN uv8 IS
-    VARIABLE x : unsigned(v'length-1 DOWNTO 0) := v;
+  -- byte k (0: the low one) of a word; k is taken modulo 4
+  FUNCTION b8 (CONSTANT v : uv32; CONSTANT k : integer) RETURN uv8 IS
   BEGIN
-    RETURN x(8*k+7 DOWNTO 8*k);
+    CASE k MOD 4 IS
+      WHEN 0      => RETURN v(7 DOWNTO 0);
+      WHEN 1      => RETURN v(15 DOWNTO 8);
+      WHEN 2      => RETURN v(23 DOWNTO 16);
+      WHEN OTHERS => RETURN v(31 DOWNTO 24);
+    END CASE;
   END FUNCTION b8;
 
   CONSTANT VENDOR  : string(1 TO 8)  := "MiSTer  ";

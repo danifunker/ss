@@ -161,6 +161,9 @@ ENTITY ts_core IS
     preset      : IN  std_logic; -- Processor REST
     reset_n     : IN  std_logic; -- Global RESET
     swconf      : IN  uv8;
+    -- SS20: SIMM slots of 64 MB with memory (8: all, slot 7 the 16 MB
+    -- one); the slots above look empty to the Sun OBP's memory probe
+    ram_slots   : IN  unsigned(3 DOWNTO 0) := x"8";
     cachena     : IN  std_logic;
     l2tlbena    : IN  std_logic;
     wback       : IN  std_logic;
@@ -1319,12 +1322,23 @@ BEGIN
   
   -----------------------------------
   -- Remap framebuffer & ROM
-  VideoShmuck:PROCESS(mem_pw)
+  VideoShmuck:PROCESS(mem_pw,ram_slots)
   BEGIN
     memm_pw<=mem_pw;
     IF SS20 THEN
       -- Remap
-      IF OBRAM AND mem_pw.ah=x"F" AND mem_pw.a(31 DOWNTO 24)=x"F0" THEN
+      IF mem_pw.ah=x"0" AND mem_pw.a(31 DOWNTO 29)="000" AND
+         ('0' & mem_pw.a(28 DOWNTO 26))>=ram_slots THEN
+        -- A SIMM slot above the memory chosen in the OSD: empty, as the
+        -- Sun OBP's probe sees an empty slot. Writes go nowhere (no byte
+        -- enables); reads return the PROM image, so its test patterns do
+        -- not read back.
+        memm_pw.a(31 DOWNTO 21)<=OBRAM_ADR(31 DOWNTO 21);
+        memm_pw.ah<=OBRAM_ADR_H;
+        IF is_write(mem_pw) THEN
+          memm_pw.be<="0000";
+        END IF;
+      ELSIF OBRAM AND mem_pw.ah=x"F" AND mem_pw.a(31 DOWNTO 24)=x"F0" THEN
         memm_pw.a(31 DOWNTO 21)<=OBRAM_ADR(31 DOWNTO 21);
         memm_pw.ah<=OBRAM_ADR_H;
       ELSIF mem_pw.ah=x"E" AND mem_pw.a(31)='0' AND mem_pw.a(23)='1' THEN

@@ -58,9 +58,9 @@ identity from then on.
 Both firmwares keep their settings there: `setenv` at the `ok` prompt,
 or `eeprom` from the OS (checked with Solaris). OpenBIOS stores the variables that
 differ from their defaults. Two OSD options win over the NVRAM for one
-boot without changing it: **Boot** (Video or Serial) picks the OpenBIOS
-console, and **AutoBoot OFF** stops at `ok`; with AutoBoot ON,
-`auto-boot?` in the NVRAM decides. OpenBIOS and the Sun PROMs use
+boot without changing it: **System → Console** (screen and keyboard, or
+serial) picks the OpenBIOS console, and **System → Auto boot: Off** stops
+at `ok`; with Auto boot On, `auto-boot?` in the NVRAM decides. OpenBIOS and the Sun PROMs use
 different formats: each formats the area for itself the first time a
 setting changes, so keep one file per firmware and machine (SS5, SS20).
 
@@ -81,9 +81,30 @@ It's better to reboot MiSTer when trying different OSes, probably a few missing 
 When trying different IOMMU rev options, do a core RESET after applying a new value as this is copied by the BIOS into
 a configuration structure.
 
-Disks are images on the MiSTer's SD card (OSD: HD, HD2, CDROM). The
-"Direct SD" modes of the SparcStation core, which drove the secondary SD card
-directly, were removed with the move to the standard MiSTer framework.
+### OSD
+The first line names the model the core was built as (SPARCstation 20 or
+5). Below it:
+
+- **Disk 0 (SCSI 3)**, **Disk 1 (SCSI 1)**, **CD-ROM (SCSI 6)**: images on
+  the MiSTer's SD card (VHD, IMG, HDA or RAW for disks, ISO for the CD), at
+  the SCSI IDs of a real Sun (the boot disk is `sd3` / `c0t3d0`). A disk is
+  there while an image is mounted; images can be mounted or swapped at any
+  time (the drive reports a medium change to the OS). The core remembers
+  the images and mounts them again at the next start.
+- **NVRAM**: see above.
+- **Video**: the graphics card (TCX, 8-bit, or CG3), the output (the
+  core's own video or the MiSTer framebuffer), the aspect ratio.
+- **System**: the console (screen and keyboard, or serial on ttya), auto
+  boot, the keyboard layout, the CD-ROM block size (2048 bytes, or 512 as
+  on Sun's own CD drives), and on the SS20 the memory (464, 256, 128 or
+  64 MB).
+- **Advanced**: developer tuning of the CPU caches, the L2 TLB, the
+  SS20's write-back cache and the IOMMU revision OSes see. The defaults
+  are the tested ones.
+
+The "Direct SD" modes of the SparcStation core, which drove the secondary
+SD card directly, were removed with the move to the standard MiSTer
+framework.
 
 CDROM works with Solaris (8), NextSTEP, Linux (RH). To mount the CD with Solaris, type: `mount -F hsfs -r /dev/dsk/c0t6d0s0 /cdrom`; for old Linux, it's `/dev/scd0`.
 

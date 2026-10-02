@@ -6,21 +6,24 @@
 # core starts, so this writes the file and the caller relaunches the core.
 # Names follow CONF_STR in SunSparcStation.sv; keep them in step.
 #
-#   disks=hd0|hd0+hd1        O[1]
-#   cdrom=off|2048|512       O[5:4]
-#   aspect=4:3|full|arc1|arc2 O[7:6]
-#   autoboot=on|off          O[8]
-#   console=video|serial     O[9]    OpenBIOS console ("Boot" in the OSD)
-#   video=tcx|cg3            O[10]
-#   fb=internal|scaler       O[11]
-#   kbd=us|fr|de|es          O[13:12]
-#   cache=on|off             O[16]
-#   l2tlb=off|on             O[17]
-#   wb=off|on                O[18]   SS20
-#   aow=off|on               O[19]   SS20
-#   iommu=26|11|23|30        O[21:20]
+#   cdbs=2048|512            O[4]    CD-ROM block size (System)
+#   aspect=4:3|full|arc1|arc2 O[7:6]  (Video)
+#   scale=normal|vint|hvint-|hvint+ O[15:14] (Video)
+#   autoboot=on|off          O[8]    (System)
+#   console=video|serial     O[9]    the console (System)
+#   video=tcx|cg3            O[10]   graphics card (Video)
+#   fb=internal|scaler       O[11]   output: core video or MiSTer fb (Video)
+#   kbd=us|fr|de|es          O[13:12] (System)
+#   cache=on|off             O[16]   (Advanced)
+#   l2tlb=off|on             O[17]   (Advanced)
+#   wb=off|on                O[18]   SS20 (Advanced)
+#   aow=off|on               O[19]   SS20 (Advanced)
+#   iommu=26|11|23|30        O[21:20] (Advanced)
+#   memory=464|256|128|64    O[23:22] SS20 (System)
+# The disks and the CD are always there (a disk while its image is
+# mounted); O[1] (two disks) and O[5] (CD off) are retired.
 #
-#   scripts/setopt.sh console=serial cdrom=2048
+#   scripts/setopt.sh console=serial cdbs=512
 #   scripts/setopt.sh            # all defaults
 set -u
 . "$(dirname "$0")/common.sh"
@@ -29,19 +32,20 @@ TMP=$(mktemp)
 python3 - "$@" > "$TMP" <<'PY' || { rm -f "$TMP"; exit 2; }
 import sys
 F = {
-    "disks":    (1, 1, {"hd0": 0, "hd0+hd1": 1}),
-    "cdrom":    (4, 2, {"off": 0, "2048": 1, "512": 2}),
+    "cdbs":     (4, 1, {"2048": 0, "512": 1}),
     "aspect":   (6, 2, {"4:3": 0, "full": 1, "arc1": 2, "arc2": 3}),
     "autoboot": (8, 1, {"on": 0, "off": 1}),
     "console":  (9, 1, {"video": 0, "serial": 1}),
     "video":    (10, 1, {"tcx": 0, "cg3": 1}),
     "fb":       (11, 1, {"internal": 0, "scaler": 1}),
     "kbd":      (12, 2, {"us": 0, "fr": 1, "de": 2, "es": 3}),
+    "scale":    (14, 2, {"normal": 0, "vint": 1, "hvint-": 2, "hvint+": 3}),
     "cache":    (16, 1, {"on": 0, "off": 1}),
     "l2tlb":    (17, 1, {"off": 0, "on": 1}),
     "wb":       (18, 1, {"off": 0, "on": 1}),
     "aow":      (19, 1, {"off": 0, "on": 1}),
     "iommu":    (20, 2, {"26": 0, "11": 1, "23": 2, "30": 3}),
+    "memory":   (22, 2, {"464": 0, "256": 1, "128": 2, "64": 3}),
 }
 st = 0
 for a in sys.argv[1:]:

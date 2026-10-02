@@ -903,6 +903,9 @@ drop one of the two machines, and asked to focus on the SS20.
 | 2026-09-30 | License: aim for GPL like the other MiSTer cores; pending Grabulosaure's confirmation (phase 0.1) |
 | 2026-10-02 | **License: GPL-2** (user). `LICENSE` + README: the rework's work GPL-2.0+; Grabulosaure's files keep their notice until he confirms |
 | 2026-10-02 | **SCSI (Stage 4) follows the NeXT or the Macintosh model** (user); it waits for the user's Mac-side PR to be approved |
+| 2026-10-02 | **SCSI: the current Mac approach, now** (user): no FPGA block cache (the Mac's release runs `SCSI_CACHE_OFF=1`); one target engine (`scsi_targets.vhd`) straight to `hps_io`, in 16 KB requests (stock Main); Main's write buffer (PR #1336) for the SPARC core once merged. Ethernet later: NeXT's frame mailbox plus the A2065's network layer |
+| 2026-10-02 | **OSD reworked** (user): the model on the first line; disks and the CD always there (a disk while its image is mounted, images hot-swappable); Video / System / Advanced pages; the two "Video" options renamed (graphics card, output) |
+| 2026-10-02 | **Memory: an OSD size option in DDR3** (user; SDRAM not pursued): 464/256/128/64 MB on the SS20; OpenBIOS reads it at AUXIO0 + 0x1C, the slots above look empty to the Sun OBP's probe |
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
