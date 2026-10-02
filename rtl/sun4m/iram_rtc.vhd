@@ -54,6 +54,8 @@ ARCHITECTURE rtc OF iram_rtc IS
   -- The IDPROM (TOD-5): format 1, the build's machine type, Ethernet
   -- address 08:00:20:12:34:56, date 0, serial 0x123456 (hostid 0x80123456
   -- or 0x72123456), XOR checksum. The SS5 OBP rejects any type but 0x80.
+  -- A blank image gets it with a serial of its own (below); the serial is
+  -- in the checksum twice (Ethernet address, hostid), so it cancels out.
   FUNCTION idprom RETURN arr_id IS
     VARIABLE id : arr_id := (
       x"01", to_unsigned(MACHINE_TYPE,8), x"08", x"00", x"20", x"12", x"34",
@@ -104,6 +106,7 @@ ARCHITECTURE rtc OF iram_rtc IS
   SIGNAL b_dr0,b_dr1,b_dr2,b_dr3 : uv8;
   SIGNAL b_hi_d : std_logic;
   SIGNAL idblank : std_logic := '0';
+  SIGNAL rnd, serial : unsigned(23 DOWNTO 0) := x"123456";
   
 --------------------------------------------------------------------------------
     
@@ -158,13 +161,24 @@ BEGIN
   ------------------------------------------------------------------------------
   -- Port B. Halfword a = NVRAM bytes 2a (low) and 2a+1 (high): word a/2,
   -- lanes 0 and 1 for an even a, 2 and 3 for an odd one.
-  -- An image whose IDPROM format byte (0x1FD8) is 0, a blank file, keeps
+  -- An image whose IDPROM format byte (0x1FD8) is 0, a blank file, gets
   -- the built-in IDPROM: its eight halfwords are replaced as they arrive
-  -- (the format byte comes first).
-  BWrite:PROCESS (nv_w,idblank)
+  -- (the format byte comes first). Its serial (Ethernet address bytes 3-5
+  -- and hostid bytes 1-3) is a free-running counter sampled when the
+  -- format byte arrives, so each blank image gets its own identity, which
+  -- nvram_sd then writes back to the file.
+  BWrite:PROCESS (nv_w,idblank,serial)
     VARIABLE blank : boolean;
     VARIABLE k : natural RANGE 0 TO 7;
+    VARIABLE id_v : arr_id;
   BEGIN
+    id_v:=ID;
+    id_v(5):=serial(23 DOWNTO 16);
+    id_v(6):=serial(15 DOWNTO 8);
+    id_v(7):=serial(7 DOWNTO 0);
+    id_v(12):=serial(23 DOWNTO 16);
+    id_v(13):=serial(15 DOWNTO 8);
+    id_v(14):=serial(7 DOWNTO 0);
     b_a<=nv_w.a(11 DOWNTO 1);
     b_dw<=nv_w.dw;
     IF nv_w.a=ID_HW THEN
@@ -174,7 +188,7 @@ BEGIN
     END IF;
     IF nv_w.a>=ID_HW AND nv_w.a<ID_HW+8 AND blank THEN
       k:=to_integer(nv_w.a-ID_HW);
-      b_dw<=ID(2*k+1) & ID(2*k);
+      b_dw<=id_v(2*k+1) & id_v(2*k);
     END IF;
     b_wlo<=nv_w.we AND NOT nv_w.a(0);
     b_whi<=nv_w.we AND nv_w.a(0);
@@ -183,8 +197,10 @@ BEGIN
   BBlank:PROCESS (clk)
   BEGIN
     IF rising_edge(clk) THEN
+      rnd<=rnd+1;
       IF nv_w.we='1' AND nv_w.a=ID_HW THEN
         idblank<=to_std_logic(nv_w.dw(7 DOWNTO 0)=x"00");
+        serial<=rnd;
       END IF;
       b_hi_d<=nv_w.a(0);
     END IF;

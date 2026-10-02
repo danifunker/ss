@@ -4,9 +4,11 @@
 # rtl/mister/nvram_sd.vhd) in simulation: the CPU suite runs twice with an
 # image in slot 3 (sim_main --nvram), both runs in parallel.
 #
-#   blank   8192 zero bytes. The built-in IDPROM replaces the blank one at
-#           the load, so the suite passes; t_nvram's stores at 0x100 are
-#           written back, restored: the file is still all zeros.
+#   blank   8192 zero bytes. The built-in IDPROM, with a serial of its
+#           own, replaces the blank one at the load, so the suite passes;
+#           the IDPROM is written back to the file, and t_nvram's stores at
+#           0x100, restored: the file is zeros but for a valid IDPROM
+#           (format 1, the machine type, 08:00:20 + the hostid's serial).
 #   random  random bytes and an IDPROM with a wrong checksum: t_idprom must
 #           fail its check 3 and nothing else (the CPU sees the loaded
 #           image, not the built-in one); the file is unchanged after the
@@ -54,12 +56,25 @@ for k in blank random; do
         || fail "$k: not 16 reads and some writes: $(grep 'NVRAM image' "$O-$k.err")"
 done
 clean "$O-blank.log" | grep -q "fail=0 " || fail "blank: failures: $(clean "$O-blank.log" | grep -B2 '^FAIL')"
-cmp -s "$O-blank.nvr" <(head -c 8192 /dev/zero) || fail "blank: the image is no longer all zeros"
+R=$(python3 - "$O-blank.nvr" "$TYPE" <<'PY'
+import sys
+b, t = open(sys.argv[1], "rb").read(), int(sys.argv[2], 0)
+i = b[0x1fd8:0x1fe8]
+x = 0
+for v in i:
+    x ^= v
+ok = (len(b) == 8192 and not any(b[:0x1fd8]) and not any(b[0x1fe8:])
+      and i[0] == 1 and i[1] == t and i[2:5] == bytes([8, 0, 0x20])
+      and i[5:8] == i[12:15] and x == 0)
+print(("ok " if ok else "bad ") + i.hex())
+PY
+)
+case "$R" in ok*) ;; *) fail "blank: the written-back IDPROM is wrong: $R" ;; esac
 F=$(clean "$O-random.log" | grep '^FAIL')
 [ "$F" = "FAIL chipset: NVRAM IDPROM format 1, machine type, checksum" ] \
     || fail "random: expected only t_idprom to fail, got: ${F:-nothing}"
 clean "$O-random.log" | grep -B1 '^FAIL' | grep -q "check 00000003" \
     || fail "random: t_idprom did not fail its checksum check"
 cmp -s "$O-random.nvr" "$O-random.orig" || fail "random: the image changed"
-[ "$bad" = 0 ] && echo "run-nvram ss$REV: PASS (blank: $(clean "$O-blank.log" | grep 'CPUTEST DONE'); $(grep 'NVRAM image' "$O-random.err" | sed 's/^\[sim\] //'))"
+[ "$bad" = 0 ] && echo "run-nvram ss$REV: PASS (blank: $(clean "$O-blank.log" | grep 'CPUTEST DONE'), IDPROM ${R#ok }; $(grep 'NVRAM image' "$O-random.err" | sed 's/^\[sim\] //'))"
 exit $bad

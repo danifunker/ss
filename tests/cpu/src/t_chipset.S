@@ -59,6 +59,18 @@ BEGIN(t_idprom, "chipset: NVRAM IDPROM format 1, machine type, checksum")
         bl 1b
         nop
         EXPECT(%l3, 0, 3)
+        /* Sun's convention: the Ethernet address ends with the hostid's
+           serial (bytes 5-7 = 12-14) */
+        clr %l4
+2:      add %l4, 5, %l2
+        lduba [%l0 + %l2] NVRAM_ASI, %l1
+        add %l4, 12, %l2
+        lduba [%l0 + %l2] NVRAM_ASI, %l3
+        EXPECT_R(%l1, %l3, 4)
+        add %l4, 1, %l4
+        cmp %l4, 3
+        bl 2b
+        nop
 END
 
 /* NVRAM offset 0x100: byte stores reach their own lanes, a word store

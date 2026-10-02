@@ -18,7 +18,9 @@
 --    Read-only images are never written.
 -- The image is a plain byte image: file byte n = NVRAM byte n (the IDPROM
 -- at 0x1FD8, the clock registers at 0x1FF8). A blank file (IDPROM format
--- byte 0) keeps the built-in IDPROM (iram_rtc).
+-- byte 0) gets the built-in IDPROM with a serial of its own (iram_rtc),
+-- and that sector is written back after the load, so the machine keeps
+-- its Ethernet address and hostid from then on.
 --------------------------------------------------------------------------------
 
 LIBRARY ieee;
@@ -78,6 +80,11 @@ ARCHITECTURE rtl OF nvram_sd IS
   SIGNAL rd_i, wr_i   : std_logic := '0';
   SIGNAL pon          : natural RANGE 0 TO LOADMAX := 0;
   SIGNAL quiet_cnt    : natural RANGE 0 TO QUIET := 0;
+  SIGNAL idgen        : std_logic := '0';  -- the image's IDPROM was blank
+
+  -- The halfword of the IDPROM format byte (0x1FD8): sector 15, 0xEC
+  CONSTANT ID_SEC : unsigned(3 DOWNTO 0) := x"F";
+  CONSTANT ID_HW  : std_logic_vector(7 DOWNTO 0) := x"EC";
 
   -- The lowest dirty sector
   FUNCTION first (CONSTANT v : unsigned(15 DOWNTO 0)) RETURN unsigned IS
@@ -140,6 +147,9 @@ BEGIN
               IF sec=x"F" THEN
                 loading<='0';
                 ready_i<='1';
+                IF idgen='1' THEN
+                  dirty(to_integer(ID_SEC))<='1';
+                END IF;
               ELSE
                 sec<=sec+1;
                 rd_i<='1';
@@ -148,6 +158,11 @@ BEGIN
             END IF;
           END IF;
       END CASE;
+
+      IF loading='1' AND sd_ack='1' AND sd_buff_wr='1' AND sec=ID_SEC
+        AND sd_buff_addr=ID_HW THEN
+        idgen<=to_std_logic(sd_buff_dout(7 DOWNTO 0)=x"00");
+      END IF;
 
       -- CPU writes (after the CASE: a mark wins over the clear above)
       IF nv_r.chg='1' AND ena='1' THEN
