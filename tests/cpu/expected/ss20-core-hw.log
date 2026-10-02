@@ -53,6 +53,8 @@ PASS cache: ldstub and swap on a cached line change only their byte / word
 PASS cache: a store then ldstub/swap on the same line keeps the store
 PASS cache: SS20 write-backs of 32 modified lines reach memory intact
 PASS cache: a patched instruction runs after FLUSH
+PASS cache: the words of a line used right after its miss are memory's
+PASS cache: a routine fetched through its line fill runs memory's words
 PASS smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
 PASS smp: SS20 3 CPUs increment a shared counter under ldstub and swap locks
 PASS smp: SS20 with SE off CPU 0 keeps its stale copy of CPU 1's line (C-4)
@@ -63,4 +65,4 @@ PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
 PASS iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=63 fail=0 skip=0
+CPUTEST DONE pass=65 fail=0 skip=0
