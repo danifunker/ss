@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's MMU/cache/SMP work and the DDR bridge write-pair fix merged (session 4). **Solaris 8 boots to login with 3 CPUs on the SS20 under the official Sun OBP 2.25** (`sol8-ss20.img`), at first with two in-memory workarounds for regressions of the merged `rtl/cpu` change (reserved ASRs, ACTION register, SFSR.OW; the first also broke NetBSD's libcrypto): Fable fixed all three on `ss20-asr`, merged `b775165` (simulation SS20 60/0/0, SS5 51/0/0, both fits met; board tests pending). Hand-off: [RESUME-20261001.md](../RESUME-20261001.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris on the board); CPU suite on the board: SS20 57/3/0 and SS5 49/2/0 (`3809e87`; the failures are the three Fable regressions, as tests, fixed in `b775165`: simulation 60/0/0 and 51/0/0, the board re-record pending), simulation = board; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's three `rtl/cpu` fixes (`b775165`) verified on the board (session 5): NetBSD 11 to a shell, and **Solaris 8 under the official Sun OBP 2.25 with no in-memory patch, 3 CPUs**. **NVRAM saved to the SD card** (TOD-6, OSD "NVRAM"): the OBP keeps its settings, and `hwtest.sh 20 solaris-obp` boots Solaris unattended in 4 minutes. Open: **memory corruption under sustained disk I/O with the caches on** (Solaris with 1 or 3 CPUs, NetBSD), handed to Fable: `scratch/handoff/fable-ss20-corruption.md`. Hand-off: [RESUME-20261002.md](../RESUME-20261002.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris under OpenBIOS, **Solaris under the Sun PROM with a saved NVRAM**); CPU suite on the board: **SS20 63/0/0, SS5 53/0/0** (`9a99e4b` + tests, session 5), simulation = board; `memstress` (board-only RAM stress, 3 CPUs) passes; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -641,37 +641,45 @@ drop one of the two machines, and asked to focus on the SS20.
 
 ### Session 5 results (2026-10-01 night to 2026-10-02)
 
-- **Fable's three fixes on the board** (`b775165`, rbf
-  `02569da` seed 1): SS20 CPU suite **60/0/0**, identical to the
-  simulation (new baseline `1f878e7`); **NetBSD 11 on the SS20: login and
-  shell** (`hwtest.sh 20 netbsd` PASS, `syslogd` runs).
+- **Fable's three fixes on the board** (`b775165`): SS20 CPU suite 60/0/0
+  (baseline `1f878e7`), then with this session's tests **SS20 63/0/0, SS5
+  53/0/0**, both identical to the simulation; **NetBSD 11 on the SS20:
+  login and shell** (`syslogd` runs).
 - **Solaris 8 under the official OBP 2.25 without any in-memory patch**:
-  the ACTION loop and the user-text page-in work; the second boot reached
-  `console login:` with **3 CPUs on-line**. But the kernel corrupts memory
-  under disk I/O, with 3 CPUs and with one (`psradm -f 1 2`): a panic at
-  boot (`bread_common+0x190`, a data fault at an ALU instruction, the
-  window's outs from another frame), a hang after ~7000 `cksum` processes
-  (a stack-growth fault that the kernel never resolves: the PTE stays 0,
-  flash-clearing every D-cache does not help), a panic with one CPU after
-  ~1000 (the kernel jumps to a garbage address in `pagefault`). Crash dumps
-  `vmcore.0-2` on `sol8-ss20.img`. Evidence and leads for Fable:
-  `scratch/handoff/fable-ss20-corruption.md`. New suite test
-  `t_smp_ring` (3 CPUs, a token through one cached line, counters and
-  ldstub in the same line): passes in simulation.
+  the ACTION loop and the user-text page-in work; login with **3 CPUs
+  on-line**.
 - **NVRAM persistence (TOD-6, `9a99e4b`)**: OSD "NVRAM" (`SC3`), an
   8192-byte image file, loaded at every core start (the machine waits for
-  it), written back half a second after the last change; a blank file gets
-  the built-in IDPROM; `t_nvram`, `sim --nvram`, `sim/run-nvram.sh 20`
-  PASS. The first SS20 fit missed the 55 MHz clock by 0.257 ns on a path
-  inside CPU 1 (`mmu_cr_e` → decode bypass), not the NVRAM: another seed.
-- **OpenBIOS was slow on the SS20** (about two minutes to "Trying disk",
-  15 s to zap the NVRAM): its MMU setup turned on the D-cache but left the
-  I-cache off ("ICE non"), so every instruction came from DDR. Turned on
-  (`bios/openbios/arch/sparc32/openbios.c`): `go()` turns both caches off
-  and flushes them before it enters a loaded program, and OpenBIOS runs no
-  code it writes.
+  it, 3 s at most without one), written back half a second after the last
+  change; a blank file gets the built-in IDPROM (`rtl/mister/nvram_sd.vhd`,
+  `iram_rtc` true dual-port). On the board: settings typed once at `ok`
+  survive a core reload; the OBP then starts in normal mode (no diag POST),
+  console on ttya, and boots Solaris in 2.5 minutes. **`hwtest.sh 20 --obp
+  FILE solaris-obp`** runs that unattended (4 minutes, 3 CPUs). Fits: SS20
+  seed 3 (`scratch/SunSparcStation20-9a99e4b-s3.rbf`: +0.201 ns worst, on
+  the HDMI clock; +0.653 ns at 55 MHz; 87 % ALMs; seeds 1, 2, 4 missed by
+  0.09-0.26 ns), SS5 seed 1 (+0.078 ns HDMI, +0.321 ns at 60 MHz).
+- **Memory corruption under disk I/O with the caches on** (the open
+  problem). Three parallel `find /usr -type f -exec cksum {} \;` loops:
+  Solaris with 3 CPUs hangs after ~7000 processes (a stack-growth fault
+  the kernel never resolves), with one CPU on-line panics after ~1000-2500
+  (a jump to a garbage address in `pagefault`; `recursive mutex_enter` on
+  the page-table lock its owner had released); a boot once panicked in
+  `bread_common` with another frame's register-window outs; NetBSD 11
+  (uniprocessor) stops dead after ~8000 (no debug-link answer). **With the
+  caches off Solaris survives 40 minutes (~3600 processes).** Plain cached
+  traffic is fine: `memstress` (board-only ROM, CPUs 0-2 × 144 MB) and the
+  new `t_smp_ring` and `t_cache_st_atomic` pass on the board. So the loss
+  needs the caches plus what an OS adds (DMA page-ins, table walks, TLB and
+  line flushes, locks on lines another agent touches). Handed to Fable
+  with the evidence, the crash dumps and a board reproducer:
+  `scratch/handoff/fable-ss20-corruption.md` (`scratch/solstress.sh`).
+- **OpenBIOS ran with its I-cache off** (its MMU setup said "ICE non"): on
+  the SS20 about two minutes to "Trying disk". Turned on (`9e89fda`): 25 s;
+  NetBSD PASS with it. `bios/boot.rom` (stock) unchanged.
 - A blank NVRAM on the SS20 OBP: "Incorrect configuration checksum" sets
-  `diag-switch?` true, hence the diag boot after every core load.
+  `diag-switch?` true, hence the diag boot after every core load before
+  TOD-6.
 
 ### Work items (the content of the stages)
 
@@ -807,6 +815,18 @@ drop one of the two machines, and asked to focus on the SS20.
   had it.
 
 ## Session log
+
+- **2026-10-02, session 5 (SS20).** Fable's three fixes verified on the
+  board (SS20 60/0/0, NetBSD shell); Solaris 8 under the Sun OBP without
+  patches, 3 CPUs. NVRAM saved to the SD card (TOD-6, OSD "NVRAM",
+  `rtl/mister/nvram_sd.vhd`, `sim --nvram`, `sim/run-nvram.sh`), and
+  `hwtest.sh solaris-obp`: Solaris boots unattended. OpenBIOS with its
+  I-cache on (5× faster start). Found: memory corruption under sustained
+  disk I/O with the caches on (both OSes, one or three CPUs; caches off
+  survives): tests `t_nvram`, `t_smp_ring`, `t_cache_st_atomic`, the
+  `memstress` ROM (all pass), and a Fable prompt with the evidence. Suite
+  on the board: SS20 63/0/0, SS5 53/0/0. Hand-off:
+  [RESUME-20261002.md](../RESUME-20261002.md).
 
 - **2026-10-01, session 4 (SS20).** Merged Fable's `ss20-smp` (MMU,
   caches, SMP, the DDR bridge write-pair fix); SS20 CPU suite 59/0/0 on the

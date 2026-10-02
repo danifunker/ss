@@ -50,6 +50,7 @@ PASS cache: SS20 flash clear (ASI 0x36/0x37) drops stale lines
 PASS cache: SS20 write hits: cached reads see the stores, memory shows the write policy
 PASS cache: SS20 line flush after a DTLB miss reaches the line
 PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: a store then ldstub/swap on the same line keeps the store
 PASS cache: SS20 write-backs of 32 modified lines reach memory intact
 PASS cache: a patched instruction runs after FLUSH
 PASS smp: SS20 CPU 0 sees CPU 1's cached store (SE on)
@@ -62,4 +63,4 @@ PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
 PASS iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=62 fail=0 skip=0
+CPUTEST DONE pass=63 fail=0 skip=0

@@ -278,6 +278,71 @@ BEGIN(t_cache_atomic, "cache: ldstub and swap on a cached line change only their
         EXPECT(%i3, 0x55555555, 9)
 END
 
+/* A store, then an atomic on the same cached line, 512 times: the store
+ * must stay. A: st word 0, ldstub byte 5; B: st word 0, swap word 2;
+ * C: a lock in byte 12 taken with ldstub, word 1 stored, the lock
+ * released with stb: the next ldstub must find it free. An atomic that
+ * wrote the line back from a copy older than the store would undo it.
+ * (Solaris 8 on the SS20, one CPU running: "recursive mutex_enter" on a
+ * lock its owner had released, 2026-10-02.) */
+BEGIN(t_cache_st_atomic, "cache: a store then ldstub/swap on the same line keeps the store")
+        call mmu_tables_init
+        nop
+        set MT_PAGE(9) + 0x80, %l0
+        clr %o0
+1:      sta %g0, [%l0 + %o0] 0x20
+        add %o0, 4, %o0
+        cmp %o0, 32
+        bl 1b
+        nop
+        call mmu_on
+        nop
+        ld [%l0], %g0                   /* cache the line */
+        mov 1, %l1                      /* i */
+        clr %l2                         /* A mismatches */
+        clr %l3                         /* B mismatches */
+        clr %l4                         /* C: lock found taken */
+2:      st %l1, [%l0]                   /* A */
+        ldstub [%l0 + 5], %o0
+        stb %g0, [%l0 + 5]
+        ld [%l0], %o1
+        cmp %o1, %l1
+        bne,a 3f
+        add %l2, 1, %l2
+3:      st %l1, [%l0]                   /* B */
+        mov %l1, %o2
+        swap [%l0 + 8], %o2
+        ld [%l0], %o1
+        cmp %o1, %l1
+        bne,a 4f
+        add %l3, 1, %l3
+4:      ldstub [%l0 + 12], %o0          /* C: acquire */
+        tst %o0
+        bne,a 5f
+        add %l4, 1, %l4
+5:      st %l1, [%l0 + 4]
+        stb %g0, [%l0 + 12]             /* release */
+        add %l1, 1, %l1
+        cmp %l1, 513
+        bl 2b
+        nop
+        sta %g0, [%l0] 0x10             /* flush the line */
+        lda [%l0] 0x20, %i0
+        add %l0, 4, %o0
+        lda [%o0] 0x20, %i1
+        add %l0, 12, %o0
+        lda [%o0] 0x20, %i2
+        call mmu_off
+        nop
+        EXPECT(%l2, 0, 1)
+        EXPECT(%l3, 0, 2)
+        EXPECT(%l4, 0, 3)
+        EXPECT(%i0, 512, 4)
+        EXPECT(%i1, 512, 5)
+        srl %i2, 24, %i2
+        EXPECT(%i2, 0, 6)
+END
+
 #if defined(TARGET_SS20)
 /* 32 lines of 8 distinct words each; an ldstub on every line brings it
  * into the cache modified (FILLMOD) and a line flush writes it back. The

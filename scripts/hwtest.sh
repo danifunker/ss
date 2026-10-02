@@ -7,7 +7,9 @@
 #            (--record overwrites that baseline instead)
 #   netbsd   OpenBIOS, console on ttya, HD0 = netbsd11.raw: wait for
 #            'login:', log in as root, run a command, check its output
-#   solaris  OpenBIOS, console on ttya, HD0 = sol8.img (target 3): wait for
+#   solaris  OpenBIOS, console on ttya, HD0 = sol8.img on the SS5,
+#            sol8-ss20.img on the SS20 (its /dev links name the SS20's ESP
+#            path, docs/disk-images.md; target 3): wait for
 #            'console login:', log in as root, run a command, check its output
 #   solaris-obp  the Sun PROM (--obp FILE, here; Sun's image is never in the
 #            repo) with the NVRAM image --nvram NAME (default ss20-obp.nvr in
@@ -102,7 +104,8 @@ for t in "${TESTS[@]}"; do
         ;;
     netbsd|solaris|solaris-obp)
         if [ "$t" = netbsd ]; then img=netbsd11.raw; want='login:'; secs=900
-        elif [ "$t" = solaris ]; then img=sol8.img; want='console login:'; secs=1800
+        elif [ "$t" = solaris ]; then want='console login:'; secs=1800
+            if [ "$REV" = SunSparcStation20 ]; then img=sol8-ss20.img; else img=sol8.img; fi
         else img=sol8-ss20.img; want='console login:'; secs=1800; fi
         if [ "$t" = solaris-obp ]; then
             [ -f "$OBP" ] || { log "solaris-obp needs --obp FILE (the Sun PROM image)"; exit 2; }

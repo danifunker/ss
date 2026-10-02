@@ -35,6 +35,7 @@ PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
 PASS chipset: system control reads 0 after power-on (RS, WD clear)
 PASS chipset: NVRAM IDPROM format 1, machine type, checksum
+PASS chipset: NVRAM byte and word stores read back (restored)
 PASS chipset: frame buffer slot starts with FCode (0xf1 header)
 PASS chipset: DMA2 E_BASE_ADDR resets to 0xff
 PASS chipset: the PROM answers at pa 0x7000_0000
@@ -42,18 +43,13 @@ PASS chipset: 82077 floppy, no drive: reset, VERSION, RECALIBRATE, IRQ
 PASS mmu: a changed PTE is seen after the matching ASI 3 flush, not before
 PASS mmu: ASI 3 probes page/segment/region/context/entire; 0 on invalid, reserved
 PASS mmu: SFSR L/AT/FT/FAV/OW and SFAR on invalid, reserved, protection, privilege faults; NF
-    check 00000003 exp=00000366 obs=00000367
-FAIL mmu: an instruction access fault sets the SFSR once (FAV, no OW)
+PASS mmu: an instruction access fault sets the SFSR once (FAV, no OW)
 PASS cache: ldstub and swap on a cached line change only their byte / word
+PASS cache: a store then ldstub/swap on the same line keeps the store
 PASS cache: a patched instruction runs after FLUSH
 PASS fpu: misaligned st %f with a pending fp_exception takes tt 7 first
 PASS fpu: FQ holds the trapping FPop; STDFQ empties it, is privileged, traps when empty
 PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
-    check 00000001 exp=ffffffff obs=00000002
-    check 00000002 exp=5a5a1234 obs=00000000
-    check 00000003 exp=5a5a1234 obs=00000000
-    check 00000004 exp=5a5a1234 obs=00000000
-FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
-    unexpected trap tt=00000002 pc=f0004ea4
-CPUTEST DONE pass=49 fail=2 skip=0
+PASS iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
+CPUTEST DONE pass=53 fail=0 skip=0
