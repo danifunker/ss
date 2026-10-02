@@ -675,8 +675,11 @@ drop one of the two machines, and asked to focus on the SS20.
   with the evidence, the crash dumps and a board reproducer:
   `scratch/handoff/fable-ss20-corruption.md` (`scratch/solstress.sh`).
 - **OpenBIOS ran with its I-cache off** (its MMU setup said "ICE non"): on
-  the SS20 about two minutes to "Trying disk". Turned on (`9e89fda`): 25 s;
-  NetBSD PASS with it. `bios/boot.rom` (stock) unchanged.
+  the SS20 about two minutes to "Trying disk". Turned on (`9e89fda`): 25 s.
+  **Our OpenBIOS build is now the default `bios/boot.rom`** (`59ffd98`):
+  NetBSD 11 and Solaris 8 reach a shell with it on both machines (SS20
+  Solaris from `sol8-ss20.img` with 3 CPUs; session 3's "Cannot assemble
+  drivers for root" was the SS5-made image).
 - A blank NVRAM on the SS20 OBP: "Incorrect configuration checksum" sets
   `diag-switch?` true, hence the diag boot after every core load before
   TOD-6.
