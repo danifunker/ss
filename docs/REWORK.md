@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (session 3; the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. SS20 on the board: CPU suite 39/0, NetBSD 11 to a shell, **the official Sun OBP 2.25 to `ok`** (3 CPUs, 464 MB, `probe-scsi`), and it boots the Solaris 8 kernel (panics in `kmem_cache_create`, open). Hand-off: [RESUME-20261001.md](../RESUME-20261001.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris on the board); the CPU suite: SS5 40/0 in simulation (board baseline 38, to re-record), SS20 39/0 on the board = simulation; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads CPU state on the board |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20** (the SS5 may be cut). SS5 at 60 MHz, SS20 at 55 MHz, both closed. Fable's MMU/cache/SMP work and the DDR bridge write-pair fix merged (session 4). **Solaris 8 boots to login with 3 CPUs on the SS20 under the official Sun OBP 2.25** (`sol8-ss20.img`), so far with two in-memory workarounds for regressions of the merged `rtl/cpu` change, which go back to Fable (`scratch/handoff/fable-iu6-asr.md`: reserved ASRs, ACTION register, SFSR.OW; the first also breaks NetBSD's libcrypto). Hand-off: [RESUME-20261001.md](../RESUME-20261001.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, NetBSD, Solaris on the board); CPU suite on the board: SS20 57/3/0 and SS5 49/2/0 (`3809e87`; the failures are the three Fable regressions, as tests), simulation = board; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump` reads and patches CPU state on the board |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -584,6 +584,47 @@ drop one of the two machines, and asked to focus on the SS20.
   PATTERN (it kills its own shell); two readers on `/dev/ttyS1` split the
   bytes (it looked like a UART bug once more).
 
+### Session 4 results (2026-10-01 evening)
+
+- **Merged `ss20-smp`** (Fable: `ss20-mmu` + `ss20-smp`, `41007eb`): 16-bit
+  contexts, flash clear, synchronous line flushes, SRMMU/V8 trap fixes, and
+  the **DDR bridge write-pair fix** (`276b3db`, `plomb_avalon_mister.vhd`:
+  a stalled odd beat replaced the latched even word). On the board the SS20
+  CPU suite matched the simulation, 59/0/0 (`4d73d63`).
+- **Three regressions of `5568d30` found on the board**, each now a test
+  that fails on the board (`3809e87`: SS20 57/3/0, SS5 49/2/0), each for
+  Fable (`scratch/handoff/fable-iu6-asr.md`):
+  1. Reserved ASRs trap `illegal_instruction` (IU-6, our audit's mistake):
+     NetBSD's `syslogd` and `login` die of SIGILL at OpenSSL's V8/V9 test
+     `rd %asr2` (gdb on the core file, single-user boot). The microSPARC
+     manuals: ASR reads act as RDY, writes as NOP. `t_rdasr` rewritten.
+  2. ASI 0x4c (SuperSPARC ACTION) no longer aliases the I-cache tags but
+     does not read back: Solaris's `bpt_reg` (in the `TI,TMS390Z55` CPU
+     module) loops until it does. `t_asi_width` checks 6-8.
+  3. One instruction fault sets SFSR.OW (the fetch unit's next fetch on the
+     same unmapped page records a second fault): Solaris's sun4m
+     `get_fault_type` then never pages user text in and the process loops
+     on the fault. Upstream kept the first instruction fault. `t_mmu_ifault`
+     (fails on both machines, SFSR `0x367`).
+- **Solaris 8 under the official Sun OBP 2.25 on the SS20**: the bridge
+  fix cured the `taskq` panic of session 3. With 2 and 3 patched in memory
+  (`pcdump -W`, `scratch/solpatch.sh`), Solaris reaches its rc scripts;
+  with **`sol8-ss20.img`** (the SS5-made image's device links fixed for the
+  SS20's ESP path in QEMU, [disk-images.md](disk-images.md)) it boots to
+  `sunsparc8 console login:`, **3 CPUs on-line** (`psrinfo`), 464 MB, the
+  root on `c1t3d0s0`. The OBP needs `setenv diag-device disk`,
+  `output-device ttya`, `input-device ttya`, `reset` after every core load
+  (blank NVRAM: TOD-6).
+- The "Cannot assemble drivers for root" of Solaris under OpenBIOS on the
+  SS20 (session 3) is probably the same image problem; retry with
+  `sol8-ss20.img` after the Fable fix.
+- Tools: `pcdump` reads/stores any ASI (`-A`, `-S`), patches a word
+  through its physical address (`-W`) and resumes a CPU elsewhere (`-j`);
+  `tools/ufsread.py` reads NetBSD's FFSv1 too; the test runtime's
+  `V_TRAP_RESUME` lets a test survive an instruction fault.
+- The SS5 rbf at 60 MHz with the merge (`41007eb`, +0.054 ns) passes
+  everything on the board but the two shared regressions.
+
 ### Work items (the content of the stages)
 
 0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
@@ -718,6 +759,15 @@ drop one of the two machines, and asked to focus on the SS20.
 
 ## Session log
 
+- **2026-10-01, session 4 (SS20).** Merged Fable's `ss20-smp` (MMU,
+  caches, SMP, the DDR bridge write-pair fix); SS20 CPU suite 59/0/0 on the
+  board. Three regressions of its `rtl/cpu` change found on the board and
+  turned into tests (reserved ASRs, ACTION register, SFSR.OW), handed back
+  to Fable (`scratch/handoff/fable-iu6-asr.md`). **Solaris 8 boots to login
+  with 3 CPUs on the SS20 under the official Sun OBP 2.25** (in-memory
+  workarounds for two of them; `sol8-ss20.img`). `pcdump` patching options.
+  New rule from the user: never change branches unless told to. Hand-off:
+  [RESUME-20261001.md](../RESUME-20261001.md).
 - **2026-10-01, session 3 (SS20).** SS20 at 55 MHz on the board: CPU suite
   39/0, NetBSD shell. MSI MID/arbiter/IMPL and the slot-7 fold (chipset
   only), an 82077 floppy model, `sim --diag` (Sun POST in simulation),

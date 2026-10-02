@@ -52,14 +52,17 @@ Sources:
 The SS20 PROM also runs in boot mode from VA 0, with the PROM at
 `0xF_F000_0000`, which the core already does. Its MP start-up comes first.
 
-**Status (2026-10-01, session 3):** S1, S2, S4, S5 and S6 done on the
-board (MSI MID and arbiter, IMPL 1, slot-7 fold, NVRAM IDPROM, TCX FCode),
-plus an 82077 floppy model the PROM needed: `ok` with 3 CPUs and 464 MB,
-`probe-scsi`, and `boot disk` loads Solaris 8 (it panics early, open). S3
-works (the `boot` reset). Left: S7 (16-bit contexts, Fable prompt
-`scratch/handoff/fable-ss20-mmu.md`), S8, LAN-1 (the PROM's `le` loopback
-test, diag-mode `boot net`), M9 bus errors (empty SBus slots print
-"Invalid FCode start byte").
+**Status (2026-10-01, session 4):** S1-S8 done on the board. S1, S2, S4,
+S5, S6 (session 3: MSI MID and arbiter, IMPL 1, slot-7 fold, NVRAM IDPROM,
+TCX FCode, an 82077 floppy model) and S3 (the `boot` reset); S7 (16-bit
+contexts, Fable `ss20-mmu`) and S8: **Solaris 8 boots to login with 3 CPUs
+on-line** (the PROM's `v3_cpustart` starts the slaves), with
+`sol8-ss20.img` and, until Fable's fix (`scratch/handoff/fable-iu6-asr.md`),
+two in-memory workarounds (`scratch/solpatch.sh`: the ACTION register
+loop, SFSR.OW). Left: NVRAM persistence (TOD-6; today every core load
+comes up in diag mode and boots `net`), LAN-1 (the PROM's `le` loopback
+test), M9 bus errors (empty SBus slots print "Invalid FCode start
+byte"), the POST's diagnostic ASIs (MMU-2, C-1) for `diag-switch?`.
 
 | M | Milestone | Blocker | Change |
 |---|---|---|---|
