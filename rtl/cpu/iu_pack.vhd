@@ -1112,8 +1112,11 @@ PACKAGE BODY iu_pack IS
             cat_o:=CAT_ALU;
             cat_o.r_reg:=use_rs1 & use_rs2 & '0';
             cat_o.m_reg:='0';
-            cat_o.m_ry:='1';
-            
+            -- Only WRY (rd = 0) writes Y. WRASR to a reserved ASR (rd /= 0,
+            -- V8 B.29 leaves them to the implementation) is a NOP, as on
+            -- the microSPARC-I/II and in QEMU; it must not write Y either.
+            cat_o.m_ry:=to_std_logic(op_rd="00000");
+
           WHEN "110001" =>                  -- WRPSR (PRIV)
             cat_o:=CAT_ALU;
             cat_o.priv:='1'; -- Privilegied
@@ -1807,13 +1810,12 @@ PACKAGE BODY iu_pack IS
       WHEN "101000" =>                  -- RDY
         -- SparcV7 ne reconnait pas les registres ASR, il n'y a que le reg. Y
         rd_ot:=ry;
-        -- RDASR: ASR 1-14, and 15 with rd /= 0, are reserved (V8 B.28);
-        -- these modules have no ASR 16-31 either. rs1 = 15, rd = 0 is STBAR.
-        IF cat.op(18 DOWNTO 14)/="00000" AND
-          NOT (cat.op(18 DOWNTO 14)="01111" AND cat.op(29 DOWNTO 25)="00000") THEN
-          trap_o:=TT_ILLEGAL_INSTRUCTION;
-        END IF;
-        
+        -- RDASR: every ASR (rs1 = 1..31) reads as Y, no trap. V8 B.28
+        -- leaves reserved ASRs to the implementation, and the microSPARC-
+        -- I/II (and QEMU) read them all as RDY; STBAR (rs1 = 15, rd = 0)
+        -- is then RDY to %g0. OpenSSL probes V8/V9 with "rd %asr2" and
+        -- NetBSD's syslogd and login died of SIGILL when it trapped.
+
       WHEN "101001" =>                  -- RDPSR (PRIV)
         rd_ot:=rdpsr(psr,IU_IMP_VERSION);
         
@@ -1838,9 +1840,8 @@ PACKAGE BODY iu_pack IS
         -- SparcV7 ne reconnait pas les registres ASR, seulement le registre Y
         -- <AVOIR> WRY est un cas particulier, Y est aussi ecrit par les MUL/DIV
         rd_ot:=rs1 XOR rs2l;
-        IF cat.op(29 DOWNTO 25)/="00000" THEN -- WRASR: no ASR but Y here
-          trap_o:=TT_ILLEGAL_INSTRUCTION;
-        END IF;
+        -- WRASR with rd /= 0 does not trap: the decoder makes it a NOP
+        -- (m_ry = 0), like the microSPARC-I/II.
         -- Copy TADDcc : Simplification decoder
         psr_o.icc.v:=(rs1(31) AND rs2l(31) AND NOT addsub(31)) OR
                       (NOT rs1(31) AND NOT rs2l(31) AND addsub(31)) OR
