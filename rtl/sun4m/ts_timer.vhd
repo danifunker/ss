@@ -263,7 +263,10 @@ BEGIN
       -- 1_0010 : Timer Configuration register
       IF rsel='1' AND w.a(16)='1' AND w.a(4 DOWNTO 2)="100" THEN
         IF w.be(3)='1' AND w.wr='1' THEN
-          p_mode<=w.dw(3 DOWNTO 0) AND CPUEN;
+          -- The SS20's four T bits are read/write however many CPUs are
+          -- fitted (its POST writes 0xf and reads it back, TMR-4); the
+          -- SS5's Slavio has T0 only
+          p_mode<=w.dw(3 DOWNTO 0) AND mux(CPU1 OR CPU2 OR CPU3, "1111", CPUEN);
         END IF;
         dr<="0000000000000000000000000000" & p_mode;
       END IF;

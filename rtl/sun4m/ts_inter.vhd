@@ -91,6 +91,11 @@ ARCHITECTURE rtl OF ts_inter IS
   SIGNAL hardint0,hardint1,hardint2,hardint3 : unsigned(15 DOWNTO 1);
   SIGNAL softint0,softint1,softint2,softint3 : unsigned(15 DOWNTO 1);
   SIGNAL pend,mask : uv32;
+  -- The mask bits that exist: on the SS20 (MP) bits 26:23 are reserved and
+  -- read 0 [S4M 5.7.3.2]; the SS20 POST writes 0xffffffff to mask-set and
+  -- expects 0xf87fffff (INT-2). The SS5's Slavio reserves more bits; it
+  -- keeps all 32 here (parked, untested).
+  CONSTANT MASK_IMPL : uv32 := mux(CPU1 OR CPU2 OR CPU3, x"F87FFFFF", x"FFFFFFFF");
   SIGNAL itr : uv2;
   SIGNAL sysint : uv32;
   SIGNAL dr : uv32;
@@ -281,7 +286,7 @@ BEGIN
       -- 1_0008 : System Interrupt target mask clear pseudo-register (W)
       IF rsel='1' AND w.a(16)='1' AND w.a(4 DOWNTO 2)="010" THEN
         IF w.be="1111" AND w.wr='1' THEN
-          mask<=mask AND NOT w.dw;
+          mask<=mask AND NOT w.dw AND MASK_IMPL;
         END IF;
         dr<=ZERO32;
       END IF;
@@ -289,7 +294,7 @@ BEGIN
       -- 1_000C : System Interrupt target mask set pseudo-register (W)
       IF rsel='1' AND w.a(16)='1' AND w.a(4 DOWNTO 2)="011" THEN
         IF w.be="1111" AND w.wr='1' THEN
-          mask<=mask OR w.dw;
+          mask<=(mask OR w.dw) AND MASK_IMPL;
         END IF;
         dr<=ZERO32;
       END IF;
@@ -311,7 +316,7 @@ BEGIN
         softint1<="000000000000000";
         softint2<="000000000000000";
         softint3<="000000000000000";
-        mask<=x"7FFFFFFF";
+        mask<=x"7FFFFFFF" AND MASK_IMPL;
         itr<="00";  -- ITR = 0 after reset [Slavio Table 6-21] (INT-1)
       END IF;
     END IF;    
