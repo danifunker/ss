@@ -47,6 +47,7 @@ PACKAGE ts_pack IS
   -- MAC EMI <-- LANCE
   TYPE type_mac_emi_w IS RECORD
     d        : unsigned(15 DOWNTO 0);
+    be       : unsigned(1 DOWNTO 0);    -- bytes of d to send: 1 d(15:8), 0 d(7:0)
     push     : std_logic;               -- Impulsion écriture
     stp      : std_logic;               -- Start Packet
     enp      : std_logic;               -- End Packet

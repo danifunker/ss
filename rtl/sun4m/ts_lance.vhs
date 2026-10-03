@@ -623,6 +623,8 @@ BEGIN
     VARIABLE mic_dw_v : uv32;
     VARIABLE mic_be_v : unsigned(0 TO 3);
     VARIABLE rec_pop_v,emi_push_v,emi_start_v : std_logic;
+    VARIABLE emi_be_v : unsigned(1 DOWNTO 0);
+    VARIABLE emi_n_v : natural RANGE 1 TO 2;
   BEGIN
     
     IF rising_edge(clk) THEN
@@ -673,6 +675,8 @@ BEGIN
       ----------------------------------
       rec_pop_v:='0';
       emi_push_v:='0';
+      emi_be_v:="11";
+      emi_n_v:=2;
       emi_start_v:='0';
       
       rint_set<='0';
@@ -877,15 +881,33 @@ BEGIN
         ----------------------------------
         -- Boucle copie émission Buffer --> MAC
         WHEN LOOP_LOAD =>
+          -- Ends with the line's last halfword once it is pushed: a buffer
+          -- that starts on that halfword first pops the FIFO up to its word
+          -- (stopping at once there looped forever, without a push).
           loop_v:=(tcpt<tcnt_neg_v) AND
-                   (dma_a(N_LINE+1 DOWNTO 1)/=C1(N_LINE+1 DOWNTO 1));
+                   NOT (dma_a(N_LINE+1 DOWNTO 1)=C1(N_LINE+1 DOWNTO 1) AND
+                        fifo_ali=dma_a(N_LINE+1 DOWNTO 2));
           dma_rw_v:='1';
           IF fifo_ali=dma_a_v(N_LINE+1 DOWNTO 2) THEN
-            dma_a_v:=dma_a_v+2;
+            -- The buffer's bytes in this halfword: from the second one at
+            -- an odd address, only the first one when one byte is left.
+            -- A buffer may start and end at any byte (Solaris's driver
+            -- sends frames in pieces straight from its network buffers).
+            IF dma_a_v(0)='1' THEN
+              emi_be_v:="01";
+              emi_n_v:=1;
+            ELSIF tcnt_neg_v-tcpt=1 THEN
+              emi_be_v:="10";
+              emi_n_v:=1;
+            ELSE
+              emi_be_v:="11";
+              emi_n_v:=2;
+            END IF;
+            dma_a_v:=dma_a_v+emi_n_v;
             IF tcpt<tcnt_neg_v THEN
               emi_push_v:='1';
-              tcpt<=tcpt+2;
-              IF dma_a_v(1)='0' THEN
+              tcpt<=tcpt+emi_n_v;
+              IF dma_a_v(1 DOWNTO 0)="00" THEN
                 mic_pop_v:='1';
                 ali_inc_v:='1';
               END IF;
@@ -995,6 +1017,7 @@ BEGIN
       
       mac_emi_w.crcgen<=NOT dtcr OR tmd_add_fcs;
       mac_emi_w.push <=emi_push_v;
+      mac_emi_w.be   <=emi_be_v;
       mac_emi_w.clr  <=init;
       
       -- REC_W

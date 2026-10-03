@@ -22,7 +22,9 @@
 --           the 4-byte FCS Main appends, 21:16 the LADRF index of the
 --           destination address, which Main computes), frame
 --
--- Transmit: the LANCE pushes the frame's 16-bit words (the first with stp);
+-- Transmit: the LANCE pushes the frame 16 bits at a time (the first with
+-- stp), one or both bytes of each ('be': a buffer may start or end on an
+-- odd byte, so a frame in several buffers needs byte granularity);
 -- 'busy' from the first word until the frame is in the mailbox stops it from
 -- starting another. A frame is complete when its bytes reach 'len' with enp.
 -- While the TX ring is full the LANCE waits (busy), as on a busy wire; the
@@ -110,7 +112,7 @@ ARCHITECTURE rtl OF eth_hps IS
 
   -- Transmit: words from the LANCE
   SIGNAL tx_acc   : unsigned(63 DOWNTO 0);  -- the word being filled
-  SIGNAL tx_cnt   : unsigned(10 DOWNTO 0);  -- 16-bit words pushed
+  SIGNAL tx_cnt   : unsigned(11 DOWNTO 0);  -- bytes received
   SIGNAL tx_over  : std_logic;              -- longer than a slot
   SIGNAL tx_busy  : std_logic;              -- a frame is in progress
   SIGNAL tx_done  : std_logic;              -- complete, to be posted
@@ -180,8 +182,9 @@ BEGIN
   ------------------------------------------------------------------------------
   -- Transmit: collect the LANCE's words into txbuf
   TxIn: PROCESS (clk)
-    VARIABLE cnt_v : unsigned(10 DOWNTO 0);
+    VARIABLE cnt_v : unsigned(11 DOWNTO 0);
     VARIABLE acc_v : unsigned(63 DOWNTO 0);
+    VARIABLE b_v   : unsigned(7 DOWNTO 0);
   BEGIN
     IF rising_edge(clk) THEN
       tx_flush <= '0';
@@ -196,29 +199,36 @@ BEGIN
           acc_v := tx_acc;
         END IF;
         tx_busy <= '1';
-        CASE cnt_v(1 DOWNTO 0) IS
-          WHEN "00"   => acc_v(15 DOWNTO 0)  := swap16(mac_emi_w.d);
-          WHEN "01"   => acc_v(31 DOWNTO 16) := swap16(mac_emi_w.d);
-          WHEN "10"   => acc_v(47 DOWNTO 32) := swap16(mac_emi_w.d);
-          WHEN OTHERS => acc_v(63 DOWNTO 48) := swap16(mac_emi_w.d);
-        END CASE;
-        IF cnt_v(1 DOWNTO 0) = "11" THEN
-          IF cnt_v(10 DOWNTO 2) < MAXLEN / 8 THEN
-            txbuf_wr <= '1';
-            txbuf_wa <= cnt_v(9 DOWNTO 2);
-            txbuf_d  <= acc_v;
-          ELSE
-            tx_over <= '1';
+        -- up to two bytes, d(15:8) first; frame byte i is byte i mod 8 of
+        -- its 64-bit word. Two bytes complete at most one word.
+        FOR k IN 1 DOWNTO 0 LOOP
+          IF mac_emi_w.be(k) = '1' THEN
+            b_v := mac_emi_w.d(8 * k + 7 DOWNTO 8 * k);
+            FOR l IN 0 TO 7 LOOP
+              IF cnt_v(2 DOWNTO 0) = l THEN
+                acc_v(8 * l + 7 DOWNTO 8 * l) := b_v;
+              END IF;
+            END LOOP;
+            IF cnt_v(2 DOWNTO 0) = "111" THEN
+              IF cnt_v(11 DOWNTO 3) < MAXLEN / 8 THEN
+                txbuf_wr <= '1';
+                txbuf_wa <= cnt_v(10 DOWNTO 3);
+                txbuf_d  <= acc_v;
+              ELSE
+                tx_over <= '1';
+              END IF;
+              acc_v := (OTHERS => '0');
+            END IF;
+            cnt_v := cnt_v + 1;
           END IF;
-          acc_v := (OTHERS => '0');
-        END IF;
+        END LOOP;
         tx_acc <= acc_v;
-        tx_cnt <= cnt_v + 1;
+        tx_cnt <= cnt_v;
       END IF;
 
       -- Complete: its bytes reached the length of its last buffer
       IF tx_busy = '1' AND tx_done = '0' AND mac_emi_w.push = '0' AND
-         mac_emi_w.enp = '1' AND (tx_cnt & '0') >= mac_emi_w.len AND
+         mac_emi_w.enp = '1' AND tx_cnt >= mac_emi_w.len AND
          mac_emi_w.len /= 0 THEN
         tx_done <= '1';
         tx_flush <= '1';
@@ -227,10 +237,10 @@ BEGIN
           tx_len <= mac_emi_w.len - 4;
         END IF;
       END IF;
-      IF tx_flush = '1' AND tx_cnt(1 DOWNTO 0) /= "00" THEN
-        IF tx_cnt(10 DOWNTO 2) < MAXLEN / 8 THEN
+      IF tx_flush = '1' AND tx_cnt(2 DOWNTO 0) /= "000" THEN
+        IF tx_cnt(11 DOWNTO 3) < MAXLEN / 8 THEN
           txbuf_wr <= '1';
-          txbuf_wa <= tx_cnt(9 DOWNTO 2);
+          txbuf_wa <= tx_cnt(10 DOWNTO 3);
           txbuf_d  <= tx_acc;
         END IF;
       END IF;

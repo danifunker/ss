@@ -45,7 +45,7 @@
 /* LANCE addresses: offsets in SCRATCH */
 #define IB              0x100           /* the init block */
 #define RDR             0x200           /* RX ring: 4 descriptors (RLEN 2) */
-#define TDR             0x300           /* TX ring: 1 descriptor */
+#define TDR             0x300           /* TX ring: 1 descriptor (4 for chains) */
 #define TXBUF           0x800           /* below 4096: an immediate */
 #define RXBUF           0x2000          /* 4 x 2 KB */
 #define RXBCNT          1600
@@ -246,8 +246,9 @@ check_rx:
 8:      ret
         restore %l7, 0, %o0
 
-/* eth_init(mode %i0) -> %i0 = CSR0 after INIT and STRT (0 if IDON never
- * came): the IOMMU, DMA2's channel, the init block and the rings */
+/* eth_init(mode %i0, TLEN field %i1: 0 for one TX descriptor, 0x4000
+ * for four) -> %i0 = CSR0 after INIT and STRT (0 if IDON never came): the
+ * IOMMU, DMA2's channel, the init block and the rings */
 eth_init:
         save %sp, -96, %sp
         set SITM_SET_PA, %l0            /* the test polls: mask everything */
@@ -323,7 +324,7 @@ eth_init:
         mov TDR, %o1
         call mh
         mov IB + 20, %o0
-        clr %o1                         /* TLEN 0: 1 descriptor */
+        mov %i1, %o1                    /* TLEN, TDRA[23:16] 0 */
         call mh
         mov IB + 22, %o0
         /* the RX ring: 4 buffers, all the LANCE's */
@@ -347,10 +348,15 @@ eth_init:
         cmp %l0, 4
         bl 4b
         nop
-        /* the TX descriptor: the host's */
-        clr %o1
+        /* the TX descriptors: the host's */
+        clr %l0
+7:      clr %o1
         call mh
-        mov TDR + 2, %o0
+        add %l0, TDR + 2, %o0
+        add %l0, 8, %l0
+        cmp %l0, 32
+        bl 7b
+        nop
         /* CSR1/2: the init block's address; INIT, wait for IDON, STRT */
         mov 1, %o0
         call le_w
@@ -382,6 +388,7 @@ eth_init:
 /* ---------------------------------------------------------------- */
 
 BEGIN(t_eth_init, "eth: the LANCE reads its init block (IDON), then runs (TXON, RXON)")
+        clr %o1
         call eth_init
         clr %o0
         set 0x0037, %o1                 /* RXON TXON STOP STRT INIT */
@@ -510,6 +517,7 @@ BEGIN(t_eth_miss, "eth: with no buffer left the frame is missed (MISS), then the
 END
 
 BEGIN(t_eth_loopback, "eth: internal loopback (MODE LOOP|INTL): the frame comes back, not on the wire")
+        clr %o1
         call eth_init
         mov 0x0044, %o0                 /* MODE: INTL | LOOP */
         set 0x0037, %o1
@@ -530,12 +538,188 @@ BEGIN(t_eth_loopback, "eth: internal loopback (MODE LOOP|INTL): the frame comes 
         mov 70, %o2
         EXPECT(%o0, 0, 4)
         /* back to normal for whatever runs next */
+        clr %o1
         call eth_init
         clr %o0
 END
 
+/* tmd(desc %o0, offset %o1, bytes %o2, flags %o3): TX descriptor desc
+ * (0-3) for the buffer at LANCE address TXBUF + offset; flags OWN, STP,
+ * ENP as given. Not a leaf: calls mh. */
+tmd:
+        save %sp, -96, %sp
+        sll %i0, 3, %l0
+        add %l0, TDR, %l0
+        set TXBUF, %o1
+        add %o1, %i1, %o1
+        call mh                         /* TMD0: address 15:0 */
+        mov %l0, %o0
+        neg %i2, %o1
+        set 0xffff, %o2
+        and %o1, %o2, %o1
+        call mh                         /* TMD2: -BCNT */
+        add %l0, 4, %o0
+        clr %o1
+        call mh                         /* TMD3 */
+        add %l0, 6, %o0
+        mov %i3, %o1
+        call mh                         /* TMD1: flags, address 23:16 = 0 */
+        add %l0, 2, %o0
+        ret
+        restore
+
+/* chain(n %i0) -> %i0 = 0 when a 100-byte frame sent over n descriptors
+ * (n = 2: 14 + 86 bytes; n = 3: 14 + 33 + 53, the last at an odd
+ * address) comes back whole, else the failing step. As an OS's driver,
+ * the later descriptors are handed over before the first. */
+chain:
+        save %sp, -96, %sp
+        set 0x4000, %o1                 /* four TX descriptors */
+        call eth_init
+        clr %o0
+        mov 1, %l7
+        set 0x0037, %o1
+        and %o0, %o1, %o0
+        cmp %o0, C0_RXON | C0_TXON | C0_STRT
+        bne 9f
+        nop
+        clr %o0                         /* the frame's bytes in TXBUF; */
+        call frame                      /* frame() also sends it from */
+        mov 100, %o1                    /* descriptor 0: let it go first */
+        call wait_own
+        mov TDR, %o0
+        mov 2, %l7
+        tst %o0
+        be 9f
+        nop
+        call wait_own                   /* it came back into RX 0 */
+        mov RDR, %o0
+        mov 3, %l7
+        tst %o0
+        be 9f
+        nop
+        mov 0, %o0
+        call le_w
+        mov C0_TINT | C0_RINT, %o1
+        /* now the chain, from descriptor 1 on */
+        cmp %i0, 2
+        bne 3f
+        nop
+        mov 2, %o0                      /* 2 fragments: 14 + 86 */
+        mov 14, %o1
+        mov 86, %o2
+        set D_OWN | D_ENP, %o3
+        call tmd
+        nop
+        mov 1, %o0
+        clr %o1
+        mov 14, %o2
+        set D_OWN | D_STP, %o3
+        call tmd
+        nop
+        ba 4f
+        mov 2, %l6                      /* the last descriptor */
+3:      mov 3, %o0                      /* 3 fragments: 14 + 33 + 53 */
+        mov 47, %o1
+        mov 53, %o2
+        set D_OWN | D_ENP, %o3
+        call tmd
+        nop
+        mov 2, %o0
+        mov 14, %o1
+        mov 33, %o2
+        set D_OWN, %o3
+        call tmd
+        nop
+        mov 1, %o0
+        clr %o1
+        mov 14, %o2
+        set D_OWN | D_STP, %o3
+        call tmd
+        nop
+        mov 3, %l6
+4:      mov 0, %o0
+        call le_w
+        mov C0_TDMD, %o1
+        sll %l6, 3, %o0
+        call wait_own                   /* the last fragment went */
+        add %o0, TDR, %o0
+        mov 4, %l7
+        tst %o0
+        bne 5f
+        nop
+        /* stuck: print TMD1 of descriptors 0-3 and CSR0 */
+        clr %l5
+6:      sll %l5, 3, %o0
+        call mrh
+        add %o0, TDR + 2, %o0
+        call puthex
+        nop
+        set s_sp, %o0
+        call puts
+        nop
+        add %l5, 1, %l5
+        cmp %l5, 4
+        bl 6b
+        nop
+        call le_r
+        mov 0, %o0
+        call puthex
+        nop
+        set s_sp, %o0
+        call puts
+        nop
+        set LE_PA, %o2                  /* CSR3 as a word: debug bits 31:20 */
+        mov 3, %o0
+        add %o2, LE_RAP, %o3
+        stha %o0, [%o3] SBUS_ASI
+        lda [%o2] SBUS_ASI, %o0
+        call puthex
+        nop
+        set s_nl2, %o0
+        call puts
+        nop
+        ba 9f
+        nop
+5:
+        call wait_own                   /* and the frame came back */
+        mov RDR + 8, %o0
+        mov 5, %l7
+        tst %o0
+        be 9f
+        nop
+        mov 1, %o0
+        clr %o1
+        call check_rx
+        mov 100, %o2
+        mov 6, %l7
+        tst %o0
+        bne 9f
+        nop
+        clr %l7
+9:      clr %o1                         /* back to one TX descriptor */
+        call eth_init
+        clr %o0
+        ret
+        restore %l7, 0, %o0
+
+BEGIN(t_eth_chain2, "eth: a frame over two TX descriptors (STP, ENP) comes back whole")
+        call chain
+        mov 2, %o0
+        EXPECT(%o0, 0, 1)
+END
+
+BEGIN(t_eth_chain3, "eth: a frame over three TX descriptors, odd lengths and address, comes back whole")
+        call chain
+        mov 3, %o0
+        EXPECT(%o0, 0, 1)
+END
+
         .section .rodata
 mac:    .byte 0x08, 0x00, 0x20, 0x12, 0x34, 0x56
+s_sp:   .asciz " "
+s_nl2:  .asciz "  (TMD1 0-3, CSR0, CSR3: pc 31:26 dma_wr dma_rd busy fifordy tx_act tdmd)\n"
+
 
         .section .testtab, "a", @progbits
         .word 0, 0                      /* end of the test table */
