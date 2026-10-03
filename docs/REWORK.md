@@ -1027,7 +1027,10 @@ drop one of the two machines, and asked to focus on the SS20.
   gateway alive, pinged from here 4/4, TCP with Perl's `IO::Socket`:
   1.16 MB out at 918 KB/s and 4 MB in at 1355 KB/s, both `cksum`s equal
   on the two sides; 3544 packets in, 1262 out, no errors); NetBSD on the
-  LAN; a 30-minute three-CPU stress (Sun OBP) clean. It is the release
+  LAN; macvlan mode (Main's child `sun0@eth0` with the guest's MAC,
+  TCP both ways checked); a 30-minute three-CPU stress (Sun OBP) clean.
+  **Under the Sun OBP, Solaris's TCP does not work yet** (DHCP and ping
+  do; RESUME-20261005 Next steps 1). It is the release
   `SunSparcStation20_20261003` (`ebf69ff`), with OpenBIOS `9cb810de`.
 - **The OSD memory size under the Sun OBP** (`scratch/obpmem.sh`): at 128
   and 64 MB the OBP's banner ("128 MB memory installed") and Solaris's
