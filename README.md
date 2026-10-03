@@ -8,17 +8,21 @@ progress on branch `danifunker`; the plan and its status are in
 ## Compilation Modes
 
 Two builds come from one Quartus project (`SunSparcStation.qpf`), one per
-revision:
-
-### SunSparcStation5
-SparcStation 5: single CPU. MicroSparcII compatible CPU. Up to around 65MHz.
-
-Compatible with all the OSes which supported actual Sun4m SparcStations: Linux, NetBSD, OpenBSD, SunOS, Solaris, NextSTEP. Some OSes require a special configuration.
+revision. **The SPARCstation 20 is the one being developed and tested**; the
+SPARCstation 5 still builds but is parked.
 
 ### SunSparcStation20
-SparcStation 20: up to 3 CPUs can fit in MiSTer FPGA. SMP with write-back caches, MESI coherency. SuperSparc compatible CPU. Up to around 50MHz.
+SPARCstation 20: three SuperSPARC-compatible CPUs at 55 MHz, SMP with
+write-back caches and MESI coherency, up to 464 MB of memory.
 
-SS20 seems to work with NetBSD with 3 CPUs. This is quite complex code and difficult to validate. Linux hardly ever supported multicore on these computers. I would like to be able to run multicore Solaris. IIRC, the debug monitor (`tools/debugarm`) is currently needed to properly activate SMP mode.
+Tested on the board: NetBSD 11 and Solaris 8 under OpenBIOS, and Solaris 8
+with all three CPUs under Sun's own OBP 2.25 (no patches; a two-hour
+three-CPU disk stress survives). CDE runs on the screen.
+
+### SunSparcStation5
+SPARCstation 5: one microSPARC-II compatible CPU at 60 MHz. Compatible with
+the OSes of the real sun4m machines (Linux, NetBSD, OpenBSD, SunOS,
+Solaris, NeXTSTEP), some of which need a special configuration.
 
 ## Code
 Core upstream: https://github.com/Grabulosaure/ss
@@ -86,7 +90,8 @@ The first line names the model the core was built as (SPARCstation 20 or
 5). Below it:
 
 - **Disk 0 (SCSI 3)**, **Disk 1 (SCSI 1)**, **CD-ROM (SCSI 6)**: images on
-  the MiSTer's SD card (VHD, IMG, HDA or RAW for disks, ISO for the CD), at
+  the MiSTer's SD card (VHD, IMG, HDA or RAW for disks; ISO, CUE/BIN or CHD
+  for the CD: CUE and CHD need the core's Main, see Ethernet below), at
   the SCSI IDs of a real Sun (the boot disk is `sd3` / `c0t3d0`). A disk is
   there while an image is mounted; images can be mounted or swapped at any
   time (the drive reports a medium change to the OS). The core remembers
@@ -96,8 +101,8 @@ The first line names the model the core was built as (SPARCstation 20 or
   core's own video or the MiSTer framebuffer), the aspect ratio.
 - **System**: the console (screen and keyboard, or serial on ttya), auto
   boot, the keyboard layout, the CD-ROM block size (2048 bytes, or 512 as
-  on Sun's own CD drives), and on the SS20 the memory (464, 256, 128 or
-  64 MB).
+  on Sun's own CD drives), on the SS20 the memory (464, 256, 128 or
+  64 MB), and the network (below).
 - **Advanced**: developer tuning of the CPU caches, the L2 TLB, the
   SS20's write-back cache and the IOMMU revision OSes see. The defaults
   are the tested ones.
@@ -110,11 +115,27 @@ CDROM works with Solaris (8), NextSTEP, Linux (RH). To mount the CD with Solaris
 
 I've changed L2TLB control so that it can be enabled/disabled at any time. NextSTEP isn't compatible, Solaris and Linux seem safe. There are a few other possible tweaks for better performance, I'm curious of the effects on real-time games.
 
-Ethernet: the SparcStation core reached the network through an MII PHY board
-(LAN8720) on the USER_IO port. The standard framework drives USER_IO
-open-drain only, which cannot carry that interface, so the option is gone;
-Ethernet through the MiSTer's own network port is planned
-([docs/HARDWARE_GAPS.md](docs/HARDWARE_GAPS.md), gap #1).
+### Ethernet
+The machine's LANCE reaches the network through the MiSTer's own network
+port: frames go to the MiSTer's Linux side, which needs the Main binary
+built from the `sparcstation-enhancements` branch of
+[danifunker/Main_MiSTer](https://github.com/danifunker/Main_MiSTer) until
+its changes are in the official Main. OSD **System → Network**:
+
+- **eth0**: the MiSTer's wired port, shared. The machine appears on your
+  LAN with its own Ethernet address (from the IDPROM, so unique per NVRAM
+  image) and gets an address from your DHCP server like any other host. It
+  cannot talk to the MiSTer itself this way.
+- **eth1**: a second (USB) network adapter, given to the machine alone.
+- **macvlan**: a virtual interface on eth0 (`sparc0`) with the machine's
+  address.
+- **tap0**: a tap interface on the MiSTer (routing is up to you; needs a
+  kernel with `/dev/net/tun`).
+
+Wi-Fi cannot carry a second Ethernet address, so it is not offered. The
+design is [docs/design/ethernet-hps.md](docs/design/ethernet-hps.md). (The
+original SparcStation core used an MII PHY board on USER_IO, which the
+standard framework cannot drive; that option is gone.)
 
 ## OS Notes
 Besides my own bugs, running all these different OSes is a bit tricky because the actual CPUs on SparcStations,
