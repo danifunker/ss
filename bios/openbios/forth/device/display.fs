@@ -71,6 +71,9 @@ defer delete-lines ( n -- )
 defer draw-logo ( line# addr width height -- )
 
 defer fb-emit ( x -- )
+defer fb-write ( addr len -- ) \ the write method's loop (C: video_write)
+: (fb-write) ( addr len -- ) bounds ?do i c@ fb-emit loop ;
+' (fb-write) to fb-write
 
 : depth-bytes ( -- bytes )
   depth-bits 1+ 8 /
@@ -119,7 +122,7 @@ defer fb-emit ( x -- )
   -1 ,
   ['] (semis) ,
   reveal
-  s" : write dup >r bounds do i c@ fb-emit loop r> ; " evaluate
+  s" : write dup >r toggle-cursor fb-write toggle-cursor r> ; " evaluate
   s" : draw-logo draw-logo ; " evaluate
   s" : restore reset-screen ; " evaluate
   ;
@@ -173,6 +176,7 @@ defer fb-emit ( x -- )
 defer fb8-blitmask
 defer fb8-fillrect
 defer fb8-invertrect
+defer fb8-move  ( src dst len -- ) \ the scroll's copy (C: the TCX accelerator)
 
 : fb8-line2addr ( line -- addr )
   window-top +
@@ -190,7 +194,7 @@ defer fb8-invertrect
   fb8-line2addr swap
   fb8-line2addr swap
   #columns char-width * depth-bytes *
-  3 pick * move drop
+  3 pick * fb8-move drop
 ;
 
 : fb8-clear-lines ( count line -- )

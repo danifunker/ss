@@ -27,6 +27,53 @@
 
 struct video_info video;
 
+#ifdef CONFIG_TACUS
+/* The TCX accelerator of the SunSparcStation core (as on a Sun TCX, and in
+   QEMU): a 32-bit store into the blit space at (pixel << 3) | 4 copies
+   ((v >> 24) & 31) + 1 pixels from pixel v[19:0] there, or fills them with
+   the colour stored at offset 0 of the space when v[23:16] is 0xff. The
+   core holds the next access to the TCX until the operation is over. The
+   stores are physical (MMU bypass): the space's pa[35:32] is the ASI's low
+   nibble, 0xe on the SS20 and 0 on the SS5. The scroll and the clears go
+   through it; acc_blit is 0 when there is none (CG3). */
+static uint32_t acc_blit;
+static int acc_asi_e;
+
+static inline void acc_st(uint32_t pa, uint32_t v)
+{
+	if (acc_asi_e)
+		__asm__ __volatile__("sta %0, [%1] 0x2e" : : "r"(v), "r"(pa) : "memory");
+	else
+		__asm__ __volatile__("sta %0, [%1] 0x20" : : "r"(v), "r"(pa) : "memory");
+}
+
+void video_accel_init(uint64_t tcx_base)
+{
+	acc_asi_e = (tcx_base >> 32) == 0xe;
+	acc_blit = (uint32_t)tcx_base + 0x6000000;
+}
+
+static int acc_ok(void)
+{
+	return acc_blit && VIDEO_DICT_VALUE(video.ih) && VIDEO_DICT_VALUE(video.depth) == 8;
+}
+
+/* n pixels from pixel p: filled with the colour last stored (src < 0), or
+   copied from pixel src, in runs of 32, in increasing order */
+static void acc_run(uint32_t p, int src, int n)
+{
+	while (n > 0) {
+		int k = n > 32 ? 32 : n;
+		acc_st(acc_blit + (p << 3) + 4,
+		       ((uint32_t)(k - 1) << 24) | (src < 0 ? 0xffffff : (uint32_t)src));
+		p += k;
+		n -= k;
+		if (src >= 0)
+			src += k;
+	}
+}
+#endif
+
 unsigned long
 video_get_color( int col_ind )
 {
@@ -45,16 +92,10 @@ video_get_color( int col_ind )
 
 /* ( fbaddr maskaddr width height fgcolor bgcolor -- ) */
 
-void
-video_mask_blit(void)
+static void
+mask_blit(unsigned char *fbaddr, unsigned char *mask, ucell width, ucell height,
+	  ucell fgcolor, ucell bgcolor)
 {
-	ucell bgcolor = POP();
-	ucell fgcolor = POP();
-	ucell height = POP();
-	ucell width = POP();
-	unsigned char *mask = (unsigned char *)POP();
-	unsigned char *fbaddr = (unsigned char *)POP();
-
 	ucell color;
 	unsigned char *dst, *rowdst;
 	int x, y, m, b, d, depthbytes;
@@ -91,6 +132,19 @@ video_mask_blit(void)
 		dst = rowdst;
 		dst += VIDEO_DICT_VALUE(video.rb);
 	}
+}
+
+void
+video_mask_blit(void)
+{
+	ucell bgcolor = POP();
+	ucell fgcolor = POP();
+	ucell height = POP();
+	ucell width = POP();
+	unsigned char *mask = (unsigned char *)POP();
+	unsigned char *fbaddr = (unsigned char *)POP();
+
+	mask_blit(fbaddr, mask, width, height, fgcolor, bgcolor);
 }
 
 /* ( x y w h fgcolor bgcolor -- ) */
@@ -149,15 +203,9 @@ video_invert_rect( void )
 }
 
 /* ( color_ind x y width height -- ) (?) */
-void
-video_fill_rect(void)
+static void
+fill_rect(int col_ind, int x, int y, int w, int h)
 {
-	int h = POP();
-	int w = POP();
-	int y = POP();
-	int x = POP();
-	int col_ind = POP();
-
 	char *pp;
 	unsigned long col = video_get_color(col_ind);
 
@@ -165,6 +213,20 @@ video_fill_rect(void)
             x + w > VIDEO_DICT_VALUE(video.w) || y + h > VIDEO_DICT_VALUE(video.h))
 		return;
 
+#ifdef CONFIG_TACUS
+	if (acc_ok() && w >= 16) {
+		uint32_t p = VIDEO_DICT_VALUE(video.rb) * y + x;
+
+		acc_st(acc_blit, col);
+		if (x == 0 && w == (int)VIDEO_DICT_VALUE(video.rb)) {
+			acc_run(p, -1, w * h);          /* whole lines: one run */
+		} else {
+			for (; h--; p += VIDEO_DICT_VALUE(video.rb))
+				acc_run(p, -1, w);
+		}
+		return;
+	}
+#endif
 	pp = (char*)VIDEO_DICT_VALUE(video.mvirt) + VIDEO_DICT_VALUE(video.rb) * y;
 	for( ; h--; pp += VIDEO_DICT_VALUE(video.rb) ) {
 		int ww = w;
@@ -183,6 +245,117 @@ video_fill_rect(void)
 				*p++ = col;
 		}
 	}
+}
+
+void
+video_fill_rect(void)
+{
+	int h = POP();
+	int w = POP();
+	int y = POP();
+	int x = POP();
+	int col_ind = POP();
+
+	fill_rect(col_ind, x, y, w, h);
+}
+
+/* The display's write method for runs of plain text: printable characters,
+   CR and LF are handled here; any other character, and every one inside an
+   escape sequence, goes to the Forth terminal emulator, (term-emit), which
+   keeps the same state (the values below). The Forth emulator costs about
+   a millisecond a character on the core; this, a few microseconds. */
+static struct {
+	volatile ucell *line, *col, *lines, *cols, *inverse, *fg, *bg;
+	volatile ucell *cw, *ch, *wtop, *wleft, *esc, *font, *fontbytes;
+	volatile ucell *charmin, *charnum, *spacing;
+} term;
+
+#define TV(x) (*(ucell *)(term.x))
+
+static volatile ucell *value_addr(const char *name)
+{
+	char buf[64];
+
+	snprintf(buf, sizeof(buf), "['] %s cell+", name);
+	feval(buf);
+	return cell2pointer(POP());
+}
+
+static void term_newline(void)
+{
+	TV(col) = 0;
+	TV(line) = TV(line) + 1;
+	if (TV(line) >= TV(lines)) {
+		TV(line) = 0;
+		PUSH(1);
+		fword("delete-lines");
+		TV(line) = TV(lines) - 1;
+	}
+}
+
+/* ( addr len -- ) */
+static void
+video_write(void)
+{
+	ucell len = POP();
+	unsigned char *s = (unsigned char *)POP();
+
+	while (len--) {
+		unsigned char c = *s++;
+
+		if (TV(esc) == 0 && c >= 0x20 && c < 0x7f) {
+			int x, y, g;
+			ucell fg = TV(fg), bg = TV(bg);
+
+			if (TV(col) >= TV(cols))
+				term_newline();         /* wrap */
+			x = TV(col) * TV(cw) + TV(wleft);
+			y = TV(line) * TV(ch) + TV(wtop);
+			fill_rect(bg, x, y, TV(cw), TV(ch));
+			g = c - (int)TV(charmin);
+			if (g > (int)TV(charnum))
+				g = TV(charnum);
+			if (TV(inverse)) {
+				ucell t = fg;
+				fg = bg;
+				bg = t;
+			}
+			mask_blit((unsigned char *)VIDEO_DICT_VALUE(video.mvirt) +
+				  y * VIDEO_DICT_VALUE(video.rb) + x *
+				  ((VIDEO_DICT_VALUE(video.depth) + 1) >> 3),
+				  (unsigned char *)TV(font) + g * TV(fontbytes),
+				  TV(cw), TV(ch) - TV(spacing), fg, bg);
+			TV(col) = TV(col) + 1;
+		} else if (TV(esc) == 0 && c == '\r') {
+			TV(col) = 0;
+		} else if (TV(esc) == 0 && c == '\n') {
+			term_newline();
+		} else {
+			PUSH(c);
+			fword("(term-emit)");
+		}
+	}
+}
+
+/* ( src dst len -- ): move for the console's scroll (fb8-copy-lines);
+   inside the framebuffer, a downward copy goes through the accelerator */
+static void
+video_move(void)
+{
+	ucell len = POP();
+	unsigned char *dst = (unsigned char *)POP();
+	unsigned char *src = (unsigned char *)POP();
+
+#ifdef CONFIG_TACUS
+	unsigned char *fb = (unsigned char *)VIDEO_DICT_VALUE(video.mvirt);
+	ucell size = VIDEO_DICT_VALUE(video.rb) * VIDEO_DICT_VALUE(video.h);
+
+	if (acc_ok() && dst < src && dst >= fb && src + len <= fb + size) {
+		acc_run(dst - fb, src - fb, len);
+		return;
+	}
+#endif
+	memmove(dst, src, len);
 }
 
 void setup_video()
@@ -218,6 +391,30 @@ void setup_video()
 	PUSH( pointer2cell(video_invert_rect) );
 	fword("is-noname-cfunc");
 	feval("to fb8-invertrect");
+	PUSH( pointer2cell(video_move) );
+	fword("is-noname-cfunc");
+	feval("to fb8-move");
+	PUSH( pointer2cell(video_write) );
+	fword("is-noname-cfunc");
+	feval("to fb-write");
+
+	term.line = value_addr("line#");
+	term.col = value_addr("column#");
+	term.lines = value_addr("#lines");
+	term.cols = value_addr("#columns");
+	term.inverse = value_addr("inverse?");
+	term.fg = value_addr("foreground-color");
+	term.bg = value_addr("background-color");
+	term.cw = value_addr("char-width");
+	term.ch = value_addr("char-height");
+	term.wtop = value_addr("window-top");
+	term.wleft = value_addr("window-left");
+	term.esc = value_addr("(escseq)");
+	term.font = value_addr("font");
+	term.fontbytes = value_addr("fontbytes");
+	term.charmin = value_addr("char-min");
+	term.charnum = value_addr("char-num");
+	term.spacing = value_addr("font-spacing");
 
 	/* Static information */
 	PUSH((ucell)fontdata);

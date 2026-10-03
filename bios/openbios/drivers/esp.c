@@ -26,6 +26,10 @@
 #include "esp.h"
 #include "libopenbios/ofmem.h"
 
+/* The DMA buffer, and the most one READ(10) moves: 8 blocks of 512. One
+   page: dvma_alloc remaps the buffer's pages uncached and maps the IOMMU
+   from the first page's physical address on; a 32 KB buffer corrupted
+   OpenBIOS's own memory (session 8). */
 #define BUFSIZE         4096
 
 #ifdef CONFIG_DEBUG_ESP
@@ -334,13 +338,17 @@ ob_sd_read_blocks(sd_private_t **sd)
     while (n) {
         sect_offset = blk / spb;
         pos = (blk - sect_offset * spb) * 512;
-        sect_num = 1;
+        /* as many device blocks as the request still covers, up to the
+           buffer: one command instead of one per block */
+        sect_num = (pos + n * 512 + (*sd)->bs - 1) / (*sd)->bs;
+        if (sect_num > BUFSIZE / (*sd)->bs)
+            sect_num = BUFSIZE / (*sd)->bs;
         DPRINTF("ob_sd_read_blocks bs=%d spb=%d pos=%d sect_offset=%d\n", (*sd)->bs, spb,pos,sect_offset); 
         if (ob_sd_read_sector(global_esp, *sd, sect_offset, sect_num)) {
             DPRINTF("ob_sd_read_blocks: error\n");
             RET(0);
         }
-        while (n && pos < spb * 512) {
+        while (n && pos < sect_num * (*sd)->bs) {
             memcpy(dest, global_esp->buffer + pos, 512);
             pos += 512;
             dest += 512;
@@ -355,6 +363,13 @@ static void
 ob_sd_block_size(__attribute__((unused))sd_private_t **sd)
 {
     PUSH(512);
+}
+
+/* The deblocker asks for this: without it, it reads 512 bytes per call */
+static void
+ob_sd_max_transfer(__attribute__((unused))sd_private_t **sd)
+{
+    PUSH(BUFSIZE);
 }
 
 static void
@@ -401,6 +416,7 @@ NODE_METHODS(ob_sd) = {
     { "close",          ob_sd_close },
     { "read-blocks",    ob_sd_read_blocks },
     { "block-size",     ob_sd_block_size },
+    { "max-transfer",   ob_sd_max_transfer },
 };
 
 

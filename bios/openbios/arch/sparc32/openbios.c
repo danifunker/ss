@@ -1710,6 +1710,7 @@ arch_init( void )
       video_type=1; // CG3
     } else {
       video_type=0; // TCX
+      video_accel_init(hwdef->tcx_base);
     }
 
     printk("INIT VIDEO\n");

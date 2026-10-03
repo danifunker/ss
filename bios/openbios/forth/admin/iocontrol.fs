@@ -51,6 +51,10 @@ variable stdin
 [THEN]
 ;
 
+\ io-emit's cache: the write method of the stdout instance it last saw
+variable emit-ih
+variable emit-xt
+
 : output    ( dev-str dev-len -- )
   2dup find-dev 0= if
     ." Output device " type ."  not found." cr exit
@@ -70,6 +74,7 @@ variable stdin
   \ close old stdout
   stdout @ ?dup if close-dev then
   stdout !
+  0 emit-ih !
 
   \ update /chosen
   " /chosen" find-package if
@@ -106,11 +111,18 @@ variable io-out-char
 ;
 
 : io-emit ( char -- )
-  stdout @ if
-    io-out-char c!
-    io-out-char 1 " write" stdout @ $call-method
+  \ the write method is looked up once per stdout, not by name per character
+  io-out-char c!
+  stdout @ ?dup 0= if exit then
+  dup emit-ih @ <> if
+    dup emit-ih !
+    " write" 2 pick ihandle>phandle find-method 0= if 0 then emit-xt !
   then
-  drop
+  emit-xt @ ?dup if
+    io-out-char 1 2swap swap call-package drop
+  else
+    drop
+  then
 ;
 
 variable CONSOLE-IN-list

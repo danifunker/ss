@@ -203,7 +203,7 @@
   ;
 
 : (term-emit) ( char -- )
-  toggle-cursor
+  \ the write method hides the cursor around the whole string
   
   (escseq) 0> if
     (escseq) 10 = if
@@ -220,18 +220,18 @@
 	." out of ESC" cr
 	drop               \ don't print breakout character
       then
-      toggle-cursor exit
+      exit
     else
       (sequence) (escseq) + c! 
       (escseq) 1+ to (escseq)
       (match-seq)
-      toggle-cursor exit
+      exit
     then  
   then
   
   case
   0 of \ NULL
-    toggle-cursor exit
+    exit
   endof
   7 of \ BEL
     blink-screen
@@ -241,7 +241,7 @@
   8 of \ BS
     column# 0<> if
       column# 1- to column#
-      toggle-cursor exit
+      exit
     then
   endof
   9 of \ TAB
@@ -250,7 +250,7 @@
     else
       8 + -8 and ff and to column#
     then
-    toggle-cursor exit
+    exit
   endof
   a of \ LF
     line# 1+ to line#
@@ -259,14 +259,14 @@
       0 to line#
       1 delete-lines
       #lines 1- to line#
-      toggle-cursor exit
+      exit
     then
   endof
   b of \ VT
     line# 0<> if
       line# 1- to line#
     then
-    toggle-cursor exit
+    exit
   endof
   c of \ FF
     0 to column# 0 to line#
@@ -274,7 +274,7 @@
   endof
   d of \ CR
     0 to column#
-    toggle-cursor exit
+    exit
   endof
   1b of \ ESC
     1b (sequence) c!
@@ -296,7 +296,6 @@
   column# 1+ to column#
 
   endcase
-  toggle-cursor
   ;
 
 ['] (term-emit) to fb-emit
