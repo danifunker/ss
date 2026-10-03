@@ -27,8 +27,8 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20 only** (the SS5 is parked). SS20 at 55 MHz, 3 CPUs, closes on every clock (`nosd-s3`, 86 % ALMs). NetBSD 11 and Solaris 8 boot under OpenBIOS and under the official Sun OBP 2.25 (Solaris with 3 CPUs, no patch); the disk-I/O corruption is fixed (session 6) and a **120-minute three-CPU Solaris stress survives** (session 7). NVRAM on the SD card for both firmwares (**OpenBIOS keeps its settings now**, Solaris `eeprom` works, halt returns to `ok`); a blank NVRAM image gets its own IDPROM. SCSI: Direct SD gone, last-block fix, the two-disk hang gone; next the new target engine on the current Mac approach. Hand-off: [RESUME-20261003.md](../RESUME-20261003.md) |
-| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, **SCSI test ROM**, NetBSD, Solaris under OpenBIOS, Solaris under the Sun PROM with a saved NVRAM); CPU suite on the board: **SS20 65/0/0** = simulation (with and without `--ddr-gaps`); **scsitest 6/0/0** = simulation (`sim/run-scsi.sh`); `memstress`; `sim/run-nvram.sh`; `sim/build.sh --diag` runs Sun's POST; `tools/debugarm/pcdump`; the stress scripts in `scratch/` (`solstress.sh`, `nbstress.sh`) |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20 only** (the SS5 is parked). SS20 at 55 MHz, 3 CPUs, **every clock met** (`esp-s1`, 89 % ALMs). NetBSD 11 and Solaris 8 boot under OpenBIOS and under the official Sun OBP 2.25 (Solaris with 3 CPUs). SCSI: one target engine, 16 KB requests straight to `hps_io`, the ESP interrupt timing of a real 53C9x; with Main's write buffer writes are 10× faster. **Ethernet works** (LANCE frame mailbox to Main: NetBSD on the LAN and the internet); CUE/CHD CDs through Main; OpenBIOS's screen console 16-51× faster. Main changes on `sparcstation-enhancements` (user's fork). Hand-off: [RESUME-20261004.md](../RESUME-20261004.md) |
+| 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, SCSI test ROM, NetBSD, Solaris under OpenBIOS and under the Sun PROM); board baselines SS20 CPU 65/0/0 and SCSI 6/0/0, both equal to the simulation; `sim/run-scsi.sh` with Main-like latency (`--sd-latency`), `sim/run-eth.sh` (`--eth-loop`: ethtest 5/0/0); `tests/cpu/check_imm.py`; board scripts in `scratch/` (speed, console speed, CD checksums, NetBSD on the LAN, stress) |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
 Phases 1 and 2 are analysis and write only under `docs/` and `tools/`, so they
@@ -803,6 +803,105 @@ drop one of the two machines, and asked to focus on the SS20.
   comes later (NeXT's frame mailbox plus the A2065's network layer; the
   Amiga's ARM-side LANCE cannot serve a LANCE that DMAs through an IOMMU).
 
+### Session 8 results (2026-10-02, SS20: speed, Ethernet, CD images)
+
+- **The build of session 7's work** (new SCSI target engine, reworked OSD,
+  memory option), seed 3: `scratch/SunSparcStation20-osd-s3.rbf`, 86 %
+  ALMs, core clock +0.017 ns, hold met, **HDMI clock -0.263 ns** (the
+  framework's scaler domain). Board: CPU suite 65/0/0.
+- **The build with Ethernet and the ESP fix** (`esp-s1`, seed 1:
+  `scratch/SunSparcStation20-esp-s1.rbf`, 89 % ALMs, **every clock met**:
+  core +0.311 ns, HDMI +0.141 ns, hold +0.249 ns). Board: CPU suite
+  65/0/0; scsitest 6/0/0, identical to the simulation (new baseline
+  `8dd0d11`); NetBSD and Solaris (OpenBIOS) boot to a shell on the new
+  target engine, and Solaris under the Sun OBP 2.25 with its 3 CPUs
+  on-line (5 minutes for the whole `hwtest` run).
+- **SCSI test ROM vs the always-present CD:** with the reworked OSD the CD
+  drive answers at t6 even without a disc, and the probe ran READ CAPACITY
+  after five failed TEST UNIT READYs (OpenBIOS skips such a target), which
+  the drive answers with CHECK CONDITION: two FAILs on the board, none in
+  simulation (which enabled the CD only with an image). The probe now
+  reports "not ready" like OpenBIOS, and the simulation's CD is always on.
+- **Speed, baseline (old rbf `nosd-s3`, stock Main):** Solaris 8 boot to
+  `console login:` 397 s; raw disk read (`dd` of `c1t3d0s2`, 64 KB) 3.7 MB/s;
+  5 MB written through UFS plus `sync` 31.6 s (166 KB/s: one 512-byte
+  O_SYNC write per request). OpenBIOS's screen console: 2.8 ms per
+  character, about 65 ms per scrolled line (`scratch/conspeed.sh`).
+- **Speed after** (`esp-s1` rbf, the Main with the write buffer; Solaris
+  under OpenBIOS, `scratch/speed.sh`):
+
+  | | old rbf, stock Main | new rbf, git OpenBIOS | + new OpenBIOS |
+  |---|---|---|---|
+  | boot to `console login:` | 397 s | 398 s | **342 s** |
+  | raw read 10 MB | 2.79 s | 2.66 s | 2.60 s |
+  | 5 MB written + `sync` | 31.6 s | **3.2 s** | 3.1 s |
+
+  Writes are 10× faster (16 KB requests, Main's write buffer). Reads stay
+  at ~3.8 MB/s: Main serves a 16 KB request in ~4 ms (its poll loop, the
+  SPI-like transfer, the read-ahead), which neither engine changes. Most
+  of the boot is Solaris itself (`scratch/tscap.sh` + `bootphases.py`
+  time the phases next). A ksh loop of 100 000 iterations takes 207 s
+  (a reference for CPU work).
+- **OpenBIOS console** (measured on the old rbf, 20 lines of 64
+  characters / 200 lines with scrolling): stock 3570 / 47340 ms; the write
+  method looked up once per stdout and the cursor hidden once per write,
+  not around each character: 1700 / 28720; the scroll and the clears
+  through the TCX accelerator (its blitter: one store per 32 pixels,
+  `video_move`, `fill_rect`): 1700 / 19310; the terminal emulator's plain
+  text (printable characters, CR, LF) in C (`video_write`), escapes and
+  other controls still in Forth: **500 / 7330** (7× and 6.5×; through the
+  write method itself 78 µs a character, from 1.1 ms); and `type` handing
+  whole strings to the write method: **70 / 3000 ms** (51× and 16×;
+  `6fedb87`, `f885cf2`). A Forth primitive costs about 115 cycles here (a
+  million empty `do loop`s: 2.09 s). The `type` step first hung: the 32 KB
+  DMA buffer (below) had corrupted memory, not the change.
+- **OpenBIOS disk reads:** `read-blocks` asks for up to 8 blocks per
+  READ(10) (the 4 KB DMA buffer) instead of one, and the disk node has
+  `max-transfer` (without it the deblocker read 512 bytes per call).
+- **Assemblers wrap 13-bit immediates silently** (LLVM 18 and GNU as:
+  `add %l0, 4096` is `add %l0, -4096`): `tests/cpu/check_imm.py`, run by
+  `build.py` (`17baee5`); only the new `ethtest` had one.
+- **Ethernet works on the board** (`esp-s1`, Main `7632b9e5`, OSD Network
+  eth0): NetBSD 11 gets a DHCP lease on the LAN (192.168.99.68, the
+  gateway as default route, an IPv6 address by autoconfiguration), is
+  pinged from this machine (5/5, ~4 ms) and pings the internet (1.1.1.1,
+  0 % loss, 24 ms). The mailbox counters on the MiSTer (`devmem
+  0x1FF00000`) showed every frame taken on both sides.
+- **Ethernet** ([design/ethernet-hps.md](design/ethernet-hps.md)): the
+  LANCE's MAC is `rtl/mister/eth_hps.vhd`, a frame mailbox in DDR3 at ARM
+  0x1FF00000 that Main's `support/sparc/sparc_enet.cpp` serves through the
+  A2065 host network layer (eth0, eth1, macvlan, tap0). Simulation
+  (`sim/run-eth.sh`, `--eth-loop`: the C model plays Main and sends every
+  frame back): ethtest 5/0/0 (init, a frame looped back, the address
+  filter and a broadcast, a 1514-byte frame, MISS and recovery).
+- **CD images:** CUE/BIN and CHD on the CD slot through Main's Mac CD
+  translation (slot 2 routed to it on this core; 16 KB requests served in
+  4 KB pieces; no boot repulse); the OSD's CD slot accepts ISO, CUE, CHD
+  (`75d5054`). On the board, NetBSD 11's install CD as ISO, CHD and CUE
+  reads the same at 0, 256 and 336 MB (`scratch/cdtest.sh`, checksums
+  through OpenBIOS's cdrom device). OpenBIOS cannot boot that CD (it does
+  not load a Sun boot block from a CD); the Sun OBP can.
+- **NetBSD on the new SCSI engine timed out on its first write**, which
+  the board regression found (CPU suite 65/0/0 on the new rbf). `pcdump`
+  showed DMA2 done, the ESP's count at zero, the bus in STATUS phase and no
+  interrupt: `ts_esp` raised its interrupt when the DMA count ran out, a
+  53C9x (and QEMU) with the target's next REQ; the new engine writes the
+  block through Main (milliseconds) before its STATUS phase, so NetBSD saw
+  the bus still in DATA OUT. Fixed in `ts_esp` (`04b59bd`);
+  `sim --sd-latency` reproduces it and scsitest checks the phase.
+- **A 32 KB OpenBIOS DMA buffer corrupts OpenBIOS's memory**: CD reads
+  through it clobbered the input buffer (`dvma_alloc` remaps the buffer's
+  pages uncached and maps the IOMMU from the first page's physical address
+  on). Multi-block reads now stay within the original 4 KB buffer (8 blocks
+  per command); the `type` hang may have the same cause (being re-tested).
+- **Self-matching waits, again**: `until ! pgrep -f 'x[.]sh'` inside a job
+  whose own command line runs `x.sh` waits forever. Chain the runs in one
+  job instead of waiting on another job's processes.
+- **Main** (branch `sparcstation-enhancements` of the user's fork, in
+  `scratch/Main_MiSTer-sparc`, on `fast-mac-scsi`): `support/sparc`
+  (`is_sparc()`), the write buffer for the SPARC disks (`eaa7caa`), the
+  Ethernet bridge, the CD routing.
+
 ### Work items (the content of the stages)
 
 0. **SCSI storage modelled on the Mac/NeXT cores** (user, 2026-09-28; the
@@ -906,6 +1005,10 @@ drop one of the two machines, and asked to focus on the SS20.
 | 2026-10-02 | **SCSI: the current Mac approach, now** (user): no FPGA block cache (the Mac's release runs `SCSI_CACHE_OFF=1`); one target engine (`scsi_targets.vhd`) straight to `hps_io`, in 16 KB requests (stock Main); Main's write buffer (PR #1336) for the SPARC core once merged. Ethernet later: NeXT's frame mailbox plus the A2065's network layer |
 | 2026-10-02 | **OSD reworked** (user): the model on the first line; disks and the CD always there (a disk while its image is mounted, images hot-swappable); Video / System / Advanced pages; the two "Video" options renamed (graphics card, output) |
 | 2026-10-02 | **Memory: an OSD size option in DDR3** (user; SDRAM not pursued): 464/256/128/64 MB on the SS20; OpenBIOS reads it at AUXIO0 + 0x1C, the slots above look empty to the Sun OBP's probe |
+| 2026-10-02 (session 8) | **Main PR #1336 (the write buffer) is tested on the board before it merges** (user); **all Main changes for the core go on one branch, `sparcstation-enhancements`** of the user's Main fork, based on `fast-mac-scsi` (user) |
+| 2026-10-02 (session 8) | Work order after the board tests (user): speed first, then Ethernet, CD images in Main, release prep |
+| 2026-10-02 (session 8) | **Ethernet: the LANCE stays in the FPGA, a frame mailbox in DDR3 to Main** (`eth_hps.vhd`, Main `sparc_enet.cpp`, magic `SSETH001`), the NeXT model with Main returning a TX read pointer: [design/ethernet-hps.md](design/ethernet-hps.md). OSD System → Network `O[26:24]` |
+| 2026-10-02 (session 8) | CD images: CUE/CHD through Main's Mac CD translation (slot 2 routed there on the SPARC core); the OSD's CD slot takes ISO, CUE, CHD. No CD audio |
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
@@ -942,6 +1045,18 @@ drop one of the two machines, and asked to focus on the SS20.
   had it.
 
 ## Session log
+
+- **2026-10-02, session 8 (SS20).** Built session 7's work: the board
+  regression found NetBSD timing out on writes with the new SCSI engine:
+  the ESP interrupted at DMA count-out instead of the target's next REQ
+  (fixed, `sim --sd-latency` reproduces it). Ethernet through a DDR3 frame
+  mailbox to Main (`eth_hps`, Main `sparc_enet`): NetBSD on the LAN, DHCP,
+  pings the internet. CUE/CHD CDs through Main's Mac CD layer. Speed:
+  writes 10× (16 KB requests + PR #1336's write buffer), OpenBIOS's console
+  16-51× (C text path, TCX blitter, whole strings), Solaris boot 397 ->
+  342 s. All Main changes on one branch, `sparcstation-enhancements`
+  (user). Build `esp-s1`: every clock met. Hand-off:
+  [RESUME-20261004.md](../RESUME-20261004.md).
 
 - **2026-10-02, session 7 (SS20).** 120-minute three-CPU Solaris stress
   survived. GPL-2 licence. OpenBIOS keeps its settings in the NVRAM
