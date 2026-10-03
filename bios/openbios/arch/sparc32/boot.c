@@ -234,7 +234,9 @@ void go(void)
 	printk("\nJumping to entry point " FMT_ucellx " for type " FMT_ucellx "...\n", address, type);
 
 #ifdef CONFIG_TACUS
-	srmmu_set_mmureg(srmmu_get_mmureg() & ~0x300);
+	/* The caches stay on, as the Sun OBP leaves them for a client (MCNTL
+	   0x01004b01 at its ok): a boot program run uncached inflates a
+	   kernel ten times slower. Flush them, the image is new. */
 	cache_flush_all();
 #endif
 
