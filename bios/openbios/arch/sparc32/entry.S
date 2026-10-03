@@ -405,7 +405,9 @@ waiting:
         lda     [%g5] ASI_M_BYPASS, %g2
         sta     %g0, [%g5] ASI_M_BYPASS
 
-        set 0x001 , %g3 // XCE=1, DCE=0, ICE=0 ,MMU_EN=1, BootMode=0, NoFault=0
+        ! MMU on and the core's L2 TLB (bit 6, also gated by the OSD
+        ! option), as CPU 0 has it: the OS keeps the bit (Solaris does)
+        set 0x041 , %g3 // XCE=1, DCE=0, ICE=0 ,MMU_EN=1, BootMode=0, NoFault=0
         sta    %g3, [%g0] ASI_M_MMUREGS	    ! configure mmu
         nop
         nop
