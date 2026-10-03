@@ -450,6 +450,8 @@ static void usage() {
         "  --noautoboot        OSD AutoBoot OFF\n"
         "  --cg3               CG3 instead of TCX\n"
         "  --nocache           OSD Cachena OFF\n"
+        "  --l2tlb             OSD L2TLB On (the MMU's 128-entry second-level TLB,\n"
+        "                      used when software also sets MCNTL bit 6)\n"
         "  --frame FILE.ppm    save the last complete video frame at the end\n"
         "  --ddr-stress        random DDR waitrequest\n"
         "  --ddr-gaps          random bubbles between the beats of a DDR read burst\n"
@@ -481,7 +483,7 @@ int main(int argc, char **argv) {
     int dl_gap = 32;
     uint64_t ddr_log_from = 0;
     bool readonly = false, video = false, noautoboot = false, cg3 = false,
-         nocache = false, quiet = false, progress = false, stress = false, gaps = false,
+         nocache = false, l2tlb = false, quiet = false, progress = false, stress = false, gaps = false,
          full_download = false, eth = false, eth_loop = false;
     int sd_latency = 40;
     struct tm rtc_tm = {};
@@ -510,6 +512,7 @@ int main(int argc, char **argv) {
         else if (a == "--noautoboot") noautoboot = true;
         else if (a == "--cg3") cg3 = true;
         else if (a == "--nocache") nocache = true;
+        else if (a == "--l2tlb") l2tlb = true;
         else if (a == "--frame") frame_path = next();
         else if (a == "--ddr-stress") stress = true;
         else if (a == "--ddr-gaps") gaps = true;
@@ -579,7 +582,7 @@ int main(int argc, char **argv) {
     t->opt_serial = !video;
     t->opt_cg3 = cg3;
     t->opt_nocache = nocache;
-    t->opt_l2tlb = 0;
+    t->opt_l2tlb = l2tlb;
     t->opt_wb = 0;
     t->opt_aow = 0;
     t->opt_iommu = 0;

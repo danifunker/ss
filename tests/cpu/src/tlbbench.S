@@ -7,7 +7,8 @@
  * (identity, cacheable), one load a page. The loads hit the D-cache, so a
  * pass costs a few cycles a page while the pages fit in the D-TLB; past
  * its entries every load walks the page tables. Compare the cycle counts
- * the simulation prints at the stop for K = 1..8. */
+ * the simulation prints at the stop for K = 1..8. -DTB_L2TLB sets MCNTL
+ * bit 6 for the core's second-level TLB (with the simulation's --l2tlb). */
 #include "runtime.S"
 #include "mmu_setup.S"
 
@@ -23,6 +24,12 @@ BEGIN(t_tlbbench, "tlbbench: TB_ITER passes, one load on each of TB_PAGES pages"
         nop
         call mmu_on
         nop
+#ifdef TB_L2TLB
+        lda [%g0] 0x04, %o0             /* MCNTL bit 6: the core's L2 TLB */
+        or %o0, 0x40, %o0               /* (also needs the OSD option: */
+        sta %o0, [%g0] 0x04             /* the simulation's --l2tlb) */
+        nop ; nop ; nop
+#endif
         set TB_ITER, %l0
         sethi %hi(0x1000), %l4          /* the page stride */
 1:      set MT_PAGE(0), %l1
