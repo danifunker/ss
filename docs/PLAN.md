@@ -106,7 +106,7 @@ uses (audit items 9, 10).
 | ID | Item | State |
 |---|---|---|
 | C1 | **Solaris's TCP under the Sun OBP.** DHCP and ping work on `le1`, but TCP does not (a connect timed out, another read 0 bytes); under OpenBIOS it works. First suspects: the LANCE's receive side with buffers that are not word-aligned or of odd size (only transmit was made byte-exact, `f99098d`), LAN-2; then the MAC filter with that NVRAM's other address. Extend `ethtest` with receive buffers at 2 mod 4 and odd sizes. Script: `OBP=1 scratch/solnet.sh` | open |
-| C2 | The network modes: the OSD (System → Network) picks the adapter at run time: **eth0** (the MiSTer's own port, shared, filtered on the machine's address: what the user wants for most things), macvlan (a virtual interface on eth0 with the machine's address), eth1 (a second, USB adapter), tap0 (needs `/dev/net/tun`, which the test MiSTer's kernel lacks). eth0 and macvlan are checked; eth1 and tap0 stay untested (no adapter, no kernel support). Open: whether eth0 should be the OSD default (today Off) | open |
+| C2 | The network modes: the OSD (System → Network) picks the adapter at run time: **eth0** (the MiSTer's own port, shared, filtered on the machine's address: what the user wants for most things), macvlan (a virtual interface on eth0 with the machine's address), eth1 (a second, USB adapter), tap0 (needs `/dev/net/tun`, which the test MiSTer's kernel lacks). eth0 and macvlan are checked; eth1 and tap0 stay untested (no adapter, no kernel support). **eth0 becomes the OSD default** (user, 2026-10-03; today Off): the OSD's first item is the default and Main reads the value itself, so the CONF_STR order, `eth_ena` in `SunSparcStation.sv`, Main's `mode_from_status()` (`sun_enet.cpp`) and `setopt.sh` change together, in the next build | open |
 
 ### N. NeXTSTEP
 
@@ -173,4 +173,6 @@ time avoids conflicts).
   CD audio stays deferred). The user's answers: the NeXTSTEP 3.3 SPARC CD
   is on the MiSTer, to be tried after the CD work is faster (N1 after
   E2/E3); eth0 is the adapter of choice (C2); Stop-A and the L-keys as in
-  the Sun-2 core (B2 design).
+  the Sun-2 core (B2 design); eth0 as the Network default (C2). Next: a
+  Fable session for A1 and A2 (`scratch/handoff/fable-session-20261003.md`),
+  then the other items.
