@@ -110,19 +110,23 @@ variable io-out-char
   io-char c@ -1 to io-char
 ;
 
-: io-emit ( char -- )
-  \ the write method is looked up once per stdout, not by name per character
-  io-out-char c!
-  stdout @ ?dup 0= if exit then
+: io-write ( addr len -- )
+  \ the write method is looked up once per stdout, not by name per call
+  stdout @ ?dup 0= if 2drop exit then
   dup emit-ih @ <> if
     dup emit-ih !
     " write" 2 pick ihandle>phandle find-method 0= if 0 then emit-xt !
   then
   emit-xt @ ?dup if
-    io-out-char 1 2swap swap call-package drop
+    swap call-package drop
   else
-    drop
+    3drop
   then
+;
+
+: io-emit ( char -- )
+  io-out-char c!
+  io-out-char 1 io-write
 ;
 
 variable CONSOLE-IN-list
@@ -166,6 +170,7 @@ variable CONSOLE-OUT-list
   \ activate console
   stdout @ if
     ['] io-emit to emit
+    ['] io-write type-xt !
   then
 
   stdin @ if

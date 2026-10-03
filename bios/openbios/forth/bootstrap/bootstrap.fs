@@ -652,7 +652,11 @@ include memory.fs
 
 defer emit
 
-: type bounds ?do i c@ emit loop ;
+\ type: one emit per character until the console is up, then the whole
+\ string to stdout's write method (the xt in type-xt: io-write)
+variable type-xt
+0 type-xt !
+: type type-xt @ ?dup if execute exit then bounds ?do i c@ emit loop ;
 
 \ this one obviously only works when called 
 \ with a forth string as count fetches addr-1.
