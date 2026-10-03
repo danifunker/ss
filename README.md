@@ -113,6 +113,23 @@ The "Direct SD" modes of the SparcStation core, which drove the secondary
 SD card directly, were removed with the move to the standard MiSTer
 framework.
 
+### The Sun keys
+The core is a Sun Type 4 keyboard (the OSD's layout: US, FR, DE, ES). The
+keys a PC keyboard lacks are chords with **Right Alt**, as on the Sun-2
+core:
+
+- **Right Alt + F1 .. F10**: L1 (Stop) .. L10 (Again, Props, Undo, Front,
+  Copy, Open, Paste, Find, Cut); **Right Alt + F11**: Help.
+- **Stop-A** (back to the PROM's `ok` from a running OS; `go` resumes):
+  Right Alt + F1, then A. Stop-N, Stop-D and Stop-F held while the machine
+  resets work as on a Sun.
+- Right Alt with any other key is AltGraph (the national layouts need it).
+- Pause and Print Screen are the Sun's Pause and Print Screen (R1, R2).
+
+On a serial console (ttya), a **BREAK** does what Stop-A does. A BREAK
+followed by `3` or `4` within 70 ms is the debug link's (`tools/debugarm`)
+and never reaches the OS.
+
 CDROM works with Solaris (8), NextSTEP, Linux (RH). To mount the CD with Solaris, type: `mount -F hsfs -r /dev/dsk/c0t6d0s0 /cdrom`; for old Linux, it's `/dev/scd0`.
 
 I've changed L2TLB control so that it can be enabled/disabled at any time. NextSTEP isn't compatible, Solaris and Linux seem safe. There are a few other possible tweaks for better performance, I'm curious of the effects on real-time games.

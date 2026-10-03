@@ -18,6 +18,24 @@
 #            must already hold diag-switch? false, auto-boot? true,
 #            boot-device disk, input-device and output-device ttya (set them
 #            once at the PROM's ok prompt: they are saved, TOD-6)
+#   post     the Sun PROM's diagnostic POST (--obp FILE): a copy of the
+#            NVRAM image (--nvram NAME, default ss20-obp.nvr) with byte 1,
+#            diag-switch?, set to 0xff, as games/SunSparcStation/post.nvr;
+#            wait for "Power-On SelfTest PASSED" on ttya (or FAILED, or the
+#            OBP's "ttya initialized" after a failure). The POST runs its
+#            list on each CPU; the log has the tests' names and any ERROR
+#            lines
+#   brk      a BREAK on ttya: tests/cpu/out/<target>/brktest.rom as boot.rom;
+#            when it prints "BRK?", a BREAK (tcsendbreak on the MiSTer's
+#            /dev/ttyS1, 0.25-0.5 s); the output must equal
+#            tests/cpu/expected/ss{5,20}-brk-hw.log (--record writes it)
+#   kbd      the keyboard: tests/cpu/out/<target>/kbdtest.rom as boot.rom;
+#            when it prints "KBD?", keys are typed on a virtual keyboard on
+#            the MiSTer (scripts/board/uinput_keys.py: A, Stop-A, Right Alt
+#            + Q, Help, Pause, Print Screen, F1), then at "RST?" Stop and A
+#            are held across the keyboard's reset; the Sun codes the ROM
+#            prints must equal tests/cpu/expected/ss{5,20}-kbd-hw.log
+#            (--record writes it)
 #   scsi     the SCSI path: tests/cpu/out/<target>/scsitest.rom as boot.rom
 #            with two images of known content (tests/cpu/mkscsiimg.py, copied
 #            to games/SunSparcStation/scsi-hd{0,1}.img) at HD0 (t3) and HD1
@@ -29,6 +47,7 @@
 #   scripts/hwtest.sh 5 cpu netbsd
 #   scripts/hwtest.sh 5 --bios bios/build/boot.rom netbsd   (a new OpenBIOS)
 #   scripts/hwtest.sh 20 --obp scratch/ss20-obp225.rom solaris-obp
+#   scripts/hwtest.sh 20 --obp scratch/ss20-obp225.rom post
 #
 # The rbf must already be on the MiSTer (deploy.sh --no-launch). Logs go to
 # sim/out/hw-<rev>-<test>.log. One capture at a time: a second reader on
@@ -50,11 +69,11 @@ while [ $# -gt 0 ]; do
         --bios) BIOS=$1; shift ;;
         --obp) OBP=$1; shift ;;
         --nvram) NVRAM=$1; shift ;;
-        cpu|netbsd|solaris|solaris-obp|scsi) TESTS+=("$a") ;;
+        cpu|netbsd|solaris|solaris-obp|scsi|post|brk|kbd) TESTS+=("$a") ;;
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
-[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] cpu|netbsd|solaris|solaris-obp|scsi..." >&2; exit 2; }
+[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] cpu|netbsd|solaris|solaris-obp|scsi|post|brk|kbd..." >&2; exit 2; }
 case "$REV" in
     SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log; OSIMG=sol8.img ;;
     SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log; OSIMG=sol8-ss20.img ;;
@@ -134,6 +153,69 @@ for t in "${TESTS[@]}"; do
             log "scsi: FAIL (HD0 unchanged: $same; diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
             FAILED=$((FAILED + 1))
         fi
+        ;;
+    kbd)
+        kexp=tests/cpu/expected/${T%-core}-kbd-hw.log
+        python3 tests/cpu/build.py "$T" --main=kbdtest > /dev/null || exit 1
+        scp -q "${SSH_OPTS[@]}" scripts/board/uinput_keys.py "$DEV:/tmp/uinput_keys.py" || exit 1
+        rsh "cp $G/boot.rom /tmp/boot.rom.hwtest"
+        scp -q "${SSH_OPTS[@]}" "tests/cpu/out/$T/kbdtest.rom" "$DEV:$G/boot.rom" || exit 1
+        scripts/setopt.sh console=serial > /dev/null
+        cp=$(run_capture "$log" 60 'KBD[?]')
+        # Linux key codes: A 30, Right Alt 100, F1 59, Q 16, F11 87, Pause
+        # 119, Print Screen (SysRq) 99
+        rsh "python3 /tmp/uinput_keys.py 30 w0.3 +100 +59 -100 30 -59 w0.3 +100 16 -100 w0.3 +100 87 -100 w0.3 119 w0.3 99 w0.3 59"
+        t=0; while [ $t -lt 30 ] && ! grep -a -q 'RST[?]' "$log"; do sleep 1; t=$((t + 1)); done
+        rsh "python3 /tmp/uinput_keys.py +100 +59 +30 w6 -30 -59 -100"
+        t=0; while [ $t -lt 30 ] && ! grep -a -q 'CPUTEST DONE' "$log"; do sleep 1; t=$((t + 1)); done
+        sleep 2; stop_capture "$cp"
+        rsh "cp /tmp/boot.rom.hwtest $G/boot.rom"
+        if [ "$RECORD" = 1 ]; then
+            clean "$log" > "$kexp"; log "kbd: baseline recorded: $(grep 'CPUTEST DONE' "$kexp")"
+        elif diff <(clean "$kexp") <(clean "$log") > "$log.diff"; then
+            log "kbd: PASS, identical to $kexp"
+        else
+            log "kbd: FAIL, differs from $kexp (diff in $log.diff)"
+            FAILED=$((FAILED + 1))
+        fi
+        ;;
+    brk)
+        bexp=tests/cpu/expected/${T%-core}-brk-hw.log
+        python3 tests/cpu/build.py "$T" --main=brktest > /dev/null || exit 1
+        rsh "cp $G/boot.rom /tmp/boot.rom.hwtest"
+        scp -q "${SSH_OPTS[@]}" "tests/cpu/out/$T/brktest.rom" "$DEV:$G/boot.rom" || exit 1
+        scripts/setopt.sh console=serial > /dev/null
+        cp=$(run_capture "$log" 60 'BRK[?]')
+        rsh "python3 -c 'import os, termios; termios.tcsendbreak(os.open(\"/dev/ttyS1\", os.O_RDWR | os.O_NOCTTY), 0)'"
+        t=0; while [ $t -lt 30 ] && ! grep -a -q 'CPUTEST DONE' "$log"; do sleep 1; t=$((t + 1)); done
+        sleep 2; stop_capture "$cp"
+        rsh "cp /tmp/boot.rom.hwtest $G/boot.rom"
+        if [ "$RECORD" = 1 ]; then
+            clean "$log" > "$bexp"; log "brk: baseline recorded: $(grep 'CPUTEST DONE' "$bexp")"
+        elif diff <(clean "$bexp") <(clean "$log") > "$log.diff"; then
+            log "brk: PASS, identical to $bexp ($(clean "$log" | grep 'CPUTEST DONE'))"
+        else
+            log "brk: FAIL, differs from $bexp (diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
+            FAILED=$((FAILED + 1))
+        fi
+        ;;
+    post)
+        [ -f "$OBP" ] || { log "post needs --obp FILE (the Sun PROM image)"; exit 2; }
+        rsh "test -s $G/$NVRAM" || { log "no $G/$NVRAM on the MiSTer"; exit 2; }
+        rsh "cp $G/$NVRAM $G/post.nvr && printf '\\377' | dd of=$G/post.nvr bs=1 seek=1 conv=notrunc 2> /dev/null" || exit 1
+        scp -q "${SSH_OPTS[@]}" "$OBP" "$DEV:$G/boot.rom" || exit 1
+        scripts/mount.sh --nvram post.nvr > /dev/null
+        scripts/setopt.sh console=serial > /dev/null
+        cp=$(run_capture "$log" 900 'Power-On SelfTest (PASSED|FAILED)|ttya initialized')
+        sleep 5; stop_capture "$cp"
+        rsh "cp $G/openbios.rom $G/boot.rom"
+        scripts/mount.sh --nvram "" > /dev/null
+        r=$(clean "$log" | grep -a -m1 -o -E 'Power-On SelfTest (PASSED|FAILED).*' || true)
+        case "$r" in
+        *PASSED*) log "post: PASS ($r)" ;;
+        *) log "post: FAIL (${r:-no result after 900 s}; $(clean "$log" | grep -a -c 'ERROR') ERROR lines; first: $(clean "$log" | grep -a -m1 -A2 'ERROR' | tr -s ' ' | tr '\n' ' '))"
+           FAILED=$((FAILED + 1)) ;;
+        esac
         ;;
     netbsd|solaris|solaris-obp)
         if [ "$t" = netbsd ]; then img=netbsd11.raw; want='login:'; secs=900

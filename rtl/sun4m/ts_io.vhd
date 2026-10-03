@@ -56,6 +56,7 @@ ENTITY ts_io IS
     rxd3_data   : IN  uv8;              -- SPORT1  / DEBUG
     rxd3_req    : IN  std_logic;
     rxd3_ack    : OUT std_logic;
+    rxd3_brk    : IN  std_logic := '0';    -- a BREAK on ttya (level)
     txd3_data   : OUT uv8;
     txd3_req    : OUT std_logic;
     txd3_rdy    : IN  std_logic;
@@ -498,6 +499,7 @@ BEGIN
       di1_data => di3_data,             -- Entrée Port série
       di1_req  => di3_req,
       di1_rdy  => di3_rdy,
+      brk1     => rxd3_brk,
       do1_data => do3_data,             -- Sortie port série
       do1_req  => do3_req,
       do1_rdy  => do3_rdy,

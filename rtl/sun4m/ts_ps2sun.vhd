@@ -341,7 +341,7 @@ ARCHITECTURE rtl OF ts_ps2sun IS
     ZZ   ,          -- x0E
     ZZ   ,          -- x0F
     ZZ   ,          -- x10
-    x"0D",          -- x11 : R alt
+    x"0D",          -- x11 : R alt (handled in KBDConv: L-keys, AltGraph)
     ZZ   ,          -- x12 : PRTSCR (1)
     ZZ   ,          -- x13
     x"4C",          -- x14 : R ctrl : Control unique
@@ -448,7 +448,7 @@ ARCHITECTURE rtl OF ts_ps2sun IS
     ZZ   ,          -- x79
     x"7B",          -- x7A : PageDown
     ZZ   ,          -- x7B
-    ZZ   ,          -- x7C : PRTSCR (2)
+    x"16",          -- x7C : PRTSCR (2) : Print Screen (R2)
     x"60",          -- x7D : PageUp
     ZZ   ,          -- x7E
     ZZ   ,          -- x7F
@@ -617,6 +617,35 @@ ARCHITECTURE rtl OF ts_ps2sun IS
   SIGNAL kfid,mad : uv8;
   SIGNAL xE0,xF0 : std_logic;
 
+  -- The Sun keys a PC keyboard lacks (as in the Sun-2 core): Right Alt +
+  -- F1..F10 are L1 (Stop) .. L10, Right Alt + F11 is Help. Right Alt alone
+  -- sends nothing; with any other key it is AltGraph (0x0D), which goes
+  -- down before that key and up with Right Alt. An F-key keeps the meaning
+  -- it went down with, so letting go of Right Alt first leaves no L-key
+  -- held; while an L-key is held, Right Alt is not AltGraph (Stop-A:
+  -- Right Alt + F1, then A). Pause (E1 14 77 E1 F0 14 F0 77, make only)
+  -- is the Sun Pause key; Print Screen is R2 (0x16).
+  SIGNAL ralt,altg : std_logic;
+  SIGNAL f_down,f_as_l : unsigned(0 TO 10);
+  SIGNAL e1_cnt : natural RANGE 0 TO 7;
+  -- The F-key a PS/2 code (not E0) is, 0..10 for F1..F11, 15 for none
+  FUNCTION fkey (CONSTANT c : uv8) RETURN natural IS
+  BEGIN
+    CASE c IS
+      WHEN x"05" => RETURN 0;  WHEN x"06" => RETURN 1;
+      WHEN x"04" => RETURN 2;  WHEN x"0C" => RETURN 3;
+      WHEN x"03" => RETURN 4;  WHEN x"0B" => RETURN 5;
+      WHEN x"83" => RETURN 6;  WHEN x"0A" => RETURN 7;
+      WHEN x"01" => RETURN 8;  WHEN x"09" => RETURN 9;
+      WHEN x"78" => RETURN 10;
+      WHEN OTHERS => RETURN 15;
+    END CASE;
+  END FUNCTION fkey;
+  -- L1 Stop, L2 Again, L3 Props, L4 Undo, L5 Front, L6 Copy, L7 Open,
+  -- L8 Paste, L9 Find, L10 Cut, Help
+  CONSTANT LKEY : arr_uv8(0 TO 10) :=(
+    x"01",x"03",x"19",x"1A",x"31",x"33",x"48",x"49",x"5F",x"61",x"76");
+
   SIGNAL leds : uv4;
   SIGNAL ledsm,ledsm_mem : std_logic;
 
@@ -691,6 +720,8 @@ BEGIN
   KBDConv: PROCESS (clk)
     VARIABLE dd_v,do : uv8;
     VARIABLE do_w,di_r : std_logic;
+    VARIABLE fk_v : natural RANGE 0 TO 15;
+    VARIABLE l_v : std_logic;
   BEGIN
     IF rising_edge(clk) THEN
       
@@ -723,7 +754,26 @@ BEGIN
           END IF;
           
         WHEN sRD =>
-          IF kfid=x"E0" THEN
+          fk_v:=fkey(kfid);
+          IF e1_cnt/=0 THEN
+            -- The rest of Pause's sequence: its make went with the E1, its
+            -- break goes with the last byte
+            di_r:='1';
+            e1_cnt<=e1_cnt-1;
+            IF e1_cnt=1 THEN
+              kb_data<=x"95";
+              kb_req<='1';
+              k_stat<=sTRANS;
+            ELSE
+              k_stat<=sTRANS2;
+            END IF;
+          ELSIF kfid=x"E1" THEN
+            di_r:='1';
+            e1_cnt<=7;
+            kb_data<=x"15";
+            kb_req<='1';
+            k_stat<=sTRANS;
+          ELSIF kfid=x"E0" THEN
             xE0<='1';
             di_r:='1';
             k_stat<=sTRANS2;
@@ -731,6 +781,47 @@ BEGIN
             xF0<='1';
             di_r:='1';
             k_stat<=sTRANS2;
+          ELSIF xE0='1' AND kfid=x"11" THEN
+            -- Right Alt: AltGraph comes up with it if it went down
+            di_r:='1';
+            ralt<=NOT xF0;
+            IF xF0='1' AND altg='1' THEN
+              kb_data<=x"8D";
+              kb_req<='1';
+              altg<='0';
+              k_stat<=sTRANS;
+            ELSE
+              k_stat<=sTRANS2;
+            END IF;
+            xE0<='0';
+            xF0<='0';
+          ELSIF xE0='0' AND fk_v/=15 THEN
+            -- F1..F11, or L1..L10 and Help with Right Alt
+            di_r:='1';
+            l_v:=f_as_l(fk_v);
+            IF xF0='0' AND f_down(fk_v)='0' THEN
+              l_v:=ralt;
+              f_as_l(fk_v)<=ralt;
+            END IF;
+            f_down(fk_v)<=NOT xF0;
+            IF l_v='1' THEN
+              kb_data<=LKEY(fk_v);
+            ELSE
+              kb_data<=mad;
+            END IF;
+            kb_data(7)<=xF0;
+            kb_req<='1';
+            k_stat<=sTRANS;
+            xF0<='0';
+          ELSIF ralt='1' AND altg='0' AND xF0='0' AND mad/=x"00" AND
+            (f_down AND f_as_l)=(f_down'range => '0') THEN
+            -- A key with Right Alt held: AltGraph goes down first, and
+            -- this byte is taken again on the next pass. Not while an
+            -- L-key is held: Stop-A is Stop then A, with nothing between
+            kb_data<=x"0D";
+            kb_req<='1';
+            altg<='1';
+            k_stat<=sTRANS;
           ELSE
             di_r:='1';
             kb_data<=mad;
@@ -810,6 +901,13 @@ BEGIN
         k_vv<='0';
         k_stat<=sOISIF;
         k_tx_req<='0';
+        xE0<='0';
+        xF0<='0';
+        ralt<='0';
+        altg<='0';
+        f_down<=(OTHERS => '0');
+        f_as_l<=(OTHERS => '0');
+        e1_cnt<=0;
       END IF;
     END IF;
   END PROCESS KBDConv;

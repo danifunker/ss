@@ -369,6 +369,7 @@ ARCHITECTURE rtl OF ts_core IS
       rxd3_data   : IN  uv8;
       rxd3_req    : IN  std_logic;
       rxd3_ack    : OUT std_logic;
+      rxd3_brk    : IN  std_logic;
       txd3_data   : OUT uv8;
       txd3_req    : OUT std_logic;
       txd3_rdy    : IN  std_logic;
@@ -444,6 +445,7 @@ ARCHITECTURE rtl OF ts_core IS
   SIGNAL io_txd3_req,io_txd3_rdy : std_logic;
   SIGNAL io_rxd3_data : uv8;
   SIGNAL io_rxd3_req,io_rxd3_ack : std_logic;
+  SIGNAL io_rxd3_brk : std_logic;
   SIGNAL led_io : std_logic;
   SIGNAL sync_rs,sync_rs_hi : std_logic;
   SIGNAL rscpt : natural RANGE 0 TO 7;
@@ -1161,6 +1163,7 @@ BEGIN
       rx1_req  => debug_rx_req,
       rx1_ack  => debug_rx_ack,
       obreak   => obreak,
+      brk0     => io_rxd3_brk,
       osel     => osel,
       clk      => clk,
       reset_n  => reset_n);
@@ -1406,6 +1409,7 @@ BEGIN
       rxd3_data   => io_rxd3_data,
       rxd3_req    => io_rxd3_req,
       rxd3_ack    => io_rxd3_ack,
+      rxd3_brk    => io_rxd3_brk,
       txd3_data   => io_txd3_data,
       txd3_req    => io_txd3_req,
       txd3_rdy    => io_txd3_rdy,

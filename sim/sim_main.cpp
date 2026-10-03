@@ -58,6 +58,7 @@ static std::string unescape(const std::string &s) {
         if (c == 'r') o += '\r';
         else if (c == 'n') o += '\n';
         else if (c == 't') o += '\t';
+        else if (c == 'B') o += '\xff';     // --send: a BREAK (see Uart)
         else if (c == 'x' && i + 2 < s.size() + 1) {
             o += (char)strtol(s.substr(i + 1, 2).c_str(), nullptr, 16);
             i += 2;
@@ -346,11 +347,13 @@ struct Uart {
     double rx_next = 0;
     int rx_byte = 0;
     int last_txd = 0;              // wait for the line to go idle first
-    // transmitter (us -> core)
-    std::deque<uint8_t> tx_q;
+    // transmitter (us -> core); BRK in the queue is a BREAK: the line low
+    // for 30 bit times
+    static const int BRK = -1;
+    std::deque<int> tx_q;
     int tx_bit = -1;
     double tx_next = 0;
-    uint8_t tx_byte = 0;
+    int tx_byte = 0;
     int rxd = 1;
 
     explicit Uart(double cyc_per_bit) : bit(cyc_per_bit) {}
@@ -381,9 +384,11 @@ struct Uart {
             tx_bit = 0;
             rxd = 0;                 // start bit
             tx_next = cyc + bit;
+            if (tx_byte == BRK) { tx_bit = 9; tx_next = cyc + bit * 30; }
         } else if (cyc >= tx_next) {
             if (tx_bit < 8) { rxd = (tx_byte >> tx_bit) & 1; tx_bit++; }
             else if (tx_bit == 8) { rxd = 1; tx_bit++; }            // stop bit
+            else if (tx_byte == BRK && tx_bit == 9) { rxd = 1; tx_bit++; } // BREAK over
             else { tx_bit = -1; tx_next = cyc + bit * 2; return; }  // idle gap
             tx_next += bit;
         }
@@ -444,7 +449,8 @@ static void usage() {
         "  --cycles N          stop after N cycles (k/M/G suffixes; default 200M)\n"
         "  --stop STR          end the run, exit 0, at the end of the line that prints STR\n"
         "  --fail STR          end the run, exit 1, at the end of the line that prints STR\n"
-        "  --send PAT=>TEXT    type TEXT on ttya once PAT has been printed (\\r etc.)\n"
+        "  --send PAT=>TEXT    type TEXT on ttya once PAT has been printed (\\r etc.;\n"
+        "                      \\B is a BREAK)\n"
         "  --log FILE          copy of the console output\n"
         "  --video             console on the screen (default: ttya)\n"
         "  --noautoboot        OSD AutoBoot OFF\n"
@@ -750,7 +756,8 @@ int main(int argc, char **argv) {
                 if (s.done) continue;
                 size_t p = console.find(s.pat, send_from);
                 if (p != std::string::npos) {
-                    for (char c : s.text) uart.tx_q.push_back((uint8_t)c);
+                    for (char c : s.text)
+                        uart.tx_q.push_back((uint8_t)c == 0xff ? Uart::BRK : (uint8_t)c);
                     s.done = true;
                     send_from = p + s.pat.size();
                 }

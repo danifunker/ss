@@ -39,6 +39,7 @@ ENTITY ts_sport IS
     di1_data : IN  uv8;       -- Réception Port 1=A
     di1_req  : IN  std_logic;
     di1_rdy  : OUT std_logic;
+    brk1     : IN  std_logic := '0'; -- A BREAK on the line of port A (level)
     do1_data : OUT uv8;       -- Emission Port 1=A
     do1_req  : OUT std_logic;
     do1_rdy  : IN  std_logic;
@@ -46,6 +47,7 @@ ENTITY ts_sport IS
     di2_data : IN  uv8;       -- Reception Port 2=B
     di2_req  : IN  std_logic;
     di2_rdy  : OUT std_logic;
+    brk2     : IN  std_logic := '0'; -- A BREAK on the line of port B (level)
     do2_data : OUT uv8;       -- Emission Port 2=B
     do2_req  : OUT std_logic;
     do2_rdy  : IN  std_logic;
@@ -75,6 +77,7 @@ ARCHITECTURE rtl OF ts_sport IS
     rx_en   : std_logic;
     rx_ie   : uv2;
     rx_ibrk : std_logic;
+    ext_ie  : std_logic;    -- WR1 bit 0: External/Status interrupts
     
     tx_bits : uv2;
     tx_en   : std_logic;
@@ -116,7 +119,14 @@ ARCHITECTURE rtl OF ts_sport IS
   
   SIGNAL tx_fin_pre   : unsigned(1 TO 2);
   SIGNAL rx_avail_pre : unsigned(1 TO 2);
-  CONSTANT rx_break   : unsigned(1 TO 2) := "00";  -- RX Break Character
+  -- BREAK: RR0 bit 7 follows the line, or holds the value it had when an
+  -- External/Status interrupt became pending (WR15 bit 7, WR1 bit 0: on
+  -- each edge of the BREAK) until WR0's Reset External/Status Interrupts.
+  -- A NUL is received when the BREAK starts, as on the Zilog part. The OBP's
+  -- ubreak?, Solaris' zs and NetBSD's zstty console abort use it.
+  SIGNAL rx_break    : unsigned(1 TO 2);  -- RR0 bit 7
+  SIGNAL brk,brk_pre : unsigned(1 TO 2);
+  SIGNAL ext_ip,ext_pend,ext_rst,brk_lat : unsigned(1 TO 2);
   
   SIGNAL vector : uv8;                   -- Interrupt Vector
   SIGNAL vecode : unsigned(2 DOWNTO 0);  -- Code dans vecteur interruption
@@ -155,6 +165,7 @@ BEGIN
       tx_iclr<="00";
       rx_iclr<="00";
       rx_maj<="00";
+      ext_rst<="00";
       ----------------------------------------------
       cw:=w.dw(31 DOWNTO 24);
       dw:=w.dw(15 DOWNTO 8);
@@ -194,6 +205,7 @@ BEGIN
                   
                 WHEN "010" =>
                   -- Reset External / Status Interrupts
+                  ext_rst(i)<='1';
                   
                 WHEN "011" =>
                   -- Send Abort
@@ -234,6 +246,7 @@ BEGIN
               --   5 : WAIT / DMA Request On Receive Transmit
               --   6 : WAIT / DMA Request function
               --   7 : WAIT / DMA Request enable
+              parms(i).ext_ie<=cw(0);
               parms(i).tx_ie<=cw(1);
               parms(i).rx_ie<=cw(4 DOWNTO 3);
               rx_maj(i)<='1';
@@ -305,12 +318,14 @@ BEGIN
                 parms(2).tx_en<='0';
                 parms(2).rx_ie<=RX_IE_DISABLE;
                 parms(2).tx_ie<='0';
+                parms(2).ext_ie<='0';
               END IF;
               IF cw(7)='1' THEN
                 parms(1).rx_en<='0';
                 parms(1).tx_en<='0';
                 parms(1).rx_ie<=RX_IE_DISABLE;
                 parms(1).tx_ie<='0';
+                parms(1).ext_ie<='0';
               END IF;
 
             WHEN "1010" => -- WR10
@@ -429,8 +444,8 @@ BEGIN
               -- 7:6 : 00
               IF i=1 THEN
                 -- Seulement channel A
-                cr:="00" & rx_ip(1) & tx_ip(1) & '0' &
-                     rx_ip(2) & tx_ip(2) & '0';
+                cr:="00" & rx_ip(1) & tx_ip(1) & ext_ip(1) &
+                     rx_ip(2) & tx_ip(2) & ext_ip(2);
               ELSE
                 cr:=x"00";
               END IF;
@@ -467,7 +482,7 @@ BEGIN
               --   5 : CTS IE
               --   6 : Tx Underrun
               --   7 : Break/Abort IE <QEMU>
-              cr:=x"00";
+              cr:=parms(i).rx_ibrk & "0000000";
               
           END CASE;
           --REPORT "SPORT RD CTRL (" & integer'image(i) &
@@ -532,6 +547,10 @@ BEGIN
         parms(2).tx_en<='0';
         parms(1).tx_ie<='0';
         parms(2).tx_ie<='0';
+        parms(1).ext_ie<='0';
+        parms(2).ext_ie<='0';
+        parms(1).rx_ibrk<='0';
+        parms(2).rx_ibrk<='0';
         vector <= x"00";
         vechilo<='0';
       END IF;
@@ -599,6 +618,11 @@ BEGIN
             recbuf(i).d<=di(i);
             recbuf(i).full<='1';
           END IF;
+          -- A BREAK starts: a NUL (the line holds no byte meanwhile)
+          IF brk(i)='1' AND brk_pre(i)='0' THEN
+            recbuf(i).d<=x"00";
+            recbuf(i).full<='1';
+          END IF;
           -- Buffer
           di_rdy(i)<='0';
           IF recbuf(i).full='1' AND rx_avail(i)='0' THEN
@@ -639,6 +663,7 @@ BEGIN
     IF rising_edge(clk) THEN
       tx_fin_pre<=tx_fin;
       rx_avail_pre<=rx_avail;
+      brk_pre<=brk;
       
       FOR i IN 1 TO 2 LOOP
         -- Interruptions émissions
@@ -662,23 +687,51 @@ BEGIN
         IF rx_iclr(i)='1' THEN
           rx_ip(i)<='0';
         END IF;
+        
+        -- External/Status: the BREAK's edges. A change while one is
+        -- pending waits for the reset, then is pending in turn.
+        IF ext_rst(i)='1' THEN
+          ext_ip(i)<=ext_pend(i);
+          ext_pend(i)<='0';
+          brk_lat(i)<=brk(i);
+        ELSIF brk(i)/=brk_pre(i) AND parms(i).rx_ibrk='1' AND
+          parms(i).ext_ie='1' THEN
+          IF ext_ip(i)='0' THEN
+            ext_ip(i)<='1';
+            brk_lat(i)<=brk(i);
+          ELSE
+            ext_pend(i)<='1';
+          END IF;
+        END IF;
+        IF parms(i).ext_ie='0' THEN
+          ext_ip(i)<='0';
+          ext_pend(i)<='0';
+        END IF;
       END LOOP;
       ----------------------------------------
       IF reset_n='0' THEN
         rx_ip<="00";
         tx_ip<="00";
+        ext_ip<="00";
+        ext_pend<="00";
       END IF;
     END IF;
   END PROCESS Inter;
+
+  brk<=brk1 & brk2;
+  rx_break(1)<=brk_lat(1) WHEN ext_ip(1)='1' ELSE brk(1);
+  rx_break(2)<=brk_lat(2) WHEN ext_ip(2)='1' ELSE brk(2);
 
   -- Priorités d'interruption :
   --   RX A (high) -> TX A -> Ext A -> RX B -> TX B -> Ext B (low)
   vecode<=VC_A_RX_AVAIL WHEN rx_ip(1)='1' ELSE
           VC_A_TX_EMPTY WHEN tx_ip(1)='1' ELSE
+          VC_A_EXTSTAT  WHEN ext_ip(1)='1' ELSE
           VC_B_RX_AVAIL WHEN rx_ip(2)='1' ELSE
           VC_B_TX_EMPTY WHEN tx_ip(2)='1' ELSE
+          VC_B_EXTSTAT  WHEN ext_ip(2)='1' ELSE
           VC_B_SPECIAL;
 
-  int<=rx_ip(1) OR rx_ip(2) OR tx_ip(1) OR tx_ip(2);
+  int<=rx_ip(1) OR rx_ip(2) OR tx_ip(1) OR tx_ip(2) OR ext_ip(1) OR ext_ip(2);
 
 END ARCHITECTURE rtl;

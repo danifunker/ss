@@ -63,6 +63,8 @@ Paths are post-phase-3 (`rtl/sun4m/…`, `rtl/mister/…`).
      user timer, and the Forth timeouts need `get-msecs`. If those do not
      count, these loops hang (see [chipset.md](chipset.md)).
 4. **S2: the reset reply never includes held keys, so Stop / Stop-D / Stop-N / Stop-F at power-on are impossible.** [V]
+   - **Fixed (2026-10-03, PLAN B2):** `ts_sunkb` lists Stop, A, N, D and F
+     when held (FF 04 … 7F); board test `hwtest.sh 20 kbd`.
    - The PROM reads held make codes between the ID and 0x7F (`abort?` for
      Stop+F; Stop-N 0x69; Stop-D 0x4f; POST `reset_power_on` checks
      0x01/0x4f). The core always sends FF 04 7F.
@@ -92,6 +94,9 @@ Paths are post-phase-3 (`rtl/sun4m/…`, `rtl/mister/…`).
    (`ts_core.vhd:1117`), and the reset then flushes the FIFO.
    - **Fix.** Make All Sent mean "ACIA FIFO empty and shifter idle".
 8. **S1: Stop-A cannot be typed at runtime.** [V]
+   - **Fixed (2026-10-03, PLAN B2):** Right Alt + F1..F10 are L1..L10, + F11
+     Help (as in the Sun-2 core); Right Alt alone is AltGraph with other keys,
+     not while an L-key is held (`ts_ps2sun`); `rtl/sun4m/tb/run.sh`, `hwtest.sh 20 kbd`.
    - **What the PROM expects.** `poll-input` (an alarm every 10 ms) aborts
      when 0x01 is followed by 0x4D.
    - **What the core does.** No PS/2 key produces Sun codes
@@ -109,6 +114,11 @@ Paths are post-phase-3 (`rtl/sun4m/…`, `rtl/mister/…`).
        Scroll Lock alone → 0x17.
      - An OSD entry "Send Stop-A".
 9. **S1: a BREAK on ttya is never delivered.** [V]
+   - **Fixed (2026-10-03, PLAN B2):** `ts_aciamux` hands a BREAK not followed
+     by '3'/'4' within ~70 ms to the ESCC as a ~70 ms level; `ts_sport` sets
+     RR0 bit 7, raises ext/status (WR15 bit 7, WR1 bit 0; RR3, vector 101,
+     RR0 latched until WR0 reset) and receives a NUL; `tests/cpu/src/brktest.S`
+     (simulation and `hwtest.sh 20 brk`).
    - **Who needs it.** OBP `poll-tty` → `ubreak?` (writes WR0=0x10, tests
      RR0 bit 7, `clear-break` waits, drops the NUL, writes 0x30). Also
      Solaris `zsa_xsint`, NetBSD zstty (console magic = BREAK) and Linux
@@ -124,6 +134,9 @@ Paths are post-phase-3 (`rtl/sun4m/…`, `rtl/mister/…`).
      - updates RR3 bits 3/0;
      - pushes a NUL when the break ends.
 10. **S1 when triggered: the debug mux can take ttya over.** [V]
+    - **Changed (2026-10-03, PLAN B2):** only '3' or '4' right after a BREAK
+      is swallowed; other bytes pass (after the BREAK has gone to the ESCC).
+      BREAK + '3' still enters the debug link (pcdump).
     - **Trigger.** A BREAK (any framing error with the stop bit low)
       followed by '3' switches the UART to the debug unit
       (`ts_aciamux.vhd:99-122`). That happens when a user sends BREAK then
@@ -142,6 +155,8 @@ Paths are post-phase-3 (`rtl/sun4m/…`, `rtl/mister/…`).
 ## B. Keyboard translator (`ts_ps2sun`, `ts_sunkb`)
 
 - **S2: Pause sends Ctrl + Num Lock.** [V]
+  - **Fixed (2026-10-03, PLAN B2):** E1 … is Pause (0x15, make and break);
+    E0 7C is Print Screen (0x16).
   - E1 is ignored, but the bytes after it are translated: 14 → 0x4C
     (Ctrl), 77 → 0x62 (Num Lock), then their breaks
     (`ts_ps2sun.vhd:87,186,292,704-724`).

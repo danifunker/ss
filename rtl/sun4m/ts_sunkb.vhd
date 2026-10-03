@@ -12,7 +12,7 @@
 
 -- Commandes :
 --  01 : RESET
---     -> FF 04 7F
+--     -> FF 04 [held keys] 7F
 --  02 : Bell ON
 --  03 : Bell OFF
 --  0A : Click ON
@@ -65,7 +65,7 @@ ARCHITECTURE rtl OF ts_sunkb IS
   CONSTANT CMD_LAYOUT : uv8 := x"0F";
 
   TYPE enum_etat IS (sOISIF,sREC,sREC2,
-                     sRESET,sRESET2,sRESET3,
+                     sRESET,sRESET2,sRESETK,sRESET3,
                      sLED,sLAYOUT,sLAYOUT2);
   SIGNAL etat : enum_etat;
   
@@ -78,6 +78,14 @@ ARCHITECTURE rtl OF ts_sunkb IS
   -- keyboard waited for the host to read its reply: the Sun OBP, which
   -- polls All Sent after each command (kbd_putc_boot), deadlocked. A
   -- command arriving in sREC or sLAYOUT2 was also dropped.
+  -- The keys the PROM looks for in the reset reply, held down: Stop (L1),
+  -- A, N, D, F (Stop-A, Stop-N: NVRAM defaults, Stop-D: diagnostics,
+  -- Stop-F: Forth on ttya). A Sun keyboard lists every key held between
+  -- its ID and 7F; these are the ones that mean something there.
+  CONSTANT HELD_CODE : arr_uv8(0 TO 4) := (x"01",x"4D",x"69",x"4F",x"50");
+  SIGNAL held : unsigned(0 TO 4);
+  SIGNAL hk : natural RANGE 0 TO 5;
+
   TYPE arr_cmd IS ARRAY(0 TO 3) OF uv8;
   SIGNAL cmdq : arr_cmd;
   SIGNAL cmdq_n : natural RANGE 0 TO 4;
@@ -149,9 +157,30 @@ BEGIN
             si_req<='1';
           END IF;
           IF si_rdy='1' THEN
-            etat<=sRESET3;
+            etat<=sRESETK;
             si_req<='0';
             cpt<=0;
+            hk<=0;
+          END IF;
+          
+        WHEN sRESETK =>
+          -- The held keys of HELD_CODE, one make code each
+          IF hk=5 THEN
+            etat<=sRESET3;
+          ELSIF held(hk)='0' THEN
+            hk<=hk+1;
+          ELSE
+            si_data<=HELD_CODE(hk);
+            IF cpt/=MAX THEN
+              cpt<=cpt+1;
+            ELSE
+              si_req<='1';
+            END IF;
+            IF si_rdy='1' THEN
+              hk<=hk+1;
+              si_req<='0';
+              cpt<=0;
+            END IF;
           END IF;
           
         WHEN sRESET3 =>
@@ -208,6 +237,15 @@ BEGIN
           --------------------------------------
       END CASE;
       
+      -- The keys of HELD_CODE that are down, from the codes going out
+      IF etat=sOISIF AND kb_req='1' THEN
+        FOR i IN 0 TO 4 LOOP
+          IF kb_data(6 DOWNTO 0)=HELD_CODE(i)(6 DOWNTO 0) THEN
+            held(i)<=NOT kb_data(7);
+          END IF;
+        END LOOP;
+      END IF;
+      
       -- Command queue: pop what the machine took, push what the ESCC sends
       n:=cmdq_n;
       IF pop THEN
@@ -230,6 +268,7 @@ BEGIN
       IF reset_n='0' THEN
         etat<=sOISIF;
         cmdq_n<=0;
+        held<=(OTHERS => '0');
       END IF;
 
     END IF;
