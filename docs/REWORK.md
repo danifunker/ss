@@ -837,8 +837,11 @@ drop one of the two machines, and asked to focus on the SS20.
   | 5 MB written + `sync` | 31.6 s | **3.2 s** | 3.1 s |
 
   Writes are 10× faster (16 KB requests, Main's write buffer). Reads stay
-  at ~3.8 MB/s: Main serves a 16 KB request in ~4 ms (its poll loop, the
-  SPI-like transfer, the read-ahead), which neither engine changes. Most
+  at ~3.8 MB/s: Main moves sector data to the FPGA as two GPIO register
+  writes per 16-bit word (`fpga_spi_fast_block_write`: data, then strobe),
+  about 3 ms per 16 KB, the same ceiling for every hps_io disk. Only a
+  DDR3 data path (Main copies sectors into DDR3, as the Ethernet mailbox
+  does) would lift it; a real SS20's SCSI disks gave 3-6 MB/s anyway. Most
   of the boot is Solaris itself (`scratch/tscap.sh` + `bootphases.py`
   time the phases next). A ksh loop of 100 000 iterations takes 207 s
   (a reference for CPU work).
