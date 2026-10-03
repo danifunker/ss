@@ -2,9 +2,11 @@
 
 Sun SPARCstation 5 / SPARCstation 20 (sun4m) core for MiSTer, by
 Grabulosaure (upstream `github.com/Grabulosaure/ss`), being reworked for
-distribution on branch `danifunker`. **Read [docs/REWORK.md](docs/REWORK.md)
-first**: the multi-session plan, its status table and the session log. The
-newest `RESUME-*.md` at the root is the hand-off from the last session.
+distribution on branch `danifunker`. **Read [docs/PLAN.md](docs/PLAN.md)
+first**: the current plan (plan 2, from session 10), its work items and
+ground rules. [docs/REWORK.md](docs/REWORK.md) is the closed bring-up plan:
+its decisions table and the session log of sessions 1-9. The newest
+`RESUME-*.md` at the root is the hand-off from the last session.
 
 ## Layout
 

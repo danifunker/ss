@@ -32,6 +32,12 @@ Sources:
 - **Every milestone is visible on ttya** (the MiSTer UART at 115200: the
   core runs the wire at a fixed 115200 whatever OBP programs, kms A.2).
 
+**Status 2026-10-03 (session 9):** the SS20 milestones S1-S8 are done
+(below); of the M rows, M8 (`test net`, the LANCE loopback) is done on the
+SS20, and **M7 (Stop-A, BREAK), M9 (bus errors) and M10 (diagnostic POST)
+are open**: [PLAN.md](../PLAN.md) items B2, B1/A3 and A2/D1. The SS5 rows
+are parked with the SS5.
+
 ## SS5, OBP 2.15
 
 | M | Milestone | Blocker | Change | Test |

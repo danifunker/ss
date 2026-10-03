@@ -1,5 +1,11 @@
 # SunSparcStation_MiSTer — rework plan
 
+> **Closed 2026-10-03 (end of session 9).** The bring-up this plan
+> describes is done in its essentials; what is left is in
+> **[PLAN.md](PLAN.md)** (plan 2), which is the plan from session 10 on.
+> This file stays as the record: the phases, the decisions table and the
+> session log of sessions 1-9.
+
 The goal is to get this core, Grabulosaure's SPARCstation 5 / SPARCstation 20
 (sun4m) core, ready for **real distribution on MiSTer**: the standard
 MiSTer-devel layout and framework, a clear hardware story, networking that
@@ -1185,6 +1191,7 @@ drop one of the two machines, and asked to focus on the SS20.
 | 2026-10-03 (session 9, user) | **Emulate the 64-entry SuperSPARC diagnostic TLB** (ASI 6, MMU-2) so the Sun POST passes its TLB tests (M10): Fable task `scratch/handoff/fable-mmu-diag-tlb.md` |
 | 2026-10-03 (session 9, user) | **The L2 TLB should be usable at run time and compatible with NeXTSTEP**: in the same Fable task (the audit's reset/enable fixes; an ASI 6 write invalidates the TLBs, the likely NeXTSTEP case). The OSD default stays Off until NeXTSTEP is shown to work with it |
 | 2026-10-03 (session 9, user) | **No new features for now** (e.g. no larger first-level TLB): the SS20 is at 89 % of the device, and more logic may force it down to 2 CPUs |
+| 2026-10-03 (session 9, user) | **This plan is closed; plan 2 is [PLAN.md](PLAN.md)**, with every open item except release engineering (later) and CD audio (deferred). Stop-A and the L-keys follow the Sun-2 core: Right Alt + F1..F10 = L1..L10 |
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
