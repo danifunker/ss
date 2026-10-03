@@ -5,8 +5,10 @@
    TBR, WIM and the 32 visible registers, and lets it run again (unless
    -s). Then it switches the UART back to the console.
 
-     pcdump [-s] [-n count] [-d ms] [-c cpu] [-m va,words] [-p pa,words]
+     pcdump [-s] [-w] [-n count] [-d ms] [-c cpu] [-m va,words] [-p pa,words]
        -s        leave the CPUs stopped
+       -w        also dump the locals and ins of all 8 windows (the PSR's
+                 CWP is moved and put back)
        -n count  take count samples (default 1), -d ms apart (default 500)
        -c cpu    only this CPU
        -m va,n   also dump n words of virtual memory (supervisor data,
@@ -21,6 +23,10 @@
        -W va,v   write the word v at va (give -c), through its physical
                  address (an MMU probe in the CPU's context), so read-only
                  kernel text can be patched; the old word is printed
+
+   Each CPU's line is followed by its debug status words: error mode
+   (halterror) and the trap that caused it (hetrap tt), the interrupt
+   level asserted (irl), the trap in progress, TBR.tt.
 
    Nothing else may read /dev/ttyS1 meanwhile (scripts/console.sh, agetty).
    Uses lib.c and serie.c unchanged.
@@ -105,6 +111,7 @@ static void poke_word(uint32_t va, uint32_t v)
 int main(int argc, char *argv[])
 {
     int keep = 0, count = 1, delay = 500, only = -1, c, s, n, mask;
+    int windows = 0;
     unsigned long long maddr = 0;
     int mwords = 0, mphys = 0, jump = 0, poke = 0;
     uint32_t jpc = 0, wva = 0, wval = 0, aaddr[8];
@@ -112,9 +119,10 @@ int main(int argc, char *argv[])
     uint32_t saddr = 0, sval = 0;
     char *comma;
 
-    while ((c = getopt(argc, argv, "sn:d:c:m:p:j:W:A:S:")) != -1) {
+    while ((c = getopt(argc, argv, "swn:d:c:m:p:j:W:A:S:")) != -1) {
         switch (c) {
         case 's': keep = 1; break;
+        case 'w': windows = 1; break;
         case 'n': count = atoi(optarg); break;
         case 'd': delay = atoi(optarg); break;
         case 'c': only = atoi(optarg); break;
@@ -145,7 +153,7 @@ int main(int argc, char *argv[])
             wval = *comma == ',' ? strtoul(comma + 1, NULL, 16) : 0;
             break;
         default:
-            fprintf(stderr, "usage: %s [-s] [-n count] [-d ms] [-c cpu] "
+            fprintf(stderr, "usage: %s [-s] [-w] [-n count] [-d ms] [-c cpu] "
                     "[-m va,words] [-p pa,words] [-A asi,a] [-S asi,a,v] [-j pc] [-W va,v]\n",
                     argv[0]);
             return 2;
@@ -178,9 +186,28 @@ int main(int argc, char *argv[])
             printf("cpu%d pc %08x npc %08x psr %08x tbr %08x wim %08x\n", n,
                    dbg_read_cop_pc(), dbg_read_cop_npc(), dbg_read_psr(),
                    dbg_read_tbr(), dbg_read_wim());
+            {
+                uint32_t st = dbg_read_status(), st2 = dbg_read_status2();
+                printf("    status %08x %08x: halterror %d hetrap.tt %02x "
+                       "irl %d trap %d tt %02x tbr.tt %02x\n", st, st2,
+                       (st >> 2) & 1, (st2 >> 8) & 0xff, (st >> 16) & 15,
+                       (st >> 23) & 1, st >> 24, st2 & 0xff);
+            }
             for (i = 0; i < 32; i++)
                 printf("%s %s=%08x%s", i % 8 ? "" : "   ", rname[i], r[i],
                        i % 8 == 7 ? "\n" : "");
+            if (windows) {
+                uint32_t psr = dbg_read_psr();
+                int w;
+                for (w = 0; w < 8; w++) {
+                    dbg_write_psr((psr & ~0x1fu) | w);
+                    printf("    w%d%s", w, w == (int)(psr & 0x1f) ? "*" : " ");
+                    for (i = 16; i < 32; i++)
+                        printf(" %08x%s", dbg_read_reg(i), i == 23 ? " |" : "");
+                    printf("\n");
+                }
+                dbg_write_psr(psr);
+            }
             for (i = 0; i < mwords; i++) {
                 unsigned long long a = maddr + 4 * i;
                 if (i % 4 == 0)
