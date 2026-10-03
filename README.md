@@ -41,6 +41,30 @@ changes) by `scripts/build-bios.sh`; one image serves the SS5 and the SS20.
 The Sun PROMs (SS5 OBP 2.15, SS20 OBP 2.25) also work, from your own
 machine: they are not distributed.
 
+**Faster boots with the SS20 Sun PROM (OBP 2.25).** On a CPU module
+without an external cache, which is what the core is, Sun's PROM maps
+the memory of the programs it boots uncacheable, so the boot loaders run
+uncached: NetBSD's install CD takes 15 minutes to reach its installer,
+Solaris 3 minutes to its login. Once the OS runs, speed is normal. One
+line at the `ok` prompt makes the PROM map that memory cacheable:
+
+    ok ffd56c30 ffd56c50 (is  1000000 0 do i cache-enable 1000 +loop
+
+then `boot cdrom` (or `boot`). To run it at every start, store it in the
+NVRAM's `nvramrc`:
+
+    ok nvedit
+     0: ffd56c30 ffd56c50 (is  1000000 0 do i cache-enable 1000 +loop
+     1: (press Ctrl-C)
+    ok nvstore
+    ok setenv use-nvramrc? true
+    ok reset
+
+With it, NetBSD's install CD reaches its installer in 90 s and Solaris 8
+its login in 102 s (177 s without). The addresses are those of OBP 2.25
+(SS20); the line means nothing to other PROMs or to OpenBIOS, which runs
+boot loaders cached on its own.
+
 **Upgrading from the SparcStation core:** the folder was `games/SparcStation`.
 Move `boot.rom` and your disk images to `games/SunSparcStation`.
 

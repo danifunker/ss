@@ -27,7 +27,7 @@ its decisions table and the session log of sessions 1-9. The newest
 | `tests/cpu/` | bare-metal test suite that runs as the boot PROM (QEMU and core): CPU tests plus `t_chipset.S`; `expected/ss{5,20}-core-hw.log` are the hardware baselines |
 | `sim/` | whole-machine Verilator simulation (GHDL 6 lowers `ss_core`); `run-cputest.sh 5\|20` must match the hardware baseline; `build.sh 20 --diag` starts with `diag-switch?` set (Sun POST); see `sim/README.md` |
 | `bios/` | OpenBIOS sources (git subtree of Grabulosaure/ss_openbios); `bios/boot.rom` is the image the MiSTer runs; `scripts/build-bios.sh` builds `bios/build/boot.rom` |
-| `scripts/` | `build.sh 5\|20 [--seed N]`, `deploy.sh 5\|20 [--rom F]`, `hwtest.sh 5\|20 cpu\|netbsd\|solaris` (board regressions), `console.sh` (ttya from the MiSTer), `setopt.sh` (OSD options via the .CFG), `mount.sh` (remembered disk slots), `machine.sh 5\|20` (per-machine boot.rom/CFG sets), `build-bios.sh`, `kbtype.sh` (types on the core's keyboard through mrext, e.g. at the Sun OBP's `ok`); machine settings in the gitignored `scripts/local.env` |
+| `scripts/` | `build.sh 5\|20 [--seed N]`, `deploy.sh 5\|20 [--rom F]`, `hwtest.sh 5\|20 TEST...` (board regressions: cpu, scsi, brk, kbd, netbsd, solaris, solaris-obp, post, net-*, cd, cd-obp, stress, `all`; the longer ones are `scripts/board/*.sh`, each usable alone), `main-swap.sh` (a Main binary onto the MiSTer), `console.sh` (ttya from the MiSTer), `setopt.sh` (OSD options via the .CFG), `mount.sh` (remembered disk slots), `machine.sh 5\|20` (per-machine boot.rom/CFG sets), `build-bios.sh`, `kbtype.sh` (types on the core's keyboard through mrext, e.g. at the Sun OBP's `ok`); machine settings in the gitignored `scripts/local.env` |
 | `docs/` | plan, gap analyses, `rom-disassembly/` of the Sun PROMs |
 | `scratch/` | reference PDFs (+ `text/` extractions) and Sun ROM images; gitignored, never commit |
 
@@ -69,4 +69,9 @@ its decisions table and the session log of sessions 1-9. The newest
   `scripts/build-bios.sh`.
 - LLVM 18 (`/usr/lib/llvm-18/bin`) assembles SPARC V8:
   `clang --target=sparc-unknown-elf -mcpu=v8`.
-- iverilog + Verilator 5 for SystemVerilog benches (`rtl/mister/tb/run.sh`).
+- iverilog + Verilator 5 for SystemVerilog benches (`rtl/mister/tb/run.sh`);
+  GHDL for the chipset benches (`rtl/sun4m/tb/run.sh`).
+- **Main** (the MiSTer binary) is `scratch/Main_MiSTer-sparc` on
+  `sparcstation-enhancements`; it builds with the ARM toolchain in
+  `~/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf/bin` (on PATH, then
+  `make -j4`); `scripts/main-swap.sh bin/MiSTer` puts it on the board.
