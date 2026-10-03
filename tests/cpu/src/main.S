@@ -20,6 +20,7 @@
 #include "t_cache3.S"
 #include "t_smp.S"
 #include "t_iu2.S"
+#include "t_dcti.S"
 
         .section .testtab, "a", @progbits
         .word 0, 0                      /* end of the test table */

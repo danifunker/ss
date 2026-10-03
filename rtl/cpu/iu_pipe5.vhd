@@ -681,7 +681,19 @@ BEGIN
     pipe_dec_c.psr<=PSR_0;
     pipe_dec_c.data_w<=plomb_rd(x"00000000",ASI_USER_DATA,LDST_UW);
     pipe_dec_c.adrs10<="00";
-    pipe_dec_c.pc    <=pc;
+    -- The address of the instruction in DEC is the fetch unit's pc, except
+    -- behind a JMPL/RETT in EXE: pc advances only when that one completes
+    -- (its target is computed in EXE), and a JMPL/RETT in DEC is exempt
+    -- from the stall that holds other instructions until then (so that the
+    -- `jmp %l1; rett %l2` couple flows). A JMPL decoded meanwhile, as the
+    -- second of a DCTI couple or as the target of a RETT held in EXE (a
+    -- store before it still waiting for the bus), read the stale pc and
+    -- linked %o7 to it: OpenBIOS's level-14 handler returning to Forth's
+    -- `call %g1` sent the callee's retl into the window spill handler
+    -- (2026-10-03). The EXE instruction's npc is the DEC instruction's
+    -- address in that case.
+    pipe_dec_c.pc    <=mux(pipe_dec.cat.mode.j AND pipe_dec.v,
+                           pipe_dec.npc,pc);
     pipe_dec_c.npc   <=mux(pipe_dec.cat.mode.j AND pipe_dec.v,
                            npc_exe_c,npc);
 

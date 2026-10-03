@@ -78,4 +78,5 @@ PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
     check 00000004 exp=5a5a1234 obs=00000000
 FAIL iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=52 fail=7 skip=6
+PASS iu: jmp/rett to a jmpl %g1,%o7 (0, 1, 2, 4, 8 stores before the rett), caches on: %o7 is the jmpl's address
+CPUTEST DONE pass=53 fail=7 skip=6
