@@ -27,7 +27,7 @@ first.**
 | 2 | Hardware gap analysis (what a real SS5/SS20 has that the core lacks), prioritised | **done**: [HARDWARE_GAPS.md](HARDWARE_GAPS.md); P0/P1 list awaiting the user (§9 there) |
 | 3 | Re-layout to the Template_MiSTer standard, rename to SunSparcStation | **done, built and booted** (SS5 and SS20): see [Bring-up](#bring-up-stage-0-results-session-1) |
 | 4 | Implementation gap analysis (what the core has, but gets wrong or leaves out) | **done**: [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) over four audits in `impl-gaps/`; the real-OBP work plan is [design/sun-obp-boot.md](design/sun-obp-boot.md) |
-| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20 only** (the SS5 is parked). SS20 at 55 MHz, 3 CPUs, **every clock met** (`esp-s1`, 89 % ALMs). NetBSD 11 and Solaris 8 boot under OpenBIOS and under the official Sun OBP 2.25 (Solaris with 3 CPUs). SCSI: one target engine, 16 KB requests straight to `hps_io`, the ESP interrupt timing of a real 53C9x; with Main's write buffer writes are 10× faster. **Ethernet works** (LANCE frame mailbox to Main: NetBSD on the LAN and the internet); CUE/CHD CDs through Main; OpenBIOS's screen console 16-51× faster. Main changes on `sparcstation-enhancements` (user's fork), in a generic `support/sun/` with the Mac code untouched (session 9). The Sun OBP's `test net` passes (M8). OpenBIOS boots NetBSD's install CD (slowly: it runs clients uncached; with the caches on, 10× faster, but that exposed a CPU hang in the trap return, handed to Fable). Hand-off: [RESUME-20261005.md](../RESUME-20261005.md) |
+| 5 | Execute, in the stage order below (bring-up, simulation, platform foundations, real OBP, Main services, device fixes, SS20/MP, diag POST, release) | **Focus: the SS20 only** (the SS5 is parked). SS20 at 55 MHz, 3 CPUs, **every clock met** (`esp-s1`, 89 % ALMs). NetBSD 11 and Solaris 8 boot under OpenBIOS and under the official Sun OBP 2.25 (Solaris with 3 CPUs). SCSI: one target engine, 16 KB requests straight to `hps_io`, the ESP interrupt timing of a real 53C9x; with Main's write buffer writes are 10× faster. **Ethernet works** (LANCE frame mailbox to Main: NetBSD on the LAN and the internet); CUE/CHD CDs through Main; OpenBIOS's screen console 16-51× faster. Main changes on `sparcstation-enhancements` (user's fork), in a generic `support/sun/` with the Mac code untouched (session 9). The Sun OBP's `test net` passes (M8); **Solaris on the network** (multi-descriptor TX fixed). The MMU's L2 TLB (OSD, default Off) gives Solaris ~14-28 %. OpenBIOS boots NetBSD's install CD (slowly: it runs clients uncached; with the caches on, 10× faster, but that exposed a CPU hang in the trap return, handed to Fable). Hand-off: [RESUME-20261005.md](../RESUME-20261005.md) |
 | 6 | Test infrastructure: simulation, CPU suite on hardware, OS boot regressions | `scripts/hwtest.sh` (CPU suite, SCSI test ROM, NetBSD, Solaris under OpenBIOS and under the Sun PROM); board baselines SS20 CPU 65/0/0 and SCSI 6/0/0, both equal to the simulation; `sim/run-scsi.sh` with Main-like latency (`--sd-latency`), `sim/run-eth.sh` (`--eth-loop`: ethtest 5/0/0); `tests/cpu/check_imm.py`; board scripts in `scratch/` (speed, console speed, CD checksums, NetBSD on the LAN, stress) |
 | 7 | Release engineering: rbfs, `releases/`, user docs, MiSTer distribution | not started |
 
@@ -1002,6 +1002,60 @@ drop one of the two machines, and asked to focus on the SS20.
   needs a 64-entry diagnostic TLB image per CPU with the demap semantics
   of the flush tests that follow: CPU work for Fable (`rtl/cpu`), with the
   SS20 at 89 % of the device; optional.
+- **Solaris on the network: two LANCE faults, fixed (`f99098d`).**
+  Under OpenBIOS the image's interface is **`le1`** (its
+  `path_to_inst` was made in QEMU, whose LANCE path took instance 0).
+  `ifconfig le1 dhcp start` got a lease, then nothing more went out
+  (`netstat -i`: 6 packets sent): Solaris's `le` driver hands IP frames
+  to the LANCE in pieces straight from its network buffers (header and
+  data in separate descriptors, any byte address and length), where
+  NetBSD's copies each frame into one aligned buffer. `ethtest` with a
+  frame over two and three TX descriptors reproduced it in simulation:
+  the LANCE's copy loop (`ts_lance.vhs` `LOOP_LOAD`) left a burst line as
+  soon as its address reached the line's last halfword, so a buffer
+  starting there pushed nothing and re-read the line forever (the TX ring
+  stopped; CSR3's debug bits showed the microcode in `tx_empty`); and the
+  path to the MAC moved 16-bit words, so a piece of odd length or at an
+  odd address shifted the rest of the frame. Fixed: the loop leaves once
+  that halfword is pushed; each push carries byte enables
+  (`type_mac_emi_w.be`) and `eth_hps` assembles frames byte by byte.
+  ethtest 8/0/0. Board, build `ethb-s2` (RTL `f99098d`, seed 2: every
+  clock met, core +0.017 ns, HDMI +0.289, hold +0.251; seed 1 failed to
+  route, congestion at 89 %): CPU suite 65/0/0, scsitest 6/0/0, NetBSD,
+  Solaris, Solaris under the Sun OBP with 3 CPUs, the OBP's `test net`;
+  **Solaris on the LAN** (`scratch/solnet.sh`: DHCP on `le1`, the
+  gateway alive, pinged from here 4/4, TCP with Perl's `IO::Socket`:
+  1.16 MB out at 918 KB/s and 4 MB in at 1355 KB/s, both `cksum`s equal
+  on the two sides; 3544 packets in, 1262 out, no errors); NetBSD on the
+  LAN.
+- **The OSD memory size under the Sun OBP** (`scratch/obpmem.sh`): at 128
+  and 64 MB the OBP's banner ("128 MB memory installed") and Solaris's
+  `prtconf` ("Memory size: 128 Megabytes") agree with the option.
+- **The MMU's second-level TLB is off by default:** the core has one
+  (`cpu_conf_pack` `L2TLB`, 128 entries), used when software sets MCNTL
+  bit 6 *and* the OSD option Advanced → L2TLB is On, whose default is
+  Off. So every miss in the 4-entry TLBs walks the tables. OpenBIOS sets
+  bit 6 on CPU 0 (`0x4340`) and Solaris keeps it, but OpenBIOS starts
+  the other CPUs with MCNTL `0x001` (`entry.S`), and the Sun OBP leaves
+  bit 6 clear (`0x01004b01` at `ok`). Solaris under OpenBIOS with the
+  option On (`scratch/l2tlbtest.sh`; MCNTL by `pcdump -A 4,0`: CPU 0
+  `0x01004b41`, CPUs 1-2 `…4b05`/`…4b09`): boot to `console login:` **305
+  s** (344 s with it Off), the ksh loop 203 s (208), `cat` of the
+  libraries 2.23 s (2.44). OpenBIOS now starts the other CPUs with
+  `0x041` (one word, the code layout unchanged), and with the bit on all
+  three CPUs: boot **296 s**, the ksh loop **150 s** (208 off: −28 %),
+  `cat` 1.71 s (−30 %). A 35-minute stress with it On, 3 CPUs on-line
+  (OpenBIOS, `ALLCPUS=1 STRESS_BIOS=… solstress.sh … l2tlb=on`): clean,
+  ~37 000 processes. **The default stays Off for now:** Grabulosaure's
+  README notes that NeXTSTEP is not compatible with the L2 TLB (Solaris
+  and Linux are), and NeXTSTEP is one of the core's OSes; the user
+  decides (speed for Solaris/NetBSD/Linux against NeXTSTEP needing it
+  Off). For the Sun OBP the core would have to take the OSD option alone
+  as the enable (an `rtl/cpu` change, Fable). The simulation has `--l2tlb` now, and
+  `tlbbench -DTB_L2TLB` sets the bit: a first-level miss then costs ~27
+  cycles instead of ~38 (5 and 8 pages: 1.763 and 2.156 M cycles, from
+  1.988 and 2.530). The second-level TLB is a third faster, not more:
+  more first-level entries would be the larger gain.
 - **Scripts:** `nbnet.sh` no longer hangs on `dhcpcd | tail` (dhcpcd
   daemonises and keeps the pipe open: its output goes to a file);
   `cdboot.sh` no longer stops at the ELF probe's message (and takes
@@ -1173,7 +1227,16 @@ drop one of the two machines, and asked to focus on the SS20.
   `scratch/handoff/fable-layout-hang.md`; `winstress.S` does not
   reproduce it alone). `tlbbench.S`: a D-TLB miss costs ~38 cycles, the
   TLBs have 4 entries. Sun POST in simulation: past the MMU context tests,
-  stops at the TLB bit-pattern test (ASI 6, 64 entries). Hand-off:
+  stops at the TLB bit-pattern test (ASI 6, 64 entries). **Solaris on the
+  network**: its `le` sends frames over several TX descriptors at any
+  byte, which hung the LANCE's TX ring and garbled odd pieces; fixed in
+  `ts_lance`/`eth_hps` (`f99098d`, ethtest 8/0/0), and Solaris on the LAN
+  with TCP both ways on the board (build `ethb-s2`). The MMU's 128-entry
+  L2 TLB (OSD Advanced, default Off): with it On on all CPUs (OpenBIOS
+  now sets the bit on CPUs 1-2) Solaris boots in 296 s instead of 344 and
+  CPU-bound work runs ~28 % faster, stress clean; the default is the
+  user's call (NeXTSTEP is not compatible). The memory option works under
+  the Sun OBP and Solaris. Hand-off:
   [RESUME-20261005.md](../RESUME-20261005.md).
 - **2026-10-02, session 8 (SS20).** Built session 7's work: the board
   regression found NetBSD timing out on writes with the new SCSI engine:
