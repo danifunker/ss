@@ -29,13 +29,15 @@ See the main [README](../README.md) for the OSD, the NVRAM and the OS notes.
 
 ## SunSparcStation20_20261002
 
-- rbf md5 `0913c49e39ca33677eca966316a8c679`; RTL as of `75d5054`
-  (branch `danifunker`); Quartus 17.0.2 Lite, fit seed 1: 89 % ALMs, every
-  clock met (core +0.311 ns, HDMI +0.141 ns, hold +0.249 ns).
+- rbf md5 `983e73aef1f7de8240da0afe51eac2d3`; RTL as of `db73f44`
+  (branch `danifunker`; the LANCE's loopback mode in the Ethernet bridge);
+  Quartus 17.0.2 Lite, fit seed 1: 89 % ALMs, every clock met (core
+  +0.455 ns, HDMI +0.019 ns, hold +0.213 ns).
 - `boot0.rom` md5 `1d88d584578ee7440500f562005ef10b` (`f885cf2`, the
   repository's `bios/boot.rom`).
-- `MiSTer` md5 `7632b9e54c3d4cfd4b6e7eb941f0a192` (Main
-  `sparcstation-enhancements` at `c00a7d1`).
+- `MiSTer` md5 `d94dbef4241eb3aa03a8e9d0ffed21b8` (Main
+  `sparcstation-enhancements` at `17224b1`: the core's services in a
+  generic `support/sun/`, the Mac code untouched).
 - New since the SparcStation core: the standard MiSTer framework; SCSI disks
   and CD through the MiSTer's Linux side (one target engine, 16 KB
   requests); Ethernet through the MiSTer's network port; CUE/CHD CDs; the
@@ -44,7 +46,11 @@ See the main [README](../README.md) for the OSD, the NVRAM and the OS notes.
   a much faster OpenBIOS screen console.
 - Tested on the board: the CPU test suite (65/0/0), the SCSI test ROM
   (6/0/0), NetBSD 11 and Solaris 8 under OpenBIOS, Solaris 8 under the Sun
-  OBP with 3 CPUs, NetBSD on the LAN (DHCP, ping to the internet), NetBSD's
-  install CD as ISO, CHD and CUE, two disks, the memory option, a blank
-  NVRAM's own IDPROM, CDE on the screen, and 74 minutes of a three-CPU
-  Solaris disk stress (find | cksum loops) without a fault.
+  OBP with 3 CPUs, the Sun OBP's `test net`, NetBSD on the LAN (DHCP, pings
+  both ways), NetBSD's install CD as ISO, CHD and CUE (and booted under
+  OpenBIOS with `boot cdrom:d`), the disk write buffer end to end (written
+  data read back after a reboot). On the previous build (`esp-s1`, the same
+  RTL without the LANCE loopback): two disks, the memory option, a blank
+  NVRAM's own IDPROM, CDE on the screen, NetBSD pinging the internet, and
+  74 minutes of a three-CPU Solaris disk stress (find | cksum loops)
+  without a fault.
