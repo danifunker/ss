@@ -1027,7 +1027,8 @@ drop one of the two machines, and asked to focus on the SS20.
   gateway alive, pinged from here 4/4, TCP with Perl's `IO::Socket`:
   1.16 MB out at 918 KB/s and 4 MB in at 1355 KB/s, both `cksum`s equal
   on the two sides; 3544 packets in, 1262 out, no errors); NetBSD on the
-  LAN.
+  LAN; a 30-minute three-CPU stress (Sun OBP) clean. It is the release
+  `SunSparcStation20_20261003` (`ebf69ff`), with OpenBIOS `9cb810de`.
 - **The OSD memory size under the Sun OBP** (`scratch/obpmem.sh`): at 128
   and 64 MB the OBP's banner ("128 MB memory installed") and Solaris's
   `prtconf` ("Memory size: 128 Megabytes") agree with the option.
@@ -1177,6 +1178,7 @@ drop one of the two machines, and asked to focus on the SS20.
 | 2026-10-02 (session 8) | CD images: CUE/CHD through Main's Mac CD translation (slot 2 routed there on the SPARC core); the OSD's CD slot takes ISO, CUE, CHD. No CD audio |
 | 2026-10-02 (session 8, end) | **No Mac code touched for the Sun core** (user): Main's Sun services are a generic Sun SCSI family module, `support/sun/` (`is_sun_scsi_family()`), with copies of what it needs from the Mac code (done in session 9, `17224b1`) |
 | 2026-10-03 (session 9) | The loopback build (`lpbk-s1`) replaces `esp-s1` in `releases/` under the same date, with the `support/sun` Main (it passed the whole regression) |
+| 2026-10-03 (session 9) | `releases/` → `SunSparcStation20_20261003` (`ethb-s2`: Solaris on the network) with OpenBIOS `9cb810de`. The OSD's L2TLB stays Off by default (NeXTSTEP is not compatible; the user decides) |
 | 2026-09-30 | SS5 and SS20 keep the shared CONF_STR name for now (one `games/` folder and `.CFG`); a split, or a runtime machine switch, is for later. During development `scripts/machine.sh` swaps the per-machine files |
 | 2026-09-30 | CPU fixes (`rtl/cpu/`) go to a Fable agent through a written prompt, one Fable agent at a time; the main session merges its branch after a hardware run |
 | 2026-09-30 | Aim for 65 MHz on the SS5 (its speed is the point of the SS5): seeds first, then the MCU→IU path (Fable) |
@@ -1231,7 +1233,9 @@ drop one of the two machines, and asked to focus on the SS20.
   network**: its `le` sends frames over several TX descriptors at any
   byte, which hung the LANCE's TX ring and garbled odd pieces; fixed in
   `ts_lance`/`eth_hps` (`f99098d`, ethtest 8/0/0), and Solaris on the LAN
-  with TCP both ways on the board (build `ethb-s2`). The MMU's 128-entry
+  with TCP both ways on the board (build `ethb-s2`, a 30-minute
+  three-CPU stress clean; in `releases/` as `SunSparcStation20_20261003`
+  with OpenBIOS `9cb810de`, `ebf69ff`). The MMU's 128-entry
   L2 TLB (OSD Advanced, default Off): with it On on all CPUs (OpenBIOS
   now sets the bit on CPUs 1-2) Solaris boots in 296 s instead of 344 and
   CPU-bound work runs ~28 % faster, stress clean; the default is the
