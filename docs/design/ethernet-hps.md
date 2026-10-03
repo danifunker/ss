@@ -52,6 +52,14 @@ multicast hash index, so the FPGA filters without a CRC unit.
   `act_tx_new` takes `busy` with `fifordy`). The frame is complete when its
   bytes reach `len` (cumulative over the chain) with `enp`. With `crcgen`
   off (DTCR, the driver supplied the FCS) the last four bytes are not sent.
+- **A full TX ring** holds the LANCE (`busy`), as a busy wire would; the
+  bridge reads TX_RPTR again every 64 cycles and drops the frame only when
+  Main has taken nothing for 50 ms (Main not running), or when the network
+  is off.
+- **Loopback** (MODE LOOP: the Sun PROM's `le` driver tests it at open):
+  the transmitted frame goes straight back to the receive side, through
+  the filter, with the 4 FCS bytes counted; nothing reaches the mailbox,
+  and the network is not polled meanwhile.
 - **Receive.** With its buffer empty the bridge polls RX_WPTR every 1024
   cycles (about 19 µs). A frame is read whole, then offered to the LANCE:
   `fifordy` while words remain, `deof` with the last. **No `eof` pulse**:
@@ -70,5 +78,16 @@ pass, `sparc_enet_stop()` at the next core load, as the NeXT bridge. Modes
 as the A2065 and NeXT: eth0 is promiscuous with the BPF filter on the guest
 MAC (broadcasts too; multicast dropped), eth1 a dedicated NIC, macvlan a
 child of eth0 named `sparc0`, tap0 needs `/dev/net/tun` (the test MiSTer's
-kernel has none). The guest's MAC is the one the OS loads into the LANCE
+kernel has none). eth1 is promiscuous with the same filter (the guest's
+address is not the NIC's). Offloads (GRO, LRO, GSO, TSO) are turned off on
+the NIC while the bridge uses it and back on when it closes, as the A2065
+does: merged super-frames are larger than any LANCE buffer.
+
+## On the board (session 8)
+
+eth0, NetBSD 11 (`scratch/nbnet.sh`): a DHCP lease on the LAN, the gateway
+as default route and an IPv6 address by autoconfiguration; pinged from
+another host (5/5, ~4 ms) and pinging the internet (0 % loss, 24 ms). The
+mailbox words, read on the MiSTer with `devmem 0x1FF00000 32` and on,
+showed every frame taken on both sides. The guest's MAC is the one the OS loads into the LANCE
 (from the IDPROM, unique per NVRAM image since `c6c45eb`).
