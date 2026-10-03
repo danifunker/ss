@@ -66,6 +66,7 @@ PACKAGE ts_pack IS
     padr     : unsigned(47 DOWNTO 0);   -- MAC Dest
     ladrf    : unsigned(63 DOWNTO 0);   -- Filtrage HASH
     prom     : std_logic;               -- promiscuous mode (MODE bit 15)
+    lpbk     : std_logic;               -- loopback (MODE bit 2)
     clr      : std_logic;               -- Réinitialisation
   END RECORD;
   

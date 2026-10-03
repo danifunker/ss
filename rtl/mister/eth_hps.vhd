@@ -35,6 +35,10 @@
 -- while words remain; deof with the last. No eof pulse: the LANCE latches
 -- eof until it pops the last word, and a frame it never takes (receiver
 -- off) is dropped after STALE cycles, or at the LANCE's INIT.
+-- Loopback (MODE LOOP, which the Sun PROM's le driver tests at open): the
+-- transmitted frame comes back as a received one at once, through the
+-- filter, with the 4 FCS bytes counted; nothing goes to the mailbox, and
+-- the network is not polled meanwhile.
 --------------------------------------------------------------------------------
 
 LIBRARY ieee;
@@ -130,7 +134,7 @@ ARCHITECTURE rtl OF eth_hps IS
   TYPE enum_state IS (sINIT, sIDLE,
                       sTX_RPTR, sTX_FETCH, sTX_DATA, sTX_WPTR,
                       sRX_WPTR, sRX_HDR, sRX_DATA, sRX_RPTR, sRX_OFFER,
-                      sMAC);
+                      sLOOP_RD, sLOOP_WR, sMAC);
   SIGNAL state    : enum_state;
   SIGNAL step     : unsigned(3 DOWNTO 0);
   SIGNAL acc_rd, acc_wr : std_logic;
@@ -368,7 +372,17 @@ BEGIN
             IF tx_retry /= 0 THEN
               tx_retry <= tx_retry - 1;
             END IF;
-            IF tx_done = '1' AND tx_posted = '0' AND tx_retry = 0 THEN
+            IF tx_done = '1' AND tx_posted = '0' AND mac_rec_w.lpbk = '1' THEN
+              IF tx_over = '1' OR tx_len < 14 THEN
+                tx_posted <= '1';         -- dropped
+              ELSIF rx_full = '0' THEN
+                k        <= (OTHERS => '0');
+                nwords   <= resize((tx_len + 4 + 7) / 8, 9);
+                txbuf_ra <= (OTHERS => '0');
+                rx_keep  <= '0';
+                state    <= sLOOP_RD;
+              END IF;                     -- else: once the LANCE took the last
+            ELSIF tx_done = '1' AND tx_posted = '0' AND tx_retry = 0 THEN
               IF ena = '1' AND tx_over = '0' AND tx_len >= 14 AND
                  tx_len <= MAXLEN THEN
                 acc_rd   <= '1';
@@ -380,7 +394,8 @@ BEGIN
               END IF;
             ELSIF mac_ok = '0' OR mac_pub /= mac_rec_w.padr THEN
               state <= sMAC;
-            ELSIF rx_full = '0' AND ena = '1' AND poll_cpt = POLL THEN
+            ELSIF rx_full = '0' AND ena = '1' AND poll_cpt = POLL AND
+                  mac_rec_w.lpbk = '0' THEN
               poll_cpt <= 0;
               acc_rd   <= '1';
               acc_wait <= '1';
@@ -499,6 +514,34 @@ BEGIN
               rx_ldlen <= rx_flen;
             END IF;
             state <= sIDLE;
+
+          ------------------------------------------
+          -- Loopback: txbuf to rxbuf, then offered
+          WHEN sLOOP_RD =>
+            state <= sLOOP_WR;            -- txbuf_q: txbuf(k) next cycle
+
+          WHEN sLOOP_WR =>
+            rxbuf_wr <= '1';
+            rxbuf_wa <= k(7 DOWNTO 0);
+            rxbuf_d  <= txbuf_q;
+            IF k = 0 THEN
+              FOR i IN 0 TO 5 LOOP
+                dst_v(8 * i + 7 DOWNTO 8 * i) := txbuf_q(8 * i + 7 DOWNTO 8 * i);
+              END LOOP;
+              IF mac_rec_w.prom = '1' OR dst_v = mac_rec_w.padr OR
+                 dst_v(0) = '1' THEN
+                rx_keep <= '1';           -- ours, broadcast, multicast
+              END IF;
+            END IF;
+            k <= k + 1;
+            txbuf_ra <= k(7 DOWNTO 0) + 1;
+            IF k + 1 = nwords THEN
+              rx_flen   <= tx_len + 4;
+              tx_posted <= '1';
+              state     <= sRX_OFFER;
+            ELSE
+              state <= sLOOP_RD;
+            END IF;
 
           ------------------------------------------
           WHEN sMAC =>

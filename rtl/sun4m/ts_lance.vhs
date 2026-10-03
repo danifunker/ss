@@ -1001,6 +1001,7 @@ BEGIN
       mac_rec_w.padr <=padr;
       mac_rec_w.ladrf<=ladrf;
       mac_rec_w.prom <=prom;
+      mac_rec_w.lpbk <=lopo;
       mac_rec_w.pop  <=rec_pop_v;
       mac_rec_w.clr  <=init;
       

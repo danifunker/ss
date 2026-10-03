@@ -509,6 +509,31 @@ BEGIN(t_eth_miss, "eth: with no buffer left the frame is missed (MISS), then the
         EXPECT(%o0, 0, 4)
 END
 
+BEGIN(t_eth_loopback, "eth: internal loopback (MODE LOOP|INTL): the frame comes back, not on the wire")
+        call eth_init
+        mov 0x0044, %o0                 /* MODE: INTL | LOOP */
+        set 0x0037, %o1
+        and %o0, %o1, %o0
+        EXPECT(%o0, C0_RXON | C0_TXON | C0_STRT, 1)
+        clr %o0
+        call frame
+        mov 70, %o1
+        call wait_own
+        mov TDR, %o0
+        EXPECT(%o0, 1, 2)
+        call wait_own
+        mov RDR, %o0
+        EXPECT(%o0, 1, 3)               /* received in descriptor 0 */
+        clr %o0
+        clr %o1
+        call check_rx
+        mov 70, %o2
+        EXPECT(%o0, 0, 4)
+        /* back to normal for whatever runs next */
+        call eth_init
+        clr %o0
+END
+
         .section .rodata
 mac:    .byte 0x08, 0x00, 0x20, 0x12, 0x34, 0x56
 
