@@ -88,7 +88,7 @@ core does the same so both behave alike:
 | Right Alt + F11 | Help (0x76; a Type 4/5 key the Sun-2 lacks) |
 | Right Alt + any other key | **AltGraph** (0x0D) + that key: the Type 4 national layouts need AltGraph, so here Right Alt stays AltGraph whenever it is not a chord with F1..F11 (the Sun-2's Type 3 has no AltGraph, so its Right Alt sends nothing) |
 | F1 .. F11 | F1 .. F11, as today (F12 is MiSTer's OSD) |
-| Pause, Print Screen | Pause (0x15), Print Screen (0x16); today Pause turns into Ctrl + Num Lock (audit item A.7) |
+| Pause, Print Screen | Pause (0x15), Print Screen (0x16); today Pause turns into Ctrl + Num Lock (keyboard audit, item B) |
 
 As in the Sun-2 core, an F-key keeps the meaning it went down with (its
 auto-repeats and its release follow it), so releasing Right Alt first
