@@ -44,6 +44,23 @@
 #            HD0 must be unchanged afterwards (the write test restores it).
 #            HD0 = the OS image again and HD1 empty afterwards
 #
+# The longer board tests are scripts in scripts/board/ (each usable alone),
+# run from here by name (SS20; the rbf, OpenBIOS and the NVRAM image as
+# above; Main from sparcstation-enhancements for the network):
+#   net-netbsd       NetBSD on the LAN (DHCP, ping both ways)
+#   net-solaris      Solaris on the LAN, TCP both ways (scripts/board/net.sh)
+#   net-solaris-obp  the same under the Sun PROM (--obp)
+#   obp-testnet      the Sun PROM's `test net` and `boot net` (--obp)
+#   cd               OpenBIOS boots NetBSD's install CD to its kernel
+#                    (scripts/board/cd.sh; --bios FILE for another image)
+#   cd-obp           the Sun PROM boots it to the installer (--obp)
+#   stress           Solaris under load for --minutes N (default 30), under
+#                    the Sun PROM if --obp is given (scripts/board/stress.sh)
+#   all              cpu scsi brk kbd netbsd solaris net-netbsd net-solaris cd,
+#                    and with --obp also solaris-obp post net-solaris-obp
+#                    obp-testnet cd-obp (not stress)
+# --obp defaults to SUN_OBP from scripts/local.env.
+#
 #   scripts/hwtest.sh 5 cpu netbsd
 #   scripts/hwtest.sh 5 --bios bios/build/boot.rom netbsd   (a new OpenBIOS)
 #   scripts/hwtest.sh 20 --obp scratch/ss20-obp225.rom solaris-obp
@@ -59,8 +76,9 @@ set -u
 REV=$(rev_of "${1:-}") || exit 2; shift
 RECORD=0
 BIOS=""
-OBP=""
+OBP="${SUN_OBP:-}"
 NVRAM=ss20-obp.nvr
+MINUTES=30
 TESTS=()
 while [ $# -gt 0 ]; do
     a=$1; shift
@@ -69,11 +87,15 @@ while [ $# -gt 0 ]; do
         --bios) BIOS=$1; shift ;;
         --obp) OBP=$1; shift ;;
         --nvram) NVRAM=$1; shift ;;
+        --minutes) MINUTES=$1; shift ;;
         cpu|netbsd|solaris|solaris-obp|scsi|post|brk|kbd) TESTS+=("$a") ;;
+        net-netbsd|net-solaris|net-solaris-obp|obp-testnet|cd|cd-obp|stress) TESTS+=("$a") ;;
+        all) TESTS+=(cpu scsi brk kbd netbsd solaris net-netbsd net-solaris cd)
+             [ -n "$OBP" ] && TESTS+=(solaris-obp post net-solaris-obp obp-testnet cd-obp) ;;
         *) echo "unknown argument $a" >&2; exit 2 ;;
     esac
 done
-[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] cpu|netbsd|solaris|solaris-obp|scsi|post|brk|kbd..." >&2; exit 2; }
+[ ${#TESTS[@]} -gt 0 ] || { echo "usage: $0 5|20 [--record] [--bios FILE] [--obp FILE] [--nvram NAME] [--minutes N] TEST... (see the header)" >&2; exit 2; }
 case "$REV" in
     SunSparcStation5)  T=ss5-core; EXP=tests/cpu/expected/ss5-core-hw.log; OSIMG=sol8.img ;;
     SunSparcStation20) T=ss20;     EXP=tests/cpu/expected/ss20-core-hw.log; OSIMG=sol8-ss20.img ;;
@@ -153,6 +175,25 @@ for t in "${TESTS[@]}"; do
             log "scsi: FAIL (HD0 unchanged: $same; diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
             FAILED=$((FAILED + 1))
         fi
+        ;;
+    net-netbsd|net-solaris|net-solaris-obp|obp-testnet|cd|cd-obp|stress)
+        case "$t" in
+            net-*|obp-*)  args=(scripts/board/net.sh "${t#net-}") ;;
+            cd)           args=(scripts/board/cd.sh openbios); [ -n "$BIOS" ] && args+=(--rom "$BIOS") ;;
+            cd-obp)       args=(scripts/board/cd.sh obp) ;;
+            stress)       args=(scripts/board/stress.sh --minutes "$MINUTES") ;;
+        esac
+        case "$t" in
+            *obp*) [ -f "$OBP" ] || { log "$t needs --obp FILE (the Sun PROM image)"; exit 2; }
+                   args+=(--obp "$OBP") ;;
+            stress) [ -f "$OBP" ] && args+=(--obp "$OBP") ;;
+        esac
+        args+=(--log "$log")
+        r=$("${args[@]}" 2>&1 | tee "$log.out" | tail -1)
+        case "$r" in
+            PASS*) log "$t: $r" ;;
+            *) log "$t: ${r:-FAIL (no result)}"; FAILED=$((FAILED + 1)) ;;
+        esac
         ;;
     kbd)
         kexp=tests/cpu/expected/${T%-core}-kbd-hw.log
