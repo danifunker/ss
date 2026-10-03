@@ -166,6 +166,15 @@ ARCHITECTURE rtl OF mcu_tw IS
   SIGNAL l2tlb_tw : std_logic;
   
   SIGNAL l2tlb_ipend,l2tlb_dpend : natural RANGE 0 TO 15;
+  -- The sweep of every tag word, after a reset and whenever the L2 TLB is
+  -- enabled (MCNTL bit 6 and the OSD option): the block RAM is not cleared
+  -- by a reset, and while the L2 TLB is off the generation goes on
+  -- counting without the background sweep, so entries of a previous
+  -- session or of an earlier generation could match again (audit CFG-1).
+  -- No hit is served while it runs.
+  SIGNAL l2tlb_init : std_logic;
+  SIGNAL l2tlb_init_cpt : unsigned(NB_L2TLB DOWNTO 0);
+  SIGNAL mmu_cr_l2tlb_mem : std_logic;
 
   SIGNAL l2tlb_icpt,l2tlb_dcpt,l2tlb_cpt : unsigned(NB_L2TLB-1 DOWNTO 0);
   SIGNAL l2tlb_cpt2 : unsigned(NB_L2TLB DOWNTO 0);
@@ -335,6 +344,15 @@ BEGIN
                   ls=>inst_tw2_c.twls,us=>inst_tw2_c.pw.asi(0),va=>inst_tw2_c.va);
             tw_ext.pw.asi<=tw_asi(inst_tw2_c.pw.asi(0),TDI_INST);
             
+          ELSIF l2tlb_init='1' THEN
+            -- The initial sweep: tag word l2tlb_init_cpt invalid (TAG_V=0)
+            l2tlb_wr<='1';
+            l2tlb_a_mem<=l2tlb_init_cpt & '0';
+            l2tlb_init_cpt<=l2tlb_init_cpt+1;
+            IF l2tlb_init_cpt=(l2tlb_init_cpt'range => '1') THEN
+              l2tlb_init<='0';
+            END IF;
+            
           ELSE
             IF l2tlb_ipend/=0 AND l2tlb_idec='0' THEN
               l2tlb_idec<=mmu_cr_l2tlb;
@@ -375,7 +393,8 @@ BEGIN
             IF tww.op=LS
             --  OR (tww.op=PROBE AND tww.va(10 DOWNTO 8)=PT_ENTIRE)
             THEN
-              IF l2tlb_hit_v='1' AND mmu_cr_l2tlb='1' AND l2tlb_tw='0' THEN
+              IF l2tlb_hit_v='1' AND mmu_cr_l2tlb='1' AND l2tlb_tw='0' AND
+                l2tlb_init='0' THEN
                 -- DATA/INST : Le cache L2TLB correspond. Super !
                 tw_st<="11";
                 tw_etat<=sTABLEWALK_L2TLB;
@@ -628,22 +647,38 @@ BEGIN
         l2tlb_inc<='0';
       END IF;
       
+      -- The pending sweep steps saturate: a burst of flushes must not
+      -- wrap them to 0 and lose the steps
       IF l2tlb_inc='1' AND l2tlb_ddec='0' THEN
-        l2tlb_dpend<=l2tlb_dpend+1;
+        IF l2tlb_dpend/=15 THEN
+          l2tlb_dpend<=l2tlb_dpend+1;
+        END IF;
       ELSIF l2tlb_inc='0' AND l2tlb_ddec='1' THEN
         l2tlb_dpend<=l2tlb_dpend-1;
         l2tlb_dcpt<=l2tlb_dcpt+1;
       END IF;
       
       IF l2tlb_inc='1' AND l2tlb_idec='0' THEN
-        l2tlb_ipend<=l2tlb_ipend+1;
+        IF l2tlb_ipend/=15 THEN
+          l2tlb_ipend<=l2tlb_ipend+1;
+        END IF;
       ELSIF l2tlb_inc='0' AND l2tlb_idec='1' THEN
         l2tlb_ipend<=l2tlb_ipend-1;
         l2tlb_icpt<=l2tlb_icpt+1;
       END IF;
       
+      -- The L2 TLB enabled: sweep every tag before any hit is served
+      mmu_cr_l2tlb_mem<=mmu_cr_l2tlb;
+      IF mmu_cr_l2tlb='1' AND mmu_cr_l2tlb_mem='0' THEN
+        l2tlb_init<='1';
+        l2tlb_init_cpt<=(OTHERS => '0');
+      END IF;
+      
       -------------------------------------------------
       IF reset_n='0' THEN
+        l2tlb_init<='1';
+        l2tlb_init_cpt<=(OTHERS => '0');
+        mmu_cr_l2tlb_mem<='0';
         l2tlb_tw<='0';
         l2tlb_ipend<=0;
         l2tlb_dpend<=0;

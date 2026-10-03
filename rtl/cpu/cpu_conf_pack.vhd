@@ -182,6 +182,13 @@ PACKAGE cpu_conf_pack IS
   --   MUST   be enabled  for NetBSD/OpenBSD compatibility
   --   SHOULD be disabled for Linux
   CONSTANT BSD_MODE : boolean := true;
+
+  --------------------------------------------------------------
+  -- The SuperSPARC TLB diagnostic image (ASI 6, 64 entries, in block RAM;
+  -- mcu_multi) on CPUs 0..DIAGTLB_CPUS-1: the Sun POST's TLB tests need it
+  -- on the CPU that runs them. Every CPU drops its TLBs on an ASI 5/6/7
+  -- write regardless.
+  CONSTANT DIAGTLB_CPUS : natural := 1;
   
   --############################################################################
   TYPE type_tech IS RECORD

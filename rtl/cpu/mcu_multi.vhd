@@ -155,10 +155,50 @@ ARCHITECTURE multi OF mcu_mp IS
   ------------------------------------------------------------------------------
   -- DATA
   TYPE enum_data_etat IS (sOISIF,sREGISTRE,sCROSS,sCROSS_DATA,sFLASH,
-                          sWAIT_FLUSH,
+                          sWAIT_FLUSH,sDIAG_FLUSH,
                           sTABLEWALK,sEXT_READ,sWAIT_FILL,sWAIT_FILL2,
                           sWAIT_SHARE);
   SIGNAL data_etat_c,data_etat : enum_data_etat;
+
+  -- The SuperSPARC TLB diagnostic image (ASI 6, MMU-2): the 64 entries the
+  -- Sun POST writes and reads back, in block RAM: SEL0 VA tag [31:12],
+  -- SEL1 context, SEL2 PTE (PPN, C, M, V in bit 5, ACC, the level in bits
+  -- 1:0), SEL3 lock/RBO. It translates nothing. While it holds a valid
+  -- entry (diag_live) an ASI 3 demap sweeps it first, one entry a cycle,
+  -- clearing V where the TLB flush rules match (POST "MMU Flush Tests");
+  -- OSes never write it, so their flushes cost nothing. A write through
+  -- ASI 5/6/7 also drops the real TLBs and, through them, the L2 TLB.
+  CONSTANT DIAGTLB : boolean := CPUID < DIAGTLB_CPUS;
+  TYPE arr_diag0 IS ARRAY(0 TO 63) OF unsigned(31 DOWNTO 12);
+  TYPE arr_diag1 IS ARRAY(0 TO 63) OF uv16;
+  TYPE arr_diag3 IS ARRAY(0 TO 63) OF uv2;
+  SIGNAL diag_s0 : arr_diag0;
+  SIGNAL diag_s1 : arr_diag1;
+  SIGNAL diag_s2 : arr_uv32(0 TO 63);
+  SIGNAL diag_s3 : arr_diag3;
+  ATTRIBUTE ramstyle : string;
+  ATTRIBUTE ramstyle OF diag_s0 : SIGNAL IS "M10K, no_rw_check";
+  ATTRIBUTE ramstyle OF diag_s1 : SIGNAL IS "M10K, no_rw_check";
+  ATTRIBUTE ramstyle OF diag_s2 : SIGNAL IS "M10K, no_rw_check";
+  ATTRIBUTE ramstyle OF diag_s3 : SIGNAL IS "M10K, no_rw_check";
+  -- one read port and one write port each (DiagRam): the sweep reads
+  -- diag_rd while it writes diag_e, the bus reads data_w's entry and
+  -- writes data2_w's
+  SIGNAL diag_ra,diag_wa : unsigned(5 DOWNTO 0);
+  SIGNAL diag_re : std_logic;
+  SIGNAL diag_we : unsigned(0 TO 3);
+  SIGNAL diag_wd2 : uv32;
+  SIGNAL diag_q0 : unsigned(31 DOWNTO 12);  -- the entry read: data_w's,
+  SIGNAL diag_q1 : uv16;                    -- or diag_e's during a sweep
+  SIGNAL diag_q2 : uv32;
+  SIGNAL diag_q3 : uv2;
+  SIGNAL diag_rd : unsigned(6 DOWNTO 0);    -- sweep: the entry being read
+  SIGNAL diag_e  : unsigned(5 DOWNTO 0);    -- sweep: the entry in diag_q*
+  SIGNAL diag_live : std_logic;             -- an entry has V set
+  SIGNAL diag_anyv : std_logic;             -- sweep: V left in an entry
+  SIGNAL diag_wr_c  : std_logic;            -- write a SEL from the bus
+  SIGNAL diag_clr_c : std_logic;            -- sweep: clear V of diag_e
+  SIGNAL dtlb_clr_c : std_logic;            -- every D-TLB entry invalid
 
   -- Contrôles
   SIGNAL data_r_c : type_plomb_r;
@@ -255,6 +295,7 @@ ARCHITECTURE multi OF mcu_mp IS
   SIGNAL itlb_hitv : std_logic;
   SIGNAL itlb_inv_c,itlb_inv : unsigned(0 TO N_ITLB-1);
   SIGNAL itlb_inval_c : std_logic;
+  SIGNAL itlb_clr_c : std_logic;        -- every I-TLB entry invalid
   SIGNAL itlb_maj_c : std_logic;
   SIGNAL itlb_sel_c : std_logic;
   SIGNAL mmu_fault_inst_acc_c : std_logic;
@@ -488,7 +529,8 @@ BEGIN
                      dtlb,dtlb_hitv,dtlb_hit,data_jat,dtlb_mem,
                      ext_dr,ext_dreq_data,inst_dr,
                      tw_done_data,tw_err,tw_pte,dbusy,hitmaj,
-                     cross_ack_c,data_ext_rdy) IS
+                     cross_ack_c,data_ext_rdy,
+                     diag_q0,diag_q1,diag_q2,diag_q3,diag_e,diag_live) IS
     -- MMU
     VARIABLE us_v,ls_v,ls2_v : std_logic;   -- User/Super Load/Store
     VARIABLE c_v,m_v,s_v : std_logic;       -- Cachable Modified Supervisor
@@ -512,6 +554,7 @@ BEGIN
     VARIABLE wthru_v,wback_v : std_logic;
     VARIABLE hist_v : uv8;
     VARIABLE hitv_v,hitm_v,hits_v : std_logic;
+    VARIABLE diag_v : type_tlb;             -- a diagnostic image entry
     
   BEGIN    
     -------------------------------------------------------------
@@ -645,6 +688,9 @@ BEGIN
     dtlb_sel_c<='0';
     dtlb_twm_c<='0';
     dtlb_inval_c<='0';
+    dtlb_clr_c<='0';
+    diag_wr_c<='0';
+    diag_clr_c<='0';
     
     wthru_v:='0';
     wback_v:='0';
@@ -690,8 +736,12 @@ BEGIN
                 dout_v.code:=PB_OK;
               ELSE
                 IF BSD_MODE THEN
-                  data_etat_c<=sCROSS;
                   dtlb_inval_c<='1';
+                  IF DIAGTLB AND ls_v='1' AND diag_live='1' THEN
+                    data_etat_c<=sDIAG_FLUSH; -- the diagnostic image first
+                  ELSE
+                    data_etat_c<=sCROSS;
+                  END IF;
                 ELSE
                   data_ext_c.twop<=PROBE;
                   IF dbusy='0' THEN
@@ -722,10 +772,32 @@ BEGIN
             WHEN ASI_MMU_DIAGNOSTIC_FOR_INSTRUCTION_TLB |
                  ASI_MMU_DIAGNOSTIC_FOR_DATA_TLB |
                  ASI_MMU_DIAGNOSTIC_IO_TLB =>
-              -- Diagnostic, on s'en fout.
-              dreq_v:='1';
-              na_v:='1';
+              -- The SuperSPARC TLB diagnostics (MMU-2). Reads: ASI 6 is
+              -- the image (entry = va[17:12], SEL = va[10:8]; SEL 4-6, the
+              -- PTP caches of the SuperSPARC-II, read 0), ASI 5 and 7 read
+              -- 0. A write goes to the image (ASI 6) and drops the real
+              -- TLBs, the I-TLB through the gateway: a program that loads
+              -- TLB entries by hand must not meet stale translations.
               dout_v.code:=PB_OK;
+              dout_v.d:=x"00000000";
+              IF DIAGTLB AND data2_w.asi=ASI_MMU_DIAGNOSTIC_FOR_DATA_TLB THEN
+                CASE data2_w.a(10 DOWNTO 8) IS
+                  WHEN "000"  => dout_v.d:=diag_q0 & x"000";
+                  WHEN "001"  => dout_v.d:=x"0000" & diag_q1;
+                  WHEN "010"  => dout_v.d:=diag_q2;
+                  WHEN "011"  => dout_v.d:=x"0000000" & "00" & diag_q3;
+                  WHEN OTHERS => NULL;
+                END CASE;
+              END IF;
+              IF ls_v='1' THEN
+                diag_wr_c<='1';
+                dtlb_inval_c<='1';
+                dtlb_clr_c<='1';
+                data_etat_c<=sCROSS;
+              ELSE
+                dreq_v:='1';
+                na_v:='1';
+              END IF;
               
               --------------------------
             WHEN ASI_USER_INSTRUCTION |
@@ -1176,6 +1248,23 @@ BEGIN
         data_etat_c<=sOISIF;
         
         ----------------------------------------------------
+      WHEN sDIAG_FLUSH =>
+        -- The diagnostic image's entry diag_e, read last cycle: the demap
+        -- in data2_w (va, type in bits 10:8) clears its V when the TLB
+        -- flush rules match. The last entry goes on to the flush proper.
+        diag_v:=TLB_ZERO;
+        diag_v.v  :=diag_q2(5);
+        diag_v.va :=diag_q0;
+        diag_v.st :=diag_q2(1 DOWNTO 0);
+        diag_v.ctx:=diag_q1;
+        diag_v.acc:=diag_q2(4 DOWNTO 2);
+        tlb_test(ig_v,tlb_inval_v,diag_v,data2_w.a,'1',mmu_ctxr,'0');
+        diag_clr_c<=tlb_inval_v;
+        IF diag_e=63 THEN
+          data_etat_c<=sCROSS;
+        END IF;
+        
+        ----------------------------------------------------
       WHEN sTABLEWALK =>
         -- Accès vers le contrôleur externe qui va faire le TableWalk
         IF (tw_op/=PROBE OR tw_va(10 DOWNTO 8)=PT_ENTIRE) AND
@@ -1401,10 +1490,38 @@ BEGIN
       
       -- Flush de TLB
       FOR I IN 0 TO N_DTLB-1 LOOP
-        IF dtlb_inv(I)='1' AND dtlb_inval_c='1' THEN
+        IF (dtlb_inv(I)='1' AND dtlb_inval_c='1') OR dtlb_clr_c='1' THEN
           dtlb(I).v<='0';
         END IF;
       END LOOP;
+      
+      -------------------------------------------
+      -- The TLB diagnostic image (ASI 6): the sweep's counters, and the
+      -- image is live while an entry has V set: a sweep that leaves none
+      -- ends it. The RAMs themselves are DiagRam below.
+      IF DIAGTLB THEN
+        IF data_etat_c=sDIAG_FLUSH THEN
+          diag_rd<=diag_rd+1;
+          diag_e<=diag_rd(5 DOWNTO 0);
+        ELSE
+          diag_rd<=(OTHERS => '0');
+        END IF;
+        IF diag_wr_c='1' AND data2_w.a(10 DOWNTO 8)="010" AND data2_w.d(5)='1' THEN
+          diag_live<='1';
+        END IF;
+        IF data_etat/=sDIAG_FLUSH THEN
+          diag_anyv<='0';
+        ELSIF diag_q2(5)='1' AND diag_clr_c='0' THEN
+          diag_anyv<='1';
+        END IF;
+        IF data_etat=sDIAG_FLUSH AND data_etat_c/=sDIAG_FLUSH THEN
+          diag_live<=diag_anyv OR (diag_q2(5) AND NOT diag_clr_c);
+        END IF;
+        IF reset_n='0' THEN
+          diag_live<='0';
+          diag_rd<=(OTHERS => '0');
+        END IF;
+      END IF;
       
       -------------------------------------------
       -- Pipeline accès DATA
@@ -1524,6 +1641,46 @@ BEGIN
   END PROCESS Sync_Data;
   
   dcache_tmux<=dcache_t_dr WHEN dcache_blo_c='1' ELSE dcache_t_mem;
+  
+  -- The TLB diagnostic image's RAMs: read the entry data_w names, with the
+  -- access (like dreg), or the sweep's; write a SEL from the bus, or SEL2
+  -- with V cleared for the sweep
+  diag_ra<=diag_rd(5 DOWNTO 0) WHEN data_etat_c=sDIAG_FLUSH ELSE
+           data_w.a(17 DOWNTO 12);
+  diag_re<='1' WHEN data_etat_c=sDIAG_FLUSH ELSE data_na_c;
+  diag_wa<=diag_e WHEN diag_clr_c='1' ELSE data2_w.a(17 DOWNTO 12);
+  diag_we(0)<=diag_wr_c AND to_std_logic(data2_w.a(10 DOWNTO 8)="000");
+  diag_we(1)<=diag_wr_c AND to_std_logic(data2_w.a(10 DOWNTO 8)="001");
+  diag_we(2)<=(diag_wr_c AND to_std_logic(data2_w.a(10 DOWNTO 8)="010"))
+               OR diag_clr_c;
+  diag_we(3)<=diag_wr_c AND to_std_logic(data2_w.a(10 DOWNTO 8)="011");
+  diag_wd2<=(diag_q2 AND NOT x"00000020") WHEN diag_clr_c='1' ELSE data2_w.d;
+  
+  DiagRam:PROCESS (clk)
+  BEGIN
+    IF rising_edge(clk) THEN
+      IF DIAGTLB THEN
+        IF diag_we(0)='1' THEN
+          diag_s0(to_integer(diag_wa))<=data2_w.d(31 DOWNTO 12);
+        END IF;
+        IF diag_we(1)='1' THEN
+          diag_s1(to_integer(diag_wa))<=data2_w.d(15 DOWNTO 0);
+        END IF;
+        IF diag_we(2)='1' THEN
+          diag_s2(to_integer(diag_wa))<=diag_wd2;
+        END IF;
+        IF diag_we(3)='1' THEN
+          diag_s3(to_integer(diag_wa))<=data2_w.d(1 DOWNTO 0);
+        END IF;
+        IF diag_re='1' THEN
+          diag_q0<=diag_s0(to_integer(diag_ra));
+          diag_q1<=diag_s1(to_integer(diag_ra));
+          diag_q2<=diag_s2(to_integer(diag_ra));
+          diag_q3<=diag_s3(to_integer(diag_ra));
+        END IF;
+      END IF;
+    END IF;
+  END PROCESS DiagRam;
   
   --###############################################################
   -- Interface bus d' Instructions
@@ -1692,6 +1849,7 @@ BEGIN
     itlb_sel_c<='0';
     itlb_twm_c<='0';
     itlb_inval_c<='0';
+    itlb_clr_c<='0';
     
     wthru_v:='0';
     readlru_v:='0';
@@ -1894,6 +2052,19 @@ BEGIN
                 inst_txt<="<Cosmos >";
                 -- Désactivé, accès croisés
               END IF;
+              
+              --------------------------
+            WHEN ASI_MMU_DIAGNOSTIC_FOR_INSTRUCTION_TLB |
+                 ASI_MMU_DIAGNOSTIC_FOR_DATA_TLB |
+                 ASI_MMU_DIAGNOSTIC_IO_TLB =>
+              -- A TLB diagnostic write, through the DATA -> INST gateway:
+              -- every I-TLB entry goes (and the L2 TLB's generation)
+              itlb_inval_c<='1';
+              itlb_clr_c<='1';
+              iout_v.code:=PB_OK;
+              iout_v.cx:=imux2_cx;
+              ireq_v:='1';
+              na_v:='1';
               
               --------------------------
             WHEN ASI_FLASH_CLEAR_INST =>
@@ -2171,7 +2342,7 @@ BEGIN
       
       -- Flush de TLB
       FOR I IN 0 TO N_ITLB-1 LOOP
-        IF itlb_inv(I)='1' AND itlb_inval_c='1' THEN
+        IF (itlb_inv(I)='1' AND itlb_inval_c='1') OR itlb_clr_c='1' THEN
           itlb(I).v<='0';
         END IF;
       END LOOP;
