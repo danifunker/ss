@@ -65,4 +65,10 @@ PASS trap: LDC/STC family -> cp_disabled (0x24), no memory access
 PASS trap: wr %psr with CWP = NWINDOWS -> illegal_instruction
 PASS iu: reserved ASRs read %y, writes do nothing; CASA -> illegal_instruction
 PASS mmu: SS20 ASI 0x4c is a register, not ASI 0x0c; ASI 0x38 holds 64-bit values
-CPUTEST DONE pass=65 fail=0 skip=0
+PASS iu: jmp/rett to a jmpl %g1,%o7 (0, 1, 2, 4, 8 stores before the rett), caches on: %o7 is the jmpl's address
+PASS mmu: SS20 ASI 6 TLB image: 64 entries x SEL0-3 hold the POST's bit patterns
+PASS mmu: SS20 ASI 6 TLB image: ASI 3 demaps (context, region, segment, page, entire) clear V by the flush rules
+PASS mmu: an ASI 6 write drops the TLBs (and the L2 TLB): a changed PTE is seen with no ASI 3 flush
+PASS mmu: the L2 TLB enabled at run time serves no entry of an earlier generation
+PASS mmu: an ASI 3 probe returns the PTE in memory after a change with no flush (L2 TLB on)
+CPUTEST DONE pass=71 fail=0 skip=0
