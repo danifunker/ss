@@ -124,10 +124,11 @@ built from the `sparcstation-enhancements` branch of
 [danifunker/Main_MiSTer](https://github.com/danifunker/Main_MiSTer) until
 its changes are in the official Main. OSD **System → Network**:
 
-- **eth0**: the MiSTer's wired port, shared. The machine appears on your
-  LAN with its own Ethernet address (from the IDPROM, so unique per NVRAM
-  image) and gets an address from your DHCP server like any other host. It
-  cannot talk to the MiSTer itself this way.
+- **eth0** (the default): the MiSTer's wired port, shared. The machine
+  appears on your LAN with its own Ethernet address (from the IDPROM, so
+  unique per NVRAM image) and gets an address from your DHCP server like
+  any other host. It cannot talk to the MiSTer itself this way.
+- **Off**: no network; the LANCE is there but no frame comes or goes.
 - **eth1**: a second (USB) network adapter, given to the machine alone.
 - **macvlan**: a virtual interface on eth0 (`sun0`) with the machine's
   address.

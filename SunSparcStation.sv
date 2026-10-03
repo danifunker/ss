@@ -111,7 +111,7 @@ localparam CONF_STR = {
 `ifdef SS20
     "P2OMN,Memory,464 MB,256 MB,128 MB,64 MB;" ,
 `endif
-    "P2OOQ,Network,Off,eth0,eth1,macvlan,tap0;" ,
+    "P2OOQ,Network,eth0,Off,eth1,macvlan,tap0;" ,
     "P3,Advanced;" ,
     "P3-;" ,
     "P3OG,Cache,On,Off;" ,
@@ -246,6 +246,9 @@ wire cachena   = !status[16];
 wire l2tlbena  = status[17];
 wire wback     = status[18];
 wire aow       = status[19];
+// OSD Network: 0 eth0 (the default), 1 Off, 2 eth1, 3 macvlan, 4 tap0; Main's
+// sun_enet reads the same value. The frame mailbox runs unless it is Off.
+wire eth_ena   = status[26:24] != 3'd1;
 
 wire [7:0] reset_mask_rev = (status[21:20]==0)?8'h26:
                             (status[21:20]==1)?8'h11:
@@ -485,7 +488,7 @@ ss_core
  .ddram3_writedata(eth_wdata),
  .ddram3_byteenable(eth_be),
  .ddram3_write(eth_wr),
- .eth_ena(|status[26:24]),
+ .eth_ena(eth_ena),
  .uart_txd(UART_TXD),
  .uart_rxd(UART_RXD)
 

@@ -20,7 +20,7 @@
 #   aow=off|on               O[19]   SS20 (Advanced)
 #   iommu=26|11|23|30        O[21:20] (Advanced)
 #   memory=464|256|128|64    O[23:22] SS20 (System)
-#   network=off|eth0|eth1|macvlan|tap0 O[26:24] (System; Main's sun_enet)
+#   network=eth0|off|eth1|macvlan|tap0 O[26:24] (System; Main's sun_enet)
 # The disks and the CD are always there (a disk while its image is
 # mounted); O[1] (two disks) and O[5] (CD off) are retired.
 #
@@ -47,7 +47,7 @@ F = {
     "aow":      (19, 1, {"off": 0, "on": 1}),
     "iommu":    (20, 2, {"26": 0, "11": 1, "23": 2, "30": 3}),
     "memory":   (22, 2, {"464": 0, "256": 1, "128": 2, "64": 3}),
-    "network":  (24, 3, {"off": 0, "eth0": 1, "eth1": 2, "macvlan": 3, "tap0": 4}),
+    "network":  (24, 3, {"eth0": 0, "off": 1, "eth1": 2, "macvlan": 3, "tap0": 4}),
 }
 st = 0
 for a in sys.argv[1:]:

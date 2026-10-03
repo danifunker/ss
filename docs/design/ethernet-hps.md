@@ -14,7 +14,7 @@ DMAs through the IOMMU, which the FPGA already does; only the wire is new.
 | `rtl/sun4m/ts_io.vhd`, `ts_core.vhd` | the MAC records (`mac_emi_*`, `mac_rec_*`) are ports now; the RMII MACs (`ts_lance_mac_rmii*`, `_void`) are no longer built |
 | `rtl/mister/eth_hps.vhd` | the MAC: 2 KB transmit and receive buffers, the address filter, and the mailbox (an Avalon master on the DDR3, single beats) |
 | `rtl/mister/ss_core.vhd` | `ddram3_*` (the mailbox master) and `eth_ena` instead of the RMII pins |
-| `SunSparcStation.sv` | a second `ddram_arb` merges the mailbox into the CPU's DDR3 port; OSD System → Network `O[26:24]`: Off, eth0, eth1, macvlan, tap0 |
+| `SunSparcStation.sv` | a second `ddram_arb` merges the mailbox into the CPU's DDR3 port; OSD System → Network `O[26:24]`: eth0 (value 0, the default), Off (1), eth1, macvlan, tap0; the mailbox runs unless the value is 1 (`eth_ena`) |
 | Main `support/sun/sun_enet.cpp` (branch `sparcstation-enhancements`) | the other side: the A2065 module's host network layer (raw socket with the BPF MAC filter, macvlan, tap) |
 | `sim/sim_main.cpp` `--eth`, `--eth-loop` | the mailbox in the DDR model and a stand-in for Main that logs frames and sends them back |
 | `tests/cpu/src/ethtest.S`, `sim/run-eth.sh` | the LANCE through the IOMMU: init, a frame looped back, the filter, a 1514-byte frame, MISS |
