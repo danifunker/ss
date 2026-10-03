@@ -129,7 +129,7 @@ its changes are in the official Main. OSD **System → Network**:
   image) and gets an address from your DHCP server like any other host. It
   cannot talk to the MiSTer itself this way.
 - **eth1**: a second (USB) network adapter, given to the machine alone.
-- **macvlan**: a virtual interface on eth0 (`sparc0`) with the machine's
+- **macvlan**: a virtual interface on eth0 (`sun0`) with the machine's
   address.
 - **tap0**: a tap interface on the MiSTer (routing is up to you; needs a
   kernel with `/dev/net/tun`).

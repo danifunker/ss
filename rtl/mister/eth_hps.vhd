@@ -2,8 +2,8 @@
 -- The LANCE's MAC, bridged to Main through a frame mailbox in DDR3
 --------------------------------------------------------------------------------
 -- The LANCE (ts_lance) keeps its descriptor rings and its DMA through the
--- IOMMU; this is the "wire" behind it. Frames go to Main (support/sparc,
--- sparc_enet.cpp) and come back from it through a mailbox in the DDR3 at
+-- IOMMU; this is the "wire" behind it. Frames go to Main (support/sun,
+-- sun_enet.cpp) and come back from it through a mailbox in the DDR3 at
 -- ARM physical address 0x1FF00000, outside the core's memory (the A2065 and
 -- the NeXT core use the same window; one core runs at a time). Main moves
 -- the frames to a raw socket or a tap interface.

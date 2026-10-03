@@ -563,8 +563,11 @@ shutdown followed by a core reload with the image intact.
   `user_io.cpp:3254-3269`). Keep `sd_blk_cnt ≤ 7`, as the Mac and SGIIndy
   do, so a request stays inside Main's 16 KB slot buffer and its read-ahead.
 - **S6 (CUE/BIN/CHD, CD audio): a Main change is needed**, because stock Main
-  serves a CD slot only as a flat file. Following the upstream pattern (one
-  family directory per core, gated by name, no new UIO opcodes):
+  serves a CD slot only as a flat file. *(Done in session 9 as Main's
+  `support/sun/`: `is_sun_scsi_family()`, `sun_cdrom.cpp` a copy of the
+  data side of `mac_cdrom.cpp`, no CD audio, `support/mac/` untouched.)*
+  Following the upstream pattern (one family directory per core, gated by
+  name, no new UIO opcodes):
   1. `support/sparc/sparc.cpp/.h`: `is_sparc()` on the core name
      `SunSparcStation`, plus mount, unmount and sector-service hooks called
      from `user_io.cpp` next to `mac_mount_hook` / `mac_sd_service` (`:2204`,

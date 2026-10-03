@@ -336,6 +336,10 @@ Differences that matter for SPARC:
   - poll: `mac_poll` (`:3304`), `next_enet_poll` (`:3346`), NeXT RTC refresh (`:3353`)
   - init: `next_enet_stop` and `next_enet_start` (`:1467`, `:1628`)
   - includes: `support.h`
+- **Done (session 9) as `support/sun/`** on `sparcstation-enhancements`: `is_sun_scsi_family()`
+  (prefix match on `"SunSparcStation"`), `sun_mount_hook`/`sun_unmount`/`sun_sd_service`/`sun_poll`
+  (the disks' write buffer, CUE/CHD on the CD) and `sun_enet_*`, with no change to `support/mac/`
+  (user, end of session 8). The plan below is the pre-implementation survey.
 - **A SPARC core would add** *(inference, following #1304/#1327)*:
   - `is_sparc()`: exact match on `"SunSparcStation"`, the shared SS5/SS20 name, or a prefix check
     if the machines get split names.

@@ -20,7 +20,7 @@
 #   aow=off|on               O[19]   SS20 (Advanced)
 #   iommu=26|11|23|30        O[21:20] (Advanced)
 #   memory=464|256|128|64    O[23:22] SS20 (System)
-#   network=off|eth0|eth1|macvlan|tap0 O[26:24] (System; Main's sparc_enet)
+#   network=off|eth0|eth1|macvlan|tap0 O[26:24] (System; Main's sun_enet)
 # The disks and the CD are always there (a disk while its image is
 # mounted); O[1] (two disks) and O[5] (CD off) are retired.
 #

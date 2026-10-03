@@ -744,7 +744,7 @@ BEGIN
   iic3_sda_i<='0';
 
   ----------------------------------------------------------
-  -- Ethernet: the LANCE's MAC is a frame mailbox to Main (sparc_enet)
+  -- Ethernet: the LANCE's MAC is a frame mailbox to Main (sun_enet)
   i_eth_hps: ENTITY work.eth_hps
     GENERIC MAP (
       SYSFREQ => SYSFREQ,
