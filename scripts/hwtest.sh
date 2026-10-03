@@ -104,6 +104,9 @@ G="/media/fat/games/$GAMES_DIR"
 mkdir -p sim/out
 rsh() { ssh "${SSH_OPTS[@]}" "$DEV" "$@"; }
 clean() { tr -d '\r' < "$1" | tr -cd '\11\12\40-\176' | grep -v '^$'; }
+# A test ROM's output from its first line on: the capture starts before the
+# core is reloaded, so the previous machine's last output can precede it
+romlog() { clean "$1" | sed -n '/^CPUTEST /,$p'; }
 
 # Capture ttya for up to $2 seconds into $1 while launching the core; stop
 # early when the log matches $3 (an extended regex).
@@ -142,8 +145,8 @@ for t in "${TESTS[@]}"; do
         sleep 2; stop_capture "$cp"
         rsh "cp /tmp/boot.rom.hwtest $G/boot.rom"
         if [ "$RECORD" = 1 ]; then
-            clean "$log" > "$EXP"; log "cpu: baseline recorded: $(grep 'CPUTEST DONE' "$EXP")"
-        elif diff <(clean "$EXP") <(clean "$log") > "$log.diff"; then
+            romlog "$log" > "$EXP"; log "cpu: baseline recorded: $(grep 'CPUTEST DONE' "$EXP")"
+        elif diff <(romlog "$EXP") <(romlog "$log") > "$log.diff"; then
             log "cpu: PASS, identical to $EXP ($(clean "$log" | grep 'CPUTEST DONE'))"
         else
             log "cpu: FAIL, differs from $EXP (diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
@@ -168,8 +171,8 @@ for t in "${TESTS[@]}"; do
         scripts/setopt.sh console=serial > /dev/null
         same=$( [ "$(rsh "md5sum < $G/scsi-hd0.img" | cut -c1-32)" = "$(md5sum < sim/out/scsi-hd0.img | cut -c1-32)" ] && echo yes || echo no)
         if [ "$RECORD" = 1 ]; then
-            clean "$log" > "$sexp"; log "scsi: baseline recorded: $(grep 'CPUTEST DONE' "$sexp"); HD0 unchanged: $same"
-        elif [ "$same" = yes ] && diff <(clean "$sexp") <(clean "$log") > "$log.diff"; then
+            romlog "$log" > "$sexp"; log "scsi: baseline recorded: $(grep 'CPUTEST DONE' "$sexp"); HD0 unchanged: $same"
+        elif [ "$same" = yes ] && diff <(romlog "$sexp") <(romlog "$log") > "$log.diff"; then
             log "scsi: PASS, identical to $sexp ($(clean "$log" | grep 'CPUTEST DONE'))"
         else
             log "scsi: FAIL (HD0 unchanged: $same; diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
@@ -212,8 +215,8 @@ for t in "${TESTS[@]}"; do
         sleep 2; stop_capture "$cp"
         rsh "cp /tmp/boot.rom.hwtest $G/boot.rom"
         if [ "$RECORD" = 1 ]; then
-            clean "$log" > "$kexp"; log "kbd: baseline recorded: $(grep 'CPUTEST DONE' "$kexp")"
-        elif diff <(clean "$kexp") <(clean "$log") > "$log.diff"; then
+            romlog "$log" > "$kexp"; log "kbd: baseline recorded: $(grep 'CPUTEST DONE' "$kexp")"
+        elif diff <(romlog "$kexp") <(romlog "$log") > "$log.diff"; then
             log "kbd: PASS, identical to $kexp"
         else
             log "kbd: FAIL, differs from $kexp (diff in $log.diff)"
@@ -232,8 +235,8 @@ for t in "${TESTS[@]}"; do
         sleep 2; stop_capture "$cp"
         rsh "cp /tmp/boot.rom.hwtest $G/boot.rom"
         if [ "$RECORD" = 1 ]; then
-            clean "$log" > "$bexp"; log "brk: baseline recorded: $(grep 'CPUTEST DONE' "$bexp")"
-        elif diff <(clean "$bexp") <(clean "$log") > "$log.diff"; then
+            romlog "$log" > "$bexp"; log "brk: baseline recorded: $(grep 'CPUTEST DONE' "$bexp")"
+        elif diff <(romlog "$bexp") <(romlog "$log") > "$log.diff"; then
             log "brk: PASS, identical to $bexp ($(clean "$log" | grep 'CPUTEST DONE'))"
         else
             log "brk: FAIL, differs from $bexp (diff in $log.diff; $(clean "$log" | grep 'CPUTEST DONE' || echo 'no CPUTEST DONE'))"
