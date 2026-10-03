@@ -32,7 +32,9 @@ There is also the OpenBIOS sources with the changes for this core (original repo
 ## Setup
 ### BIOS
 Place this repository's [`bios/boot.rom`](bios/boot.rom) in the
-`games/SunSparcStation` folder, as `boot.rom`. It is OpenBIOS (GPL-2) built
+`games/SunSparcStation` folder, as `boot0.rom` (or `boot.rom`: keep only
+one of the two, since Main sends a `boot.rom` after `boot0.rom` and the
+last one wins). Releases ship it as `releases/boot0.rom`. It is OpenBIOS (GPL-2) built
 from [`bios/`](bios/) (Grabulosaure's
 [ss_openbios](https://github.com/Grabulosaure/ss_openbios) with this core's
 changes) by `scripts/build-bios.sh`; one image serves the SS5 and the SS20.
