@@ -2,13 +2,13 @@
 
 | file | what |
 |---|---|
-| `SunSparcStation20_20261002.rbf` | the SPARCstation 20 core: 3 CPUs at 55 MHz |
+| `SunSparcStation20_20261003.rbf` | the SPARCstation 20 core: 3 CPUs at 55 MHz |
 | `boot0.rom` | OpenBIOS for the core (GPL-2), built from `bios/` (one image for the SS5 and the SS20) |
 | `MiSTer` | the Main binary the core's network and CUE/CHD support need |
 
 ## Installing
 
-1. Copy `SunSparcStation20_20261002.rbf` to `_Computer/` (or wherever your
+1. Copy `SunSparcStation20_20261003.rbf` to `_Computer/` (or wherever your
    cores live) on the MiSTer's SD card.
 2. Copy `boot0.rom` to `games/SunSparcStation/boot0.rom`. Remove any
    `boot.rom` in that folder: Main sends `boot0.rom` first and then a
@@ -27,30 +27,36 @@
 
 See the main [README](../README.md) for the OSD, the NVRAM and the OS notes.
 
-## SunSparcStation20_20261002
+## SunSparcStation20_20261003
 
-- rbf md5 `983e73aef1f7de8240da0afe51eac2d3`; RTL as of `db73f44`
-  (branch `danifunker`; the LANCE's loopback mode in the Ethernet bridge);
-  Quartus 17.0.2 Lite, fit seed 1: 89 % ALMs, every clock met (core
-  +0.455 ns, HDMI +0.019 ns, hold +0.213 ns).
-- `boot0.rom` md5 `1d88d584578ee7440500f562005ef10b` (`f885cf2`, the
+- rbf md5 `fae19dda41fcda0f7ab625efc8b9c4a6`; RTL as of `f99098d`
+  (branch `danifunker`); Quartus 17.0.2 Lite, fit seed 2: 89 % ALMs, every
+  clock met (core +0.017 ns, HDMI +0.289 ns, hold +0.251 ns).
+- `boot0.rom` md5 `9cb810de69b84f26422d3336da8b49dc` (`8db4c3a`, the
   repository's `bios/boot.rom`).
 - `MiSTer` md5 `d94dbef4241eb3aa03a8e9d0ffed21b8` (Main
   `sparcstation-enhancements` at `17224b1`: the core's services in a
   generic `support/sun/`, the Mac code untouched).
 - New since the SparcStation core: the standard MiSTer framework; SCSI disks
   and CD through the MiSTer's Linux side (one target engine, 16 KB
-  requests); Ethernet through the MiSTer's network port; CUE/CHD CDs; the
-  NVRAM saved on the SD card, with its own IDPROM per NVRAM file; an OSD
-  memory size; the official Sun OBP 2.25 boots Solaris on all three CPUs;
-  a much faster OpenBIOS screen console.
-- Tested on the board: the CPU test suite (65/0/0), the SCSI test ROM
-  (6/0/0), NetBSD 11 and Solaris 8 under OpenBIOS, Solaris 8 under the Sun
-  OBP with 3 CPUs, the Sun OBP's `test net`, NetBSD on the LAN (DHCP, pings
-  both ways), NetBSD's install CD as ISO, CHD and CUE (and booted under
-  OpenBIOS with `boot cdrom:d`), the disk write buffer end to end (written
-  data read back after a reboot). On the previous build (`esp-s1`, the same
-  RTL without the LANCE loopback): two disks, the memory option, a blank
-  NVRAM's own IDPROM, CDE on the screen, NetBSD pinging the internet, and
-  74 minutes of a three-CPU Solaris disk stress (find | cksum loops)
-  without a fault.
+  requests); Ethernet through the MiSTer's network port (NetBSD and
+  Solaris); CUE/CHD CDs; the NVRAM saved on the SD card, with its own
+  IDPROM per NVRAM file; an OSD memory size; the official Sun OBP 2.25
+  boots Solaris on all three CPUs; a much faster OpenBIOS screen console.
+- New since 20261002: the LANCE sends frames given to it in several pieces
+  at any byte (Solaris's driver does that: Solaris now works on the
+  network); OpenBIOS starts every CPU with the MMU's L2 TLB bit, so OSD
+  Advanced → L2TLB On speeds Solaris up (boot 344 → 296 s, CPU-bound work
+  ~28 % faster) — it stays Off by default, as NeXTSTEP is not compatible
+  with it.
+- Tested on the board with this build: the CPU test suite (65/0/0), the
+  SCSI test ROM (6/0/0), NetBSD 11 and Solaris 8 under OpenBIOS, Solaris 8
+  under the Sun OBP with 3 CPUs, the Sun OBP's `test net`, Solaris on the
+  LAN (DHCP, pings both ways, TCP transfers both ways checked), NetBSD on
+  the LAN, and a 30-minute three-CPU Solaris disk stress (find | cksum
+  loops) without a fault. With the same Main on the 20261002 build: NetBSD's
+  install CD as ISO, CHD and CUE (and booted under OpenBIOS with `boot
+  cdrom:d`), the disk write buffer end to end, the memory option under
+  the Sun OBP and Solaris, a 35-minute three-CPU stress with the L2 TLB
+  On; earlier: two disks, the memory option under OpenBIOS, a blank
+  NVRAM's own IDPROM, CDE on the screen, NetBSD pinging the internet.
