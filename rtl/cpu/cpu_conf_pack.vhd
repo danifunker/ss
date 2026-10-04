@@ -195,6 +195,14 @@ PACKAGE cpu_conf_pack IS
   -- 0..DIAGCACHE_CPUS-1, for the POST's cache RAM, tag and flash-clear
   -- tests, which run on every CPU too. 48 M10K per CPU.
   CONSTANT DIAGCACHE_CPUS : natural := 4;
+
+  -- Main memory (pa[35:32] = 0) is cached whatever the PTE's C bit says,
+  -- while snooping is on (MCNTL.SE; mcu_multi tlb_mod_f): the Sun OBP
+  -- 2.25 maps everything it gives a client uncacheable on a module
+  -- without an E-cache, so boot loaders ran uncached (PLAN.md E3, A4).
+  -- The caches snoop DMA and the walker's own PTE writes, so OSes that
+  -- keep their page tables uncached on this module type stay coherent.
+  CONSTANT CACHE_FORCE_MEM : boolean := true;
   
   --############################################################################
   TYPE type_tech IS RECORD

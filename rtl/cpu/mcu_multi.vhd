@@ -420,6 +420,7 @@ ARCHITECTURE multi OF mcu_mp IS
   SIGNAL data_tw_rdy   ,inst_tw_rdy    : std_logic;
   
   SIGNAL tlb_mod_c : type_tlb;
+  SIGNAL tlb_mod_f : type_tlb;         -- tlb_mod_c, C forced for main memory
   SIGNAL tw_ext : type_ext;
   SIGNAL tw_ext_req,tw_ext_ack : std_logic;
   
@@ -1557,13 +1558,13 @@ BEGIN
       
       -- MàJ d'un TLB avec le contenu de tlb_mod_c.
       IF dtlb_maj_c='1' AND NOT MMU_DIS THEN
-        dtlb_mem<=tlb_mod_c;
+        dtlb_mem<=tlb_mod_f;
         data_jat<='1';
         IF dtlb_twm='1' THEN
           -- Cas particulier : Modification du bit M, le TLB est déjà chargé
           FOR I IN 0 TO N_DTLB-1 LOOP
             IF dtlb_hitm(I)='1' THEN
-              dtlb(I)<=tlb_mod_c;
+              dtlb(I)<=tlb_mod_f;
             END IF;
           END LOOP;
         ELSE          
@@ -1572,14 +1573,14 @@ BEGIN
             no:=I;
             IF dtlb(I).v='0' THEN
               tlb_trouve:='1';
-              dtlb(I)<=tlb_mod_c;
+              dtlb(I)<=tlb_mod_f;
               hist_maj_v:='1';
             END IF;
           END LOOP;
           IF tlb_trouve='0' THEN
             IF DTLB_MODE=CPT THEN
               -- Mode compteur
-              dtlb(dtlb_cpt)<=tlb_mod_c;
+              dtlb(dtlb_cpt)<=tlb_mod_f;
               IF dtlb_cpt/=N_DTLB-1 THEN
                 dtlb_cpt<=dtlb_cpt+1;
               ELSE
@@ -1588,7 +1589,7 @@ BEGIN
             ELSE
               -- Mode LRU
               no:=lru_old(dtlb_hist,N_DTLB);
-              dtlb(no)<=tlb_mod_c;
+              dtlb(no)<=tlb_mod_f;
               hist_maj_v:='1';
             END IF;
           END IF;
@@ -2498,13 +2499,13 @@ BEGIN
       
       -- MàJ d'un TLB avec le contenu de tlb_mod_c.
       IF itlb_maj_c='1' AND NOT MMU_DIS THEN
-        itlb_mem<=tlb_mod_c;
+        itlb_mem<=tlb_mod_f;
         inst_jat<='1';
         IF itlb_twm='1' THEN
           -- Cas particulier : Modification du bit M, le TLB est déjà chargé
           FOR I IN 0 TO N_ITLB-1 LOOP
             IF itlb_hitm(I)='1' THEN
-              itlb(I)<=tlb_mod_c;
+              itlb(I)<=tlb_mod_f;
             END IF;
           END LOOP;
         ELSE
@@ -2514,14 +2515,14 @@ BEGIN
             no:=I;
             IF itlb(I).v='0' THEN
               tlb_trouve:='1';
-              itlb(I)<=tlb_mod_c;
+              itlb(I)<=tlb_mod_f;
               hist_maj_v:='1';
             END IF;
           END LOOP;
           IF tlb_trouve='0' THEN
             IF ITLB_MODE=CPT THEN
               -- Mode compteur
-              itlb(itlb_cpt)<=tlb_mod_c;
+              itlb(itlb_cpt)<=tlb_mod_f;
               IF itlb_cpt/=N_ITLB-1 THEN
                 itlb_cpt<=itlb_cpt+1;
               ELSE
@@ -2530,7 +2531,7 @@ BEGIN
             ELSE
               -- Mode LRU
               no:=lru_old(itlb_hist,N_ITLB);
-              itlb(no)<=tlb_mod_c;
+              itlb(no)<=tlb_mod_f;
               hist_maj_v:='1';
             END IF;
           END IF;
@@ -2858,6 +2859,30 @@ BEGIN
       clk            => clk);
 
   mmu_l2tlbena <= mmu_cr_l2tlb AND l2tlbena;
+  
+  -- The entry the walker made, with C set for main memory (pa[35:32] = 0)
+  -- while snooping is on (cpu_conf_pack CACHE_FORCE_MEM): the Sun OBP
+  -- 2.25 maps what it gives a client uncacheable on a module without an
+  -- E-cache, which ran boot loaders uncached (PLAN.md E3). With SE the
+  -- D-cache snoops DMA and this CPU's own walker, whose R/M write
+  -- invalidates a cached copy of the PTE (t_cache_force); without it a
+  -- page keeps the PTE's C bit. Probes return the PTE in memory as before.
+  Gen_ForceC: IF CACHE_FORCE_MEM AND CPUTYPE=CPUTYPE_SS GENERATE
+    tlb_mod_f.v  <=tlb_mod_c.v;
+    tlb_mod_f.va <=tlb_mod_c.va;
+    tlb_mod_f.st <=tlb_mod_c.st;
+    tlb_mod_f.ctx<=tlb_mod_c.ctx;
+    tlb_mod_f.acc<=tlb_mod_c.acc;
+    tlb_mod_f.ppn<=tlb_mod_c.ppn;
+    tlb_mod_f.c  <=tlb_mod_c.c OR
+                   (to_std_logic(tlb_mod_c.ppn(35 DOWNTO 32)=x"0") AND mmu_cr_dsnoop);
+    tlb_mod_f.m  <=tlb_mod_c.m;
+    tlb_mod_f.wb <=tlb_mod_c.wb;
+    tlb_mod_f.al <=tlb_mod_c.al;
+  END GENERATE Gen_ForceC;
+  Gen_NoForceC: IF NOT (CACHE_FORCE_MEM AND CPUTYPE=CPUTYPE_SS) GENERATE
+    tlb_mod_f<=tlb_mod_c;
+  END GENERATE Gen_NoForceC;
   
   --###############################################################
   
