@@ -198,3 +198,52 @@ BEGIN(t_fpu_fsr, "fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid")
         and %l0, %l7, %l0
         EXPECT(%l0, 0x00000260, 5)
 END
+
+/* Trapped underflow (TEM.UF): FLT_MIN * FLT_MIN = 2^-252 and DBL_MIN *
+ * DBL_MIN leave nothing of the mantissa after the denormalisation; the
+ * result is tiny all the same: fp_exception (deferred on the core, taken
+ * at the next FP store, which is blocked; precise under QEMU), ftt 1,
+ * cexc UF | NX. This is the Sun POST's "FPU SP/DP Underflow CEXC" tests.
+ * Then untrapped: the result is +0 with cexc and aexc UF | NX. */
+#define UF_TRAP_CASE(fpop, s1, d, fst, code)                            \
+        set 0x0f800000, %o0 ; st %o0, [%g7 + V_SIZE] ;                  \
+        ld [%g7 + V_SIZE], %fsr         /* TEM = all */ ;              \
+        set FTMP, %l0 ; st %g0, [%l0] ; st %g0, [%l0 + 4] ;             \
+        EXPECT_TRAP(TT_FP_EXC) ;                                        \
+        fpop s1, s1, d ; fst d, [%l0] ; nop ;                           \
+        CHECK_TRAPPED(TT_FP_EXC, code) ;                                \
+        std %fq, [%g7 + V_SIZE]         /* leave exception mode */ ;   \
+        st %fsr, [%g7 + V_SIZE] ; ld [%g7 + V_SIZE], %l1 ;              \
+        set FSR_MASK, %l7 ; and %l1, %l7, %l1 ;                         \
+        EXPECT(%l1, 0x0f804005, code + 1) /* TEM, ftt 1, cexc UF|NX */ ;\
+        ld [%l0], %l2 ; EXPECT(%l2, 0, code + 2) /* the store blocked */ ; \
+        ld [%l0 + 4], %l2 ; EXPECT(%l2, 0, code + 3)
+
+BEGIN(t_fpu_underflow, "fpu: FLT_MIN*FLT_MIN, DBL_MIN*DBL_MIN: trapped UF|NX (store blocked), untrapped +0")
+        FPU_OR_SKIP
+        LDF(0x00800000, %f1)            /* FLT_MIN */
+        LDF(0x12345678, %f3)            /* a store that got through shows */
+        LDF(0x00100000, %f4)            /* DBL_MIN */
+        LDF(0x00000000, %f5)
+        LDF(0x12345678, %f6)
+        LDF(0x9abcdef0, %f7)
+        UF_TRAP_CASE(fmuls, %f1, %f3, st, 1)
+        UF_TRAP_CASE(fmuld, %f4, %f6, std, 5)
+        ld [%g7 + V_SKIP], %fsr         /* untrapped */
+        fmuls %f1, %f1, %f3
+        STF(%f3, %l2)
+        EXPECT(%l2, 0, 9)
+        st %fsr, [%g7 + V_SIZE]
+        ld [%g7 + V_SIZE], %l1
+        and %l1, %l7, %l1
+        EXPECT(%l1, 0x000000a5, 10)     /* aexc UF|NX, cexc UF|NX */
+        fmuld %f4, %f4, %f6
+        STF(%f6, %l2)
+        EXPECT(%l2, 0, 11)
+        STF(%f7, %l2)
+        EXPECT(%l2, 0, 12)
+        st %fsr, [%g7 + V_SIZE]
+        ld [%g7 + V_SIZE], %l1
+        and %l1, %l7, %l1
+        EXPECT(%l1, 0x000000a5, 13)
+END

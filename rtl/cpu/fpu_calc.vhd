@@ -669,9 +669,12 @@ BEGIN
             mds_nxf_v:=mds_sticky_v OR mds_fs_man_v(0);
           END IF;
 
+          -- Tiny: denormalised and not an exact zero; a value shifted out
+          -- entirely (FLT_MIN * FLT_MIN) leaves only the sticky bit and is
+          -- an underflow all the same (fpu_pack mds_4)
           mds_udf_v:=to_std_logic(
             mds_expo_v="0000000000001" AND
-            mds_fs_man_v/=ZERO(53 DOWNTO 0) AND
+            (mds_fs_man_v/=ZERO(53 DOWNTO 0) OR mds_sticky_v='1') AND
             mds_fs_man_v(53)='0');
           mds_udf_v:=(mds_udf_v AND mds_nxf_v AND NOT tem(X_UF)) OR
                      (mds_udf_v AND tem(X_UF)); -- Underflow type 'W'

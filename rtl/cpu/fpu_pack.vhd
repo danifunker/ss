@@ -1457,8 +1457,12 @@ PACKAGE BODY fpu_pack IS
       nxf_v:=sticky_v OR fs_man_v(0);
     END IF;
     
-    IF expo_v="0000000000001" AND
-      fs_man_v/=ZERO(53 DOWNTO 0) AND fs_man_v(53)='0' THEN
+    -- Tiny: denormalised, and not an exact zero. A value shifted out of
+    -- the mantissa entirely (FLT_MIN * FLT_MIN) leaves only the sticky
+    -- bit; it is an underflow all the same (the Sun POST's "FPU SP
+    -- Underflow CEXC Test" expects UF | NX with UFM set)
+    IF expo_v="0000000000001" AND fs_man_v(53)='0' AND
+      (fs_man_v/=ZERO(53 DOWNTO 0) OR sticky_v='1') THEN
       udf_v:='1';
     ELSE
       udf_v:='0';
