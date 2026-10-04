@@ -33,6 +33,7 @@ PASS fpu: double precision arithmetic, even/odd pairs
 PASS fpu: fitos/fitod/fstoi/fdtoi/fstod/fdtos
 PASS fpu: fcmps/fcmpd fcc values and FBfcc
 PASS fpu: FSR cexc/aexc on inexact, divide-by-zero, invalid
+PASS fpu: FLT_MIN*FLT_MIN, DBL_MIN*DBL_MIN: trapped UF|NX (store blocked), untrapped +0
 PASS chipset: system control reads 0 after power-on (RS, WD clear)
 PASS chipset: NVRAM IDPROM format 1, machine type, checksum
 PASS chipset: NVRAM byte and word stores read back (restored)
@@ -95,4 +96,7 @@ FAIL mmu: an ASI 6 write drops the TLBs (and the L2 TLB): a changed PTE is seen 
     check 00000002 exp=4c200018 obs=4c200016
 FAIL mmu: the L2 TLB enabled at run time serves no entry of an earlier generation
 PASS mmu: an ASI 3 probe returns the PTE in memory after a change with no flush (L2 TLB on)
-CPUTEST DONE pass=54 fail=11 skip=6
+SKIP cache: SS20 ASI 0x0f/0x0d D and I data images hold every doubleword (4x128x4, 5x64x8)
+SKIP cache: SS20 ASI 0x0e/0x0c PTAGs keep V/D/S or V and PA[35:12], STAGs the MRU and lock bits
+SKIP cache: SS20 flash clears on the image: lock (VA 0x80000000) drops the locks, valid (VA 0) the PTAG V bits and the MRUs
+CPUTEST DONE pass=55 fail=11 skip=9

@@ -23,6 +23,7 @@
 #include "t_dcti.S"
 #include "t_mmu_diag.S"
 #include "t_mmu_l2.S"
+#include "t_cache_diag.S"
 
         .section .testtab, "a", @progbits
         .word 0, 0                      /* end of the test table */

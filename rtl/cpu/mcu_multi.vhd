@@ -155,7 +155,7 @@ ARCHITECTURE multi OF mcu_mp IS
   ------------------------------------------------------------------------------
   -- DATA
   TYPE enum_data_etat IS (sOISIF,sREGISTRE,sCROSS,sCROSS_DATA,sFLASH,
-                          sWAIT_FLUSH,sDIAG_FLUSH,
+                          sWAIT_FLUSH,sDIAG_FLUSH,sCDIAG,sCDIAG_SWEEP,
                           sTABLEWALK,sEXT_READ,sWAIT_FILL,sWAIT_FILL2,
                           sWAIT_SHARE);
   SIGNAL data_etat_c,data_etat : enum_data_etat;
@@ -199,6 +199,94 @@ ARCHITECTURE multi OF mcu_mp IS
   SIGNAL diag_wr_c  : std_logic;            -- write a SEL from the bus
   SIGNAL diag_clr_c : std_logic;            -- sweep: clear V of diag_e
   SIGNAL dtlb_clr_c : std_logic;            -- every D-TLB entry invalid
+
+  -- The SuperSPARC cache diagnostic image (ASI 0x0c-0x0f, audit C-1/C-2):
+  -- the data, PTAG and STAG words the Sun POST writes and reads back
+  -- through the diagnostic ASIs, in block RAM, with the Viking geometry
+  -- (D: 4 ways x 128 sets x 32 bytes, I: 5 ways x 64 sets x 64 bytes) and
+  -- tag layouts (post-tests.md section 3). It is not the cache: the real
+  -- tags and data are untouched, nothing translates or hits through it.
+  --   ASI 0x0f  D data   VA[27:26] way, [11:5] set, [4:2] word -> RAM A
+  --   ASI 0x0d  I data   VA[28:26] way, [11:6] set, [5:2] word -> RAM B 0-4
+  --   ASI 0x0e  D tags   VA[31]: PTAG (way [27:26], set [11:5]) -> RAM B 5,
+  --                      else STAG (set [11:5])                 -> RAM B 7
+  --   ASI 0x0c  I tags   VA[31]: PTAG (way [28:26], set [11:6]) -> RAM B 6,
+  --                      else STAG (set [11:6])                 -> RAM B 7
+  -- RAM B is region(3) & sub(10); a 64-bit entry is two words, VA[2]
+  -- the low one. The bits that read back are masked on the write: a D
+  -- PTAG high word keeps V/D/S (0x01010100), an I PTAG high word its two
+  -- valid bits (0x03000000), the low words PA[35:12] (0x00ffffff); a D
+  -- STAG low word the MRU bits [11:8] and the locks [3:1], an I STAG low
+  -- word MRU [12:8] and locks [4:1]; the STAG high words read 0.
+  -- A flash clear (ASI 0x37 D, 0x36 I; VA[31] = 0: every PTAG high word
+  -- := 0 and the MRU bits; VA[31] = 1: the lock bits), while the image
+  -- holds a bit it would clear (cd_dlive / cd_ilive), first sweeps those
+  -- words (sCDIAG_SWEEP, 1280 cycles: 1024 PTAG words then 256 STAG
+  -- words, read one cycle ahead of the write), then clears the real
+  -- cache as before; a sweep that leaves them all 0 ends the live flag,
+  -- so after the POST the OSes' flash clears cost nothing.
+  CONSTANT DIAGCACHE : boolean := CPUID < DIAGCACHE_CPUS;
+  SIGNAL cd_rama : arr_uv32(0 TO 4095);
+  SIGNAL cd_ramb : arr_uv32(0 TO 8191);
+  ATTRIBUTE ramstyle OF cd_rama : SIGNAL IS "M10K, no_rw_check";
+  ATTRIBUTE ramstyle OF cd_ramb : SIGNAL IS "M10K, no_rw_check";
+  SIGNAL cd_a   : unsigned(13 DOWNTO 0);    -- the access: VA[31], [28:26], [11:2]
+  SIGNAL cd_asi : uv2;                      -- its ASI[1:0]: 1 = D side, 0 = data
+  SIGNAL cd_ia  : unsigned(11 DOWNTO 0);    -- RAM A index
+  SIGNAL cd_ib,cd_wib,cd_wab : unsigned(12 DOWNTO 0); -- RAM B read, read last cycle, write
+  SIGNAL cd_qa,cd_qb : uv32;                -- the words read
+  SIGNAL cd_wea,cd_web : std_logic;
+  SIGNAL cd_wd  : uv32;
+  SIGNAL cd_wr_c : std_logic;               -- a write from the bus
+  SIGNAL cd_cpt : unsigned(10 DOWNTO 0);    -- sweep: the word read
+  SIGNAL cd_wv  : std_logic;                -- sweep: write the word read last cycle
+  SIGNAL cd_wmask : uv32;                   -- sweep: the bits it clears
+  SIGNAL cd_wtag : std_logic;               -- sweep: a word that counts for live
+  SIGNAL cd_dlive,cd_ilive,cd_anynz : std_logic;
+
+  -- The bits a diagnostic write keeps: ASI[1:0], VA[31] (PTAG), VA[2] (low word)
+  FUNCTION cd_wmask_f(asi : uv2; ptag : std_logic; lo : std_logic) RETURN uv32 IS
+  BEGIN
+    IF asi(0)='1' THEN
+      RETURN x"FFFFFFFF";                 -- data
+    ELSIF ptag='1' AND lo='1' THEN
+      RETURN x"00FFFFFF";                 -- PTAG low: PA[35:12]
+    ELSIF ptag='1' AND asi(1)='1' THEN
+      RETURN x"01010100";                 -- D PTAG high: V, D, S
+    ELSIF ptag='1' THEN
+      RETURN x"03000000";                 -- I PTAG high: two valid bits
+    ELSIF lo='0' THEN
+      RETURN x"00000000";                 -- STAG high
+    ELSIF asi(1)='1' THEN
+      RETURN x"00000F0E";                 -- D STAG low: MRU, locks
+    ELSE
+      RETURN x"00001F1E";                 -- I STAG low: MRU, locks
+    END IF;
+  END FUNCTION cd_wmask_f;
+
+  -- The bits a flash clear drops: VA[31] (lock flash), the I side,
+  -- a STAG word (else PTAG), the low word
+  FUNCTION cd_smask_f(lock : std_logic; isi : std_logic;
+                      stag : std_logic; lo : std_logic) RETURN uv32 IS
+  BEGIN
+    IF stag='0' THEN
+      IF lock='0' AND lo='0' THEN
+        RETURN x"FFFFFFFF";               -- PTAG high: valid (D, S)
+      ELSE
+        RETURN x"00000000";
+      END IF;
+    ELSIF lo='0' THEN
+      RETURN x"00000000";
+    ELSIF lock='0' AND isi='1' THEN
+      RETURN x"00001F00";                 -- the MRU bits
+    ELSIF lock='0' THEN
+      RETURN x"00000F00";
+    ELSIF isi='1' THEN
+      RETURN x"0000001E";                 -- the lock bits
+    ELSE
+      RETURN x"0000000E";
+    END IF;
+  END FUNCTION cd_smask_f;
 
   -- Contrôles
   SIGNAL data_r_c : type_plomb_r;
@@ -530,7 +618,8 @@ BEGIN
                      ext_dr,ext_dreq_data,inst_dr,
                      tw_done_data,tw_err,tw_pte,dbusy,hitmaj,
                      cross_ack_c,data_ext_rdy,
-                     diag_q0,diag_q1,diag_q2,diag_q3,diag_e,diag_live) IS
+                     diag_q0,diag_q1,diag_q2,diag_q3,diag_e,diag_live,
+                     cd_qa,cd_qb,cd_asi,cd_cpt,cd_dlive,cd_ilive) IS
     -- MMU
     VARIABLE us_v,ls_v,ls2_v : std_logic;   -- User/Super Load/Store
     VARIABLE c_v,m_v,s_v : std_logic;       -- Cachable Modified Supervisor
@@ -691,6 +780,7 @@ BEGIN
     dtlb_clr_c<='0';
     diag_wr_c<='0';
     diag_clr_c<='0';
+    cd_wr_c<='0';
     
     wthru_v:='0';
     wback_v:='0';
@@ -998,23 +1088,28 @@ BEGIN
               END IF;
               
               --------------------------
-            WHEN ASI_CACHE_TAG_INSTRUCTION =>
-              -- RW cache TAG entry in split Instruction cache
-              data_etat_c<=sCROSS;
-              
-              --------------------------
-            WHEN ASI_CACHE_DATA_INSTRUCTION =>
-              -- RW cache DATA entry in split Instruction cache 
-              dreq_v:='1';
-              na_v:='1';
+            WHEN ASI_CACHE_TAG_INSTRUCTION |
+                 ASI_CACHE_DATA_INSTRUCTION |
+                 ASI_CACHE_TAG_DATA |
+                 ASI_CACHE_DATA_DATA =>
               dout_v.code:=PB_OK;
-              
-              --------------------------
-            WHEN ASI_CACHE_TAG_DATA =>
-              -- RW cache TAG entry in split Data or Combined cache
-              IF ASICACHE THEN
+              IF DIAGCACHE THEN
+                -- The cache diagnostic image: a write is posted (its
+                -- word was indexed with the access), a read waits one
+                -- cycle for the RAM
+                IF ls_v='1' THEN
+                  cd_wr_c<='1';
+                  dreq_v:='1';
+                  na_v:='1';
+                ELSE
+                  data_etat_c<=sCDIAG;
+                END IF;
+              ELSIF data2_w.asi=ASI_CACHE_TAG_INSTRUCTION THEN
+                -- RW cache TAG entry in split Instruction cache
+                data_etat_c<=sCROSS;
+              ELSIF data2_w.asi=ASI_CACHE_TAG_DATA AND ASICACHE THEN
+                -- RW cache TAG entry in split Data or Combined cache
                 dout_v.d:=dcache_t_dr(0);
-                dout_v.code:=PB_OK;
                 IF dbusy='0' THEN
                   -- <AFAIRE> Sélection voie selon adresse...
                   dreq_v:='1';
@@ -1030,17 +1125,10 @@ BEGIN
                   END IF;
                 END IF;
               ELSE
+                -- cache DATA entries: nothing
                 dreq_v:='1';
                 na_v:='1';
-                dout_v.code:=PB_OK;
               END IF;
-              
-              --------------------------
-            WHEN ASI_CACHE_DATA_DATA =>
-              -- RW cache DATA entry in split Data or Combined cache
-              dreq_v:='1';
-              na_v:='1';
-              dout_v.code:=PB_OK;
               
               --------------------------
             WHEN ASI_CACHE_FLUSH_LINE_COMBINED_PAGE |
@@ -1099,9 +1187,14 @@ BEGIN
               --------------------------
             WHEN ASI_FLASH_CLEAR_DATA =>
               -- SuperSPARC D-cache flash clear (a store; VA bit 31 selects
-              -- the lock bits on the real module, the same sweep here)
+              -- the lock bits on the real module, the same sweep here),
+              -- after the diagnostic image's while it holds such bits
               IF ls_v='1' THEN
-                data_etat_c<=sFLASH;
+                IF DIAGCACHE AND cd_dlive='1' THEN
+                  data_etat_c<=sCDIAG_SWEEP;
+                ELSE
+                  data_etat_c<=sFLASH;
+                END IF;
               ELSE
                 dreq_v:='1';
                 na_v:='1';
@@ -1111,9 +1204,14 @@ BEGIN
               --------------------------
             WHEN ASI_FLASH_CLEAR_INST =>
               -- SuperSPARC I-cache flash clear, through the DATA -> INST
-              -- gateway like the I-cache tag ASI
+              -- gateway like the I-cache tag ASI, after the diagnostic
+              -- image's while it holds such bits
               IF ls_v='1' THEN
-                data_etat_c<=sCROSS;
+                IF DIAGCACHE AND cd_ilive='1' THEN
+                  data_etat_c<=sCDIAG_SWEEP;
+                ELSE
+                  data_etat_c<=sCROSS;
+                END IF;
               ELSE
                 dreq_v:='1';
                 na_v:='1';
@@ -1246,6 +1344,31 @@ BEGIN
         dout_v.code:=inst_dr.code;
         dreq_v:='1';
         data_etat_c<=sOISIF;
+        
+        ----------------------------------------------------
+      WHEN sCDIAG =>
+        -- The cache diagnostic image's word, read at the access's index
+        IF cd_asi="11" THEN
+          dout_v.d:=cd_qa;
+        ELSE
+          dout_v.d:=cd_qb;
+        END IF;
+        dout_v.code:=PB_OK;
+        dreq_v:='1';
+        na_v:='1';
+        data_etat_c<=sOISIF;
+        
+      WHEN sCDIAG_SWEEP =>
+        -- The flash clear over the image (the RAM ports are driven below);
+        -- then the real cache's: the D side's tag sweep, the I side's
+        -- through the gateway
+        IF cd_cpt=1279 THEN
+          IF data2_w.asi=ASI_FLASH_CLEAR_DATA THEN
+            data_etat_c<=sFLASH;
+          ELSE
+            data_etat_c<=sCROSS;
+          END IF;
+        END IF;
         
         ----------------------------------------------------
       WHEN sDIAG_FLUSH =>
@@ -1524,6 +1647,56 @@ BEGIN
       END IF;
       
       -------------------------------------------
+      -- The cache diagnostic image: the access's index (with it, like
+      -- dreg), the sweep's counters, and the live flags: set by a tag
+      -- write that leaves a bit a flash clear would drop, recomputed by
+      -- the sweep from what it leaves
+      IF DIAGCACHE THEN
+        IF data_na_c='1' THEN
+          cd_a<=data_w.a(31) & data_w.a(28 DOWNTO 26) & data_w.a(11 DOWNTO 2);
+          cd_asi<=data_w.asi(1 DOWNTO 0);
+        END IF;
+        IF data_etat=sCDIAG_SWEEP THEN
+          cd_cpt<=cd_cpt+1;
+        ELSE
+          cd_cpt<=(OTHERS => '0');
+        END IF;
+        cd_wv<=to_std_logic(data_etat=sCDIAG_SWEEP);
+        cd_wib<=cd_ib;
+        cd_wmask<=cd_smask_f(data2_w.a(31),NOT data2_w.asi(0),
+                             cd_cpt(10),cd_cpt(0));
+        cd_wtag<=NOT (cd_cpt(10) XOR cd_cpt(0)); -- PTAG high, STAG low
+        IF cd_wv='0' THEN
+          cd_anynz<='0';
+        ELSIF cd_wtag='1' AND cd_wd/=x"00000000" THEN
+          cd_anynz<='1';
+        END IF;
+        IF cd_wv='1' AND data_etat/=sCDIAG_SWEEP THEN
+          -- the last word written
+          IF data2_w.asi(0)='1' THEN
+            cd_dlive<=cd_anynz OR (cd_wtag AND to_std_logic(cd_wd/=x"00000000"));
+          ELSE
+            cd_ilive<=cd_anynz OR (cd_wtag AND to_std_logic(cd_wd/=x"00000000"));
+          END IF;
+        END IF;
+        IF cd_wr_c='1' AND cd_asi(0)='0' AND cd_a(13)/=cd_a(0) AND
+          cd_wd/=x"00000000" THEN
+          -- a PTAG high word or a STAG low word written non-zero
+          IF cd_asi(1)='1' THEN
+            cd_dlive<='1';
+          ELSE
+            cd_ilive<='1';
+          END IF;
+        END IF;
+        IF reset_n='0' THEN
+          cd_dlive<='0';
+          cd_ilive<='0';
+          cd_wv<='0';
+          cd_cpt<=(OTHERS => '0');
+        END IF;
+      END IF;
+      
+      -------------------------------------------
       -- Pipeline accès DATA
       IF data_na_c='1' THEN
         -- Si pas de bloquage, au suivant
@@ -1681,6 +1854,46 @@ BEGIN
       END IF;
     END IF;
   END PROCESS DiagRam;
+  
+  -- The cache diagnostic image's RAMs. RAM A: D data. RAM B (region(3) &
+  -- sub(10)): I data ways 0-4 (set(6) & word(4)), 5 D PTAG (way(2) &
+  -- set(7) & VA[2]), 6 I PTAG (way(3) & set(6) & VA[2]), 7 STAGs (D:
+  -- "00" & set(7) & VA[2], I: "010" & set(6) & VA[2]). The sweep reads
+  -- the PTAG region (0x36: I, 0x37: D) then 256 STAG words, and writes
+  -- each word back a cycle later with its bits cleared.
+  cd_ia<=cd_a(11 DOWNTO 10) & cd_a(9 DOWNTO 0);
+  cd_ib<='1' & NOT data2_w.asi(0) & data2_w.asi(0) & cd_cpt(9 DOWNTO 0) WHEN
+             data_etat=sCDIAG_SWEEP AND cd_cpt(10)='0' ELSE        -- PTAGs: 5 D, 6 I
+         "1110" & NOT data2_w.asi(0) & cd_cpt(7 DOWNTO 0) WHEN
+             data_etat=sCDIAG_SWEEP ELSE
+         cd_a(12 DOWNTO 10) & cd_a(9 DOWNTO 0) WHEN cd_asi="01" ELSE -- I data
+         "110" & cd_a(12 DOWNTO 10) & cd_a(9 DOWNTO 4) & cd_a(0) WHEN
+             cd_asi="00" AND cd_a(13)='1' ELSE                   -- I PTAG
+         "111010" & cd_a(9 DOWNTO 4) & cd_a(0) WHEN cd_asi="00" ELSE -- I STAG
+         "101" & cd_a(11 DOWNTO 10) & cd_a(9 DOWNTO 3) & cd_a(0) WHEN
+             cd_a(13)='1' ELSE                                   -- D PTAG
+         "11100" & cd_a(9 DOWNTO 3) & cd_a(0);                   -- D STAG
+  cd_wab<=cd_wib WHEN cd_wv='1' ELSE cd_ib;
+  cd_wd <=(cd_qb AND NOT cd_wmask) WHEN cd_wv='1' ELSE
+          (data2_w.d AND cd_wmask_f(cd_asi,cd_a(13),cd_a(0)));
+  cd_wea<=cd_wr_c AND to_std_logic(cd_asi="11");
+  cd_web<=cd_wv OR (cd_wr_c AND to_std_logic(cd_asi/="11"));
+  
+  CDiagRam:PROCESS (clk)
+  BEGIN
+    IF rising_edge(clk) THEN
+      IF DIAGCACHE THEN
+        IF cd_wea='1' THEN
+          cd_rama(to_integer(cd_ia))<=cd_wd;
+        END IF;
+        cd_qa<=cd_rama(to_integer(cd_ia));
+        IF cd_web='1' THEN
+          cd_ramb(to_integer(cd_wab))<=cd_wd;
+        END IF;
+        cd_qb<=cd_ramb(to_integer(cd_ib));
+      END IF;
+    END IF;
+  END PROCESS CDiagRam;
   
   --###############################################################
   -- Interface bus d' Instructions

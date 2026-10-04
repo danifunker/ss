@@ -185,10 +185,16 @@ PACKAGE cpu_conf_pack IS
 
   --------------------------------------------------------------
   -- The SuperSPARC TLB diagnostic image (ASI 6, 64 entries, in block RAM;
-  -- mcu_multi) on CPUs 0..DIAGTLB_CPUS-1: the Sun POST's TLB tests need it
-  -- on the CPU that runs them. Every CPU drops its TLBs on an ASI 5/6/7
-  -- write regardless.
-  CONSTANT DIAGTLB_CPUS : natural := 1;
+  -- mcu_multi) on CPUs 0..DIAGTLB_CPUS-1: the Sun POST runs its TLB tests
+  -- on every CPU in turn (the master dispatches post_main to each slave).
+  -- Every CPU drops its TLBs on an ASI 5/6/7 write regardless.
+  CONSTANT DIAGTLB_CPUS : natural := 4;
+
+  -- The SuperSPARC cache diagnostic image (ASI 0x0c-0x0f and the flash
+  -- clears 0x36/0x37 on it, in block RAM; mcu_multi) on CPUs
+  -- 0..DIAGCACHE_CPUS-1, for the POST's cache RAM, tag and flash-clear
+  -- tests, which run on every CPU too. 48 M10K per CPU.
+  CONSTANT DIAGCACHE_CPUS : natural := 4;
   
   --############################################################################
   TYPE type_tech IS RECORD
